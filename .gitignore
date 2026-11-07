@@ -1,0 +1,33 @@
+# reference material: contains secrets, never commit
+HackTX template to use/
+
+# deps / build
+node_modules/
+.next/
+dist/
+out/
+coverage/
+*.tsbuildinfo
+spacetimedb/target/
+test-results/
+playwright-report/
+
+# env and secrets (only .env.example is committed)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# media and large artifacts (live in object storage)
+*.mp4
+*.mov
+*.m4v
+*.heic
+tmp/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
