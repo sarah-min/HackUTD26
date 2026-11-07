@@ -1,0 +1,9 @@
+{
+  "docKind": "utility_bill",
+  "fullName": "SAMPLE SPECIMEN",
+  "addressText": "98 OAK AVE, AUSTIN, TX 78701",
+  "isLikelyId": true,
+  "confidence": 0.88,
+  "modelId": "fixture",
+  "promptVersion": "id-document-v1"
+}
