@@ -85,11 +85,10 @@ Commands follow the 2.x CLI. **VERIFY** flags with `spacetime --help`.
 1. Install the `spacetime` CLI, then `spacetime login` (GitHub). Redeem `HACKUTD2026` for Maincloud credit.
 2. `cd spacetimedb && spacetime publish <module-name>` (Maincloud is the default server for logged-in users; **VERIFY**). The publisher identity becomes `admin` via the `init` reducer.
 3. Generate bindings: `spacetime generate --lang typescript --out-dir ../packages/stdb-bindings` (wrapped as `pnpm stdb:generate`). Commit the output (Part 2 only).
-4. Create the **worker** and **seeder** identities: run a tiny script per role that connects anonymously, prints its identity and token, and saves the token. **VERIFY** the token-issuing flow.
-5. As admin: `spacetime call <module> admin_add_service <worker-identity> worker`, and the same for `seeder`.
-6. Set the join code: `spacetime call <module> admin_set_config responder_join_code <code>`.
-7. Put `STDB_SERVICE_TOKEN`, `STDB_SEEDER_TOKEN`, `STDB_URI` and `STDB_MODULE` in `/opt/app/.env`, and `NEXT_PUBLIC_STDB_URI` / `NEXT_PUBLIC_STDB_MODULE` in both the env file and the web build args.
-8. Breaking schema change during the event: Part 2 announces it, runs `spacetime publish --delete-data <module>`, reruns steps 5–6, and reruns the seed.
+4. Create the **worker** identity: run a tiny script that connects anonymously, prints its identity and token, and saves the token. **VERIFY** the token-issuing flow.
+5. As admin: `spacetime call <module> admin_add_service <worker-identity> worker`.
+6. Put `STDB_SERVICE_TOKEN`, `STDB_URI` and `STDB_MODULE` in `/opt/app/.env`, and `NEXT_PUBLIC_STDB_URI` / `NEXT_PUBLIC_STDB_MODULE` in both the env file and the web build args.
+7. Breaking schema change during the event: Part 2 announces it, runs `spacetime publish --delete-data <module>`, and reruns step 5.
 
 **Self-host fallback** (if Maincloud is unavailable): add a `spacetimedb` service to Compose using the official `clockworklabs/spacetime` image (**VERIFY** name and tag) with a persistent volume, publish to it with `spacetime publish -s <local-server>`, and route `wss://<domain>/stdb` through Caddy to it. Update the `STDB_URI` values.
 
@@ -131,7 +130,7 @@ Run it over SSH after every merge to `main`. Record the deployed commit hash in 
 cd /opt/app && git checkout <last-good-sha> && docker compose -f infra/compose.yaml up -d --build
 ```
 
-Keep the last good SHA in `status/part4.md`. Schema rollbacks on SpacetimeDB need a republish of the older module (and probably `--delete-data` plus a reseed), so avoid schema changes after the internal freeze (Sun 10:30 AM).
+Keep the last good SHA in `status/part4.md`. Schema rollbacks on SpacetimeDB need a republish of the older module (and probably `--delete-data`, which wipes existing reports), so avoid schema changes after the internal freeze (Sun 10:30 AM).
 
 ## 11. Teardown and cost ledger
 

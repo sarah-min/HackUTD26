@@ -1,8 +1,8 @@
 # Project Aftermath (working name)
 
-**Film the damage. Get help in the right order. Know how you'll pay for it.**
+**Film the damage. Understand it in a minute. Know how you'll pay for it.**
 
-A person affected by a natural disaster records a short phone video of their home. A Nemotron vision model reads the footage. A Nemotron agent then works through several steps with tools: it identifies damage and life-safety hazards, estimates repair cost, checks disaster declarations and weather alerts, and builds a personal financial recovery plan. All of this is written to a SpacetimeDB backend. A responder dashboard ranks every report in real time, so the most urgent people are reached first and nobody gets missed.
+Anyone at the scene of a natural disaster records a 30–60 second phone video of the damage. A Nemotron vision model reads the footage. A Nemotron agent then works through several steps with tools: it identifies damage and life-safety hazards, estimates repair cost, checks disaster declarations and weather alerts, drafts an insurance claim summary, and builds a financial recovery plan. All of this is written to a SpacetimeDB backend, so the report updates live, step by step, on every device that has it open.
 
 > "Project Aftermath" is a placeholder. The UI must read the product name from `apps/web/lib/brand.ts`, so renaming takes one edit. The domain is also TBD (GoDaddy Registry, code `MLHUTD84`).
 
@@ -26,10 +26,10 @@ A person affected by a natural disaster records a short phone video of their hom
 
 | Sponsor | Challenge | How we answer it |
 |---|---|---|
-| **State Farm** | "The Worst Day, at Scale": find the most urgent needs, coordinate help, make sure no one is overlooked | Real-time triage queue, deterministic urgency score, an "overlooked" lane, live responder assignment |
 | **PNC** | "360° Financial Health Navigator": one clear view of the whole financial picture and the next move | Recovery Navigator: 3+ health indicators, 90-day balance forecast, "what-if" funding simulator, coach |
 | **NVIDIA** | "Use Nemotron Beyond a Chatbot": multi-step workflows, tool integration, real-world use | Nemotron VL over video frames, plus a Nemotron agent loop over 8 tools, with a visible run trace |
-| **Spacetime** | The reactive backend: tables, functions, auth, sync | The whole backend is a SpacetimeDB module. Victim and responder screens are live subscriptions |
+| **Spacetime** | The reactive backend: tables, functions, auth, sync | The whole backend is a SpacetimeDB module. Every screen is a live subscription; one report on two devices updates in lockstep |
+| **State Farm** | "The Worst Day, at Scale" | Anyone at the scene documents damage in a minute; life-safety hazard detection + 911 prompt; auto-drafted claim summary. Weaker fit: no multi-report triage (see IDEA.md) |
 | **Vultr** (MLH) | Best use of Vultr | Web and worker on a Vultr VM; footage on Vultr Object Storage |
 | **GoDaddy Registry** (MLH) | Best domain | Production domain registered via GoDaddy Registry |
 

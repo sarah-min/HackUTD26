@@ -7,7 +7,7 @@ Four people with four LLMs will produce a lot of code quickly. This workflow kee
 | Branch | Purpose |
 |---|---|
 | `main` | Always builds (`pnpm check` green) and is always deployable. Protected: PRs only, no force-push |
-| `partN/<short-topic>` | Your work, e.g. `part3/vl-findings`, `part2/triage-tick`. Short-lived (aim for under 2 hours) |
+| `partN/<short-topic>` | Your work, e.g. `part3/vl-findings`, `part2/job-leases`. Short-lived (aim for under 2 hours) |
 | `demo/freeze` | Cut from `main` at the 10:30 AM freeze. Only critical fixes, cherry-picked |
 
 Don't keep one giant long-lived `partN` branch. Merge small slices often. A branch that is 6 hours old will conflict.

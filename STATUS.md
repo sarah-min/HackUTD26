@@ -4,8 +4,8 @@ This is the index only. **Each part logs progress in its own append-only file**,
 
 | Part | Log | Owner |
 |---|---|---|
-| 1. Reporter App & UX | [status/part1.md](status/part1.md) | unassigned |
-| 2. Realtime Backend & Ops | [status/part2.md](status/part2.md) | unassigned |
+| 1. Capture App & UX | [status/part1.md](status/part1.md) | unassigned |
+| 2. Realtime Backend & Live Report | [status/part2.md](status/part2.md) | unassigned |
 | 3. AI Pipeline (Nemotron) | [status/part3.md](status/part3.md) | unassigned |
 | 4. Recovery Navigator & Infra | [status/part4.md](status/part4.md) | unassigned |
 
@@ -27,11 +27,11 @@ This is the index only. **Each part logs progress in its own append-only file**,
 - [ ] Module on Maincloud + bindings + provider hooks (P2)
 - [ ] Real Nemotron VL call returns a valid FrameFinding (P3)
 - [ ] Presigned upload to Vultr Object Storage; VM serving HTTPS (P4)
-- [ ] **Vertical slice:** upload → worker → findings → assessment visible live on /report/[id] and /ops
-- [ ] Triage + scheduled recompute + claiming
+- [ ] **Vertical slice:** upload → worker → findings → assessment visible live on /report/[id] (phone + second device)
+- [ ] 911 banner + safety guidance + `needs_more_footage` re-shoot flow
 - [ ] Agent tools + trace
 - [ ] Recovery Navigator + what-if
-- [ ] Surge seed + Overlooked lane + map
+- [ ] Coach chat
 - [ ] Initial Devpost submitted (Sat 11 PM)
 - [ ] Demo recorded on `demo/freeze` (Sun 10:30 AM)
 - [ ] Final Devpost submitted (Sun 12 PM)

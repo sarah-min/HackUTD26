@@ -7,13 +7,12 @@ This file is the single source of truth for every interface between the four par
 | Contract area | Doc section | Code location | Owner |
 |---|---|---|---|
 | Conventions, shared enums, report and household | §1, §2 | `packages/contracts/src/common.ts`, `report.ts` | **Part 2** |
-| Vision findings, assessment, cost, agent trace | §3, §7 | `packages/contracts/src/assessment.ts`, `agent.ts` | **Part 3** |
-| Finance: profile, insurance, scenario, plan | §4, §8 | `packages/contracts/src/finance.ts` | **Part 4** |
+| Vision findings, assessment, cost, agent trace | §3, §6 | `packages/contracts/src/assessment.ts`, `agent.ts` | **Part 3** |
+| Finance: profile, insurance, scenario, plan | §4, §7 | `packages/contracts/src/finance.ts` | **Part 4** |
 | SpacetimeDB tables and reducers | §5 | `spacetimedb/**` (+ generated `packages/stdb-bindings/**`) | **Part 2** |
-| Triage formula | §6 | `spacetimedb/src/triage.ts` | **Part 2** |
-| HTTP routes | §9 | `apps/web/app/api/**` | **Part 4** |
-| Worker job and tool interface | §10 | `packages/agent/src/tools/types.ts`, `apps/worker/src/handlers/types.ts` | **Part 3** |
-| Env vars | §11 | `.env.example` | **Part 4** |
+| HTTP routes | §8 | `apps/web/app/api/**` | **Part 4** |
+| Worker job and tool interface | §9 | `packages/agent/src/tools/types.ts`, `apps/worker/src/handlers/types.ts` | **Part 3** |
+| Env vars | §10 | `.env.example` | **Part 4** |
 
 `packages/contracts/src/index.ts` is written once at scaffold time (Part 2) as `export * from './common'; export * from './report'; export * from './assessment'; export * from './agent'; export * from './finance';`. It never needs to change, so it never conflicts.
 
@@ -45,15 +44,13 @@ export const LifeSafetyFlagSchema = z.enum([
   'road_blocked'                                                           // access
 ]);
 export const VulnerabilitySchema = z.enum(['elderly','child_under_5','disability','medical_device','no_transport','pets','limited_english']);
-export const ReportStatusSchema = z.enum(['draft','queued','processing','assessed','needs_review','failed']);
-export const TierSchema = z.enum(['P1','P2','P3','P4']); // P1 immediate, P2 urgent, P3 standard, P4 low
-export const AssignmentStatusSchema = z.enum(['unassigned','claimed','en_route','contacted','resolved']);
+export const ReportStatusSchema = z.enum(['draft','queued','processing','assessed','needs_more_footage','failed']);
 export const SourceSchema = z.enum(['live','synthetic','fixture']);
 
 export const HouseholdSchema = z.object({
   peopleCount: z.number().int().min(1).max(20),
-  vulnerabilities: z.array(VulnerabilitySchema),
-  selfReportedDanger: z.boolean(),             // "Are you in danger right now?"
+  vulnerabilities: z.array(VulnerabilitySchema),  // tailors safety guidance
+  selfReportedDanger: z.boolean(),             // "Is anyone in danger right now?" → 911 banner
   homeSqft: z.number().int().min(200).max(10000).default(1800),
   stories: z.number().int().min(1).max(4).default(1),
   tenure: z.enum(['own','rent']),
@@ -258,74 +255,40 @@ Below are logical definitions. Part 2 translates them into the current TS module
 
 | Table | Vis. | Columns (pk first) | Notes |
 |---|---|---|---|
-| `report` | public | `id u64 pk autoInc`, `owner Identity`, `created_at`, `updated_at`, `status`, `hazard`, `lat_coarse f64`, `lng_coarse f64` (2 dp), `people_count u8`, `vulnerabilities string` (csv of enum), `self_danger bool`, `insured bool`, `tenure`, `overall_level` (default `none`), `triage_score u8`, `tier`, `assignment_status`, `assigned_to Identity?`, `assigned_name string?`, `usable_frames u8`, `needs_review_reason string?`, `source` | Everything the ops board needs to rank, filter and map. No PII |
-| `report_private` | private | `report_id pk`, `owner`, `address_text`, `lat f64`, `lng f64`, `contact_name?`, `contact_phone?`, `household_json`, `insurance_json`, `persona_id`, `owner_secret string` | Visible to owner. Address and contact visible to assigned responder |
-| `media_asset` | private | `id pk autoInc`, `report_id` (index), `kind 'video'|'image'`, `object_key`, `content_type`, `size_bytes u64`, `sha256`, `uploaded_at` | Owner and responders |
-| `frame` | private | `id pk autoInc`, `report_id` (index), `frame_index u8`, `t_sec f32`, `thumb_key`, `finding_json` (FrameFinding) | Owner and responders |
-| `assessment` | private | `report_id pk`, `json` (DamageAssessment), `created_at` | Owner and responders |
-| `triage` | public | `report_id pk`, `score u8`, `tier`, `reasons_json` (TriageReason[]), `score_version`, `computed_at` | Reasons contain no PII |
-| `recovery_plan` | private | `report_id pk`, `json` (RecoveryPlan), `created_at` | **Owner only** (responders never see finances) |
-| `agent_step` | private | `id pk autoInc`, `report_id` (index), `seq u16`, `kind`, `name`, `summary`, `visibility`, `duration_ms u32?`, `at` | Owner sees all. Responders see `visibility='public'` |
+| `report` | public | `id u64 pk autoInc`, `owner Identity`, `created_at`, `updated_at`, `status`, `hazard`, `self_danger bool`, `life_safety_csv string`, `overall_level` (default `none`), `usable_frames u8`, `total_frames u8`, `status_reason string?`, `source` | Drives the live status timeline. No PII, no location, no finances |
+| `report_private` | private | `report_id pk`, `owner`, `address_text`, `lat f64`, `lng f64`, `contact_name?`, `contact_phone?`, `household_json`, `insurance_json`, `persona_id`, `owner_secret string` | Owner only |
+| `media_asset` | private | `id pk autoInc`, `report_id` (index), `kind 'video'|'image'`, `object_key`, `content_type`, `size_bytes u64`, `sha256`, `uploaded_at` | Owner only |
+| `frame` | private | `id pk autoInc`, `report_id` (index), `frame_index u8`, `t_sec f32`, `thumb_key`, `finding_json` (FrameFinding) | Owner only |
+| `assessment` | private | `report_id pk`, `json` (DamageAssessment), `created_at` | Owner only |
+| `recovery_plan` | private | `report_id pk`, `json` (RecoveryPlan), `created_at` | Owner only |
+| `agent_step` | private | `id pk autoInc`, `report_id` (index), `seq u16`, `kind`, `name`, `summary`, `visibility`, `duration_ms u32?`, `at` | Owner only. `visibility='owner'` steps are also redacted from logs |
 | `coach_message` | private | `id pk autoInc`, `report_id` (index), `role`, `text`, `at` | Owner only |
 | `job` | private | `id pk autoInc`, `kind 'analyze'|'coach'`, `report_id`, `payload_json`, `state 'queued'|'leased'|'done'|'failed'`, `attempts u8`, `lease_owner Identity?`, `lease_expires_at?`, `last_error?`, `created_at` | Service only |
-| `responder` | public | `identity pk`, `display_name`, `org string`, `active bool`, `joined_at` | |
-| `assignment_event` | public | `id pk autoInc`, `report_id` (index), `actor Identity`, `actor_name`, `action` (AssignmentStatus or `released`), `note?`, `at` | Audit trail shown on ops detail |
-| `service_identity` | private | `identity pk`, `role 'admin'|'worker'|'seeder'` | |
-| `config` | private | `key pk`, `value` | e.g. `responder_join_code` |
-| `triage_tick` | scheduled | `scheduled_id pk autoInc`, `scheduled_at` (interval 60 s) → `recompute_triage` | Wait-time bump |
+| `service_identity` | private | `identity pk`, `role 'admin'|'worker'` | |
 | `lease_tick` | scheduled | (interval 30 s) → `requeue_expired_jobs` | |
 
-**Visibility VERIFY (hour 1):** document here which mechanism grants the owner and responders read access to the private rows above (views / RLS / filters), or note that the HTTP fallback in §9 is in use.
+**Visibility VERIFY (hour 1):** document here which mechanism grants the owning identity read access to its private rows above (views / RLS / filters), or note that the HTTP fallback in §8 is in use.
 
 ### 5.2 Reducers
 
 | Reducer | Caller | Args | Effect / checks |
 |---|---|---|---|
-| `init` | system | — | Inserts the publisher into `service_identity(admin)`. Schedules `triage_tick` and `lease_tick` |
+| `init` | system | — | Inserts the publisher into `service_identity(admin)`. Schedules `lease_tick` |
 | `admin_add_service` | admin | `identity, role` | |
-| `admin_set_config` | admin | `key, value` | |
-| `register_responder` | anyone | `display_name, org, join_code` | `join_code == config.responder_join_code`, else error |
-| `create_report` | anyone | `CreateReportInput` as JSON string | Validates (light checks in module; full Zod in web). Inserts `report` (status `draft`, coarse coords, `source='live'`) and `report_private` (random `owner_secret`) |
-| `attach_media` | owner | `report_id, kind, object_key, content_type, size_bytes, sha256` | Status must be `draft`. Max 8 images or 1 video |
-| `submit_report` | owner | `report_id` | Needs ≥1 media. Status → `queued`. Inserts `job(analyze)`. Computes preliminary triage (self-danger, vulnerabilities, wait) |
+| `create_report` | anyone | `CreateReportInput` as JSON string | Validates (light checks in module; full Zod in web). Inserts `report` (status `draft`, `source='live'`) and `report_private` (random `owner_secret`) |
+| `attach_media` | owner | `report_id, kind, object_key, content_type, size_bytes, sha256` | Status must be `draft` or `needs_more_footage`. Max 8 images or 1 video |
+| `submit_report` | owner | `report_id` | Needs ≥1 media. Allowed from `draft`, `needs_more_footage` or `failed` (resubmit). Status → `queued`. Inserts `job(analyze)` |
 | `claim_job` | service | `job_id, lease_ms` | Only if `state='queued'` or the lease has expired. Sets lease. Report → `processing` |
 | `record_frame` | service | `report_id, frame_index, t_sec, thumb_key, finding_json` | Upsert by (report_id, frame_index) |
 | `record_agent_step` | service | `report_id, seq, kind, name, summary, visibility, duration_ms?` | |
-| `record_assessment` | service | `report_id, json, overall_level, usable_frames, life_safety_csv, confidence` | Stores the assessment. Updates `report.overall_level`. Status → `assessed`, or `needs_review` if `usable_frames*2 < total` or `confidence < 0.5`. Recomputes triage |
+| `record_assessment` | service | `report_id, json, overall_level, usable_frames, life_safety_csv, confidence` | Stores the assessment. Updates `report.overall_level`. Status → `needs_more_footage` if `usable_frames*2 < total`, else `assessed` (low confidence is a label, not a status) |
 | `record_recovery_plan` | service | `report_id, json` | |
-| `complete_job` | service | `job_id, ok, error?` | `ok` → done. Else attempts++ → requeue if < 2, else `failed` and report → `needs_review` with a reason |
-| `claim_report` | responder | `report_id` | Only if `assignment_status ∈ {unassigned}`. Sets `claimed`, `assigned_to`. Inserts event. Error text `"Already claimed by <name>"` |
-| `update_assignment` | assigned responder | `report_id, status, note?` | `en_route` / `contacted` / `resolved` |
-| `release_report` | assigned responder | `report_id, note?` | Back to `unassigned` (wait clock keeps the original `created_at`) |
-| `review_report` | responder | `report_id, overall_level, note` | Manual assessment for the `needs_review` lane. Sets status `assessed`, `source` unchanged |
+| `complete_job` | service | `job_id, ok, error?` | `ok` → done. Else attempts++ → requeue if < 2, else `failed` and report → `failed` with `status_reason` (page offers "Try again") |
 | `ask_coach` | owner | `report_id, text` | Inserts `coach_message(user)` + `job(coach)`. Rate limit: 1 pending coach job per report |
 | `record_coach_reply` | service | `report_id, text` | |
-| `seed_report` | seeder | full synthetic report + assessment JSON + triage inputs | `source='synthetic'`. Used by `scripts/seed-surge.ts` |
-| `recompute_triage` | scheduled | — | For all unresolved reports, recompute the score (wait-time component) |
 | `requeue_expired_jobs` | scheduled | — | |
 
-## 6. Triage formula (Part 2: `spacetimedb/src/triage.ts`, `scoreVersion = "triage-v1"`)
-
-Pure function: `computeTriage(input) → { score: 0..100, tier, reasons: {code, points, text}[] }`.
-
-```text
-lifeSafetyPts (cap 60):
-  severe flag   (person_trapped | injury_visible | active_fire | gas_leak_suspected)      → 50 for the first, +5 per additional
-  serious flag  (structural_collapse | downed_power_line | standing_water_interior)        → 30 for the first, +5 per additional
-  access flag   (road_blocked)                                                              → 10
-  use the highest category as the base, add +5 for each other flag; only flags with confidence ≥ 0.5
-selfDanger = true → score forced to max(score, 75) and reason "Resident reports immediate danger"
-damagePts: destroyed 25 | major 18 | minor 8 | affected 3 | none 0  (overall_level)
-vulnerabilityPts: 6 per distinct vulnerability, cap 18 (pets counts 2, not 6)
-exposurePts: uninsured +5; peopleCount ≥ 5 +3
-waitPts: +1 per full 10 minutes since submitted while assignment_status = 'unassigned', cap 15
-score = min(100, sum)
-tier: score ≥ 70 → P1 | 45–69 → P2 | 20–44 → P3 | < 20 → P4
-```
-
-**Overlooked lane** (computed client-side on `/ops` from public tables): unassigned and (`waited ≥ 30 min`, or `status ∈ {needs_review, failed}`, or (`tier ∈ {P1,P2}` and `waited ≥ 10 min`)).
-
-## 7. Repair cost model (Part 3: `packages/damage`, `costModelVersion = "cost-v1"`)
+## 6. Repair cost model (Part 3: `packages/damage`, `costModelVersion = "cost-v1"`)
 
 All values are **illustrative defaults** and labeled as such in the UI. They're configurable in `packages/damage/src/costTable.ts`. If a citable public figure is found, cite it in SOURCES.md.
 
@@ -339,10 +302,10 @@ vehicle  (fixed): affected 50000 | minor 250000 | major 1200000 | destroyed 2500
 likelyCents(component) = round(structureValue × share × fraction)
 likely = Σ components (structure capped at structureValue) + contents + vehicle
 low = round(likely × 0.70); high = round(likely × 1.40)
-renters (tenure='rent'): structure components excluded from the resident's cost (landlord), with a note; contents + vehicle kept
+renters (tenure='rent'): structure components excluded from the renter's cost (landlord), with a note; contents + vehicle kept
 ```
 
-## 8. Finance formulas (Part 4: `packages/finance`)
+## 7. Finance formulas (Part 4: `packages/finance`)
 
 ```text
 liquid = Σ checking + Σ savings
@@ -391,18 +354,18 @@ All arithmetic is integer cents with Math.round at each multiplication. Never ac
 
 `simulate(profile, assessment, insurance, scenario) → { forecast, indicators, gapCents, firstShortfallDay, totalCostOfFundsCents }` is pure, runs in the browser, and finishes in < 20 ms.
 
-## 9. HTTP API (Part 4 unless noted)
+## 8. HTTP API (Part 4 unless noted)
 
 | Method + path | Auth | Request | Response |
 |---|---|---|---|
 | `POST /api/uploads/presign` | `reportId` + `ownerSecret` header `x-owner-secret` | `{ reportId, contentType: 'video/mp4'|'video/quicktime'|'image/jpeg'|'image/png'|'image/webp', sizeBytes, sha256 }` | `{ putUrl, objectKey, expiresAt }`. Rejects > 200 MB video / 15 MB image |
-| `GET /api/media/[...key]` | owner secret, or responder token (VERIFY approach with Part 2) | — | 302 to a presigned GET (10 min) |
+| `GET /api/media/[...key]` | owner secret (`x-owner-secret`), or the owner-view approach Part 2 picks | — | 302 to a presigned GET (10 min) |
 | `GET /api/health` | none | — | `{ ok, web: true, stdb: bool, storage: bool, version }` |
 | `GET /api/reports/[id]/private` | `x-owner-secret` | — | **Only if the §5 visibility fallback is chosen** (owned by Part 2) |
 
 Object keys: `media/<reportId>/<sha256>.<ext>`, `frames/<reportId>/<frameIndex>.jpg`.
 
-## 10. Worker interfaces (Part 3)
+## 9. Worker interfaces (Part 3)
 
 ```ts
 // apps/worker/src/handlers/types.ts
@@ -443,7 +406,7 @@ export function getPersona(id: string): FinancialProfile;
 export const PERSONAS: FinancialProfile[];
 ```
 
-## 11. Environment variables (`.env.example`, Part 4)
+## 10. Environment variables (`.env.example`, Part 4)
 
 | Name | Used by | Example / note |
 |---|---|---|
@@ -453,8 +416,6 @@ export const PERSONAS: FinancialProfile[];
 | `NEXT_PUBLIC_STDB_MODULE` | web | module/database name |
 | `STDB_URI`, `STDB_MODULE` | worker, scripts | same values |
 | `STDB_SERVICE_TOKEN` | worker | token of the worker identity (**secret**) |
-| `STDB_SEEDER_TOKEN` | scripts | seeder identity token (**secret**) |
-| `RESPONDER_JOIN_CODE` | admin script | set into `config` via `admin_set_config` |
 | `NVIDIA_API_KEY` | worker | **secret** |
 | `NVIDIA_BASE_URL` | worker | `https://integrate.api.nvidia.com/v1` |
 | `NEMOTRON_VL_MODEL` | worker | `nvidia/nemotron-nano-12b-v2-vl` (VERIFY) |
@@ -466,7 +427,7 @@ export const PERSONAS: FinancialProfile[];
 | `VL_CONCURRENCY` | worker | `4` |
 | `USE_FIXTURES` | worker | `false`; `true` = return labeled fixture model output (dev only) |
 
-## 12. Fixtures
+## 11. Fixtures
 
 - Location: `fixtures/<domain>/*.json`, owned by the domain owner (`fixtures/report` P2, `fixtures/assessment` P3, `fixtures/finance` P4).
 - Every fixture validates against its schema in a unit test, and has `source: "fixture"`.

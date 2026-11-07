@@ -18,6 +18,8 @@ Source: `HackTX template to use/Public HackUTD Opening Ceremony Slides.pdf` (loc
 
 Not found in the slides: any limit on the number of tracks a team may select. **VERIFY** in the Hackerpack/Discord.
 
+**How honestly we fit State Farm (p57):** we no longer do multi-report triage or coordination dashboards. Our fit rests on (1) letting anyone at the scene document damage in about a minute, (2) automatic life-safety hazard detection with a 911 prompt, and (3) an auto-drafted first-notice-of-loss claim summary. This is weak on "identify those with the most urgent needs" across thousands of people and on "coordinate assistance"; don't claim those parts.
+
 ## NVIDIA / Nemotron
 
 | Item | Source | Status |
@@ -38,8 +40,8 @@ Not found in the slides: any limit on the number of tracks a team may select. **
 | Reducers | https://spacetimedb.com/docs/functions/reducers | Reducers have full read-write access to all tables (public and private) via `ReducerContext` |
 | Chat app tutorial | https://spacetimedb.com/docs/tutorials/chat-app | `schema({ user, message })` pattern; `ctx.db.<table>` accessors |
 | **API style caveat** | — | The current 2.x style imports from `spacetimedb/server` and uses `schema` / `table` / `t` builders. Older 1.x examples (`import { spacetimedb, table, t } from 'spacetimedb'`, `table({ name, public })`) are outdated, so ignore them. **VERIFY** against the docs for the installed CLI version |
-| Per-identity visibility (views / RLS) | docs | **VERIFY** (Part 2, hour 1); see ARCHITECTURE §5 |
-| Scheduled reducers | docs | **VERIFY** the syntax for `triage_tick` / `lease_tick` |
+| Per-identity visibility (views / RLS) | docs | **VERIFY** (Part 2, hour 1): how the report owner reads private rows; see ARCHITECTURE §5 |
+| Scheduled reducers | docs | **VERIFY** the syntax for `lease_tick` (job lease requeue) |
 | Maincloud credit | Slide p49 | Code `HACKUTD2026`, one per GitHub account |
 
 ## Public data APIs (free, no key)
@@ -60,7 +62,6 @@ Not found in the slides: any limit on the number of tracks a team may select. **
 | Vultr Object Storage (S3-compatible) | https://docs.vultr.com/products/cloud-storage/object-storage | Works with `@aws-sdk/client-s3`. **VERIFY** the endpoint hostname for the chosen region and CORS support |
 | GoDaddy Registry domain | mlh.link/godaddyregistry, code `MLHUTD84` | **VERIFY** which TLDs the code covers |
 | Caddy automatic HTTPS | https://caddyserver.com/docs/automatic-https | Needs ports 80/443 open and the A record live |
-| OpenStreetMap tiles | https://operations.osmfoundation.org/policies/tiles/ | Fine for low demo traffic; attribution required |
 
 ## Media (demo footage)
 
