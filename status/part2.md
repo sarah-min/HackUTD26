@@ -1,4 +1,4 @@
-# Part 2: Realtime Backend & Live Report: status log
+# Part 2: Backend & Affected View: status log
 
 Owner: unassigned. Append-only, newest entry first. Format is in [STATUS.md](../STATUS.md). Only this part's owner (and their LLM) edits this file.
 

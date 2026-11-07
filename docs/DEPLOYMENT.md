@@ -77,6 +77,17 @@ Set `APP_DOMAIN` in `.env`. Until DNS is live, use the VM IP over plain HTTP for
 ```
 
 4. Presigned URLs expire after 10 minutes. The bucket is never public.
+5. **ID-document images (`idv/` prefix).** The worker deletes each `idv/<verificationId>/…` object immediately after extraction. As a backstop, add a bucket **lifecycle rule that expires everything under `idv/` after 1 day** (via `aws s3api put-bucket-lifecycle-configuration --endpoint-url $S3_ENDPOINT`, or the provider UI; **VERIFY** that Vultr supports lifecycle rules, and if it doesn't, run a small daily cleanup job from the worker instead):
+
+```json
+{
+  "Rules": [
+    { "ID": "expire-idv", "Filter": { "Prefix": "idv/" }, "Status": "Enabled", "Expiration": { "Days": 1 } }
+  ]
+}
+```
+
+   `/api/media` never serves `idv/` keys. Never back up or copy the `idv/` prefix.
 
 ## 5. SpacetimeDB (Maincloud). Part 2 runs the publish; Part 4 wires the env
 
@@ -103,6 +114,7 @@ Commands follow the 2.x CLI. **VERIFY** flags with `spacetime --help`.
 
 - Path: `/opt/app/.env`, then `chmod 600 /opt/app/.env`. It's owned by the deploy user and never committed.
 - Start from `.env.example`. Real values come from the team password manager or a DM, never from git or Discord channels.
+- Variables added for the two-view design: `NOMINATIM_USER_AGENT` (a generic app name, not a personal email), `CENSUS_GEOCODER_BENCHMARK` (default `Public_AR_Current`) and `IDV_MAX_ATTEMPTS_PER_HOUR` (default `3`).
 
 ## 8. Deploy flow (`infra/deploy.sh`)
 
@@ -122,7 +134,7 @@ Run it over SSH after every merge to `main`. Record the deployed commit hash in 
 
 - `GET /api/health`: web, SpacetimeDB and storage reachability.
 - `docker compose -f infra/compose.yaml logs -f web worker`
-- The worker logs each job: claim → frames → VL → agent → complete, with durations.
+- The worker logs each job: claim → frames → VL → agent → complete, with durations. For `verify_identity` it logs only the verification ID, outcome and fail reason, never names, addresses or image contents.
 
 ## 10. Rollback
 

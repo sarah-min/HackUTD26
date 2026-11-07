@@ -2,19 +2,24 @@
 
 This file is the single source of truth for every interface between the four parts. Implement it exactly. If the live provider forces a change, the domain owner updates this file **in the same PR** as the code and posts in team chat.
 
+Two kinds of people use the product (see IDEA.md): the **reporter** (anyone who submits footage) and the **affected person** (a verified resident of the property). Both are anonymous SpacetimeDB identities; their roles are derived from data (§5).
+
 ## 0. Who owns which contract, and how to change it
 
 | Contract area | Doc section | Code location | Owner |
 |---|---|---|---|
-| Conventions, shared enums, report and household | §1, §2 | `packages/contracts/src/common.ts`, `report.ts` | **Part 2** |
-| Vision findings, assessment, cost, agent trace | §3, §6 | `packages/contracts/src/assessment.ts`, `agent.ts` | **Part 3** |
-| Finance: profile, insurance, scenario, plan | §4, §7 | `packages/contracts/src/finance.ts` | **Part 4** |
+| Conventions, shared enums, report input | §1, §2.1, §2.2 | `packages/contracts/src/common.ts`, `report.ts` | **Part 2** |
+| Property, normalized address, area cells, address rules | §2.3 | `packages/contracts/src/property.ts`, `packages/address/**` | **Part 2** |
+| Vision findings, assessment, agent trace | §3.1, §3.2 | `packages/contracts/src/assessment.ts`, `agent.ts` | **Part 3** |
+| ID-document verification | §3.3 | `packages/contracts/src/verification.ts` | **Part 3** |
+| Repair cost model | §6 | `packages/damage/**` | **Part 3** |
+| Finance: intake, profile, insurance, scenario, plan | §4, §7 | `packages/contracts/src/finance.ts`, `packages/finance/**` | **Part 4** |
 | SpacetimeDB tables and reducers | §5 | `spacetimedb/**` (+ generated `packages/stdb-bindings/**`) | **Part 2** |
-| HTTP routes | §8 | `apps/web/app/api/**` | **Part 4** |
+| HTTP routes | §8 | `apps/web/app/api/**`: geocode and private fallback are **Part 2**; uploads, media and health are **Part 4** | split |
 | Worker job and tool interface | §9 | `packages/agent/src/tools/types.ts`, `apps/worker/src/handlers/types.ts` | **Part 3** |
 | Env vars | §10 | `.env.example` | **Part 4** |
 
-`packages/contracts/src/index.ts` is written once at scaffold time (Part 2) as `export * from './common'; export * from './report'; export * from './assessment'; export * from './agent'; export * from './finance';`. It never needs to change, so it never conflicts.
+`packages/contracts/src/index.ts` is written once at scaffold time (Part 2) as `export * from './common'; export * from './report'; export * from './property'; export * from './assessment'; export * from './agent'; export * from './verification'; export * from './finance';`. It never needs to change, so it never conflicts.
 
 **Change rules**
 
@@ -24,14 +29,17 @@ This file is the single source of truth for every interface between the four par
 
 ## 1. Conventions
 
-- Every schema is defined in **Zod**, with TS types derived via `z.infer`. Export both: `FrameFinding` (schema) and `type FrameFinding`. If there's a name clash, the schema is `FrameFindingSchema` and the type is `FrameFinding`. Use the `...Schema` suffix everywhere for consistency.
+- Every schema is defined in **Zod**, with TS types derived via `z.infer`. Schemas use the `...Schema` suffix (`FrameFindingSchema`); types drop it (`type FrameFinding`).
 - **Money:** integer cents, fields end in `Cents`. **Rates:** integer basis points, fields end in `Bps` (1% = 100 bps). **Ratios** in indicators are plain numbers for display only, never for money math.
 - **Time:** epoch milliseconds (`At` suffix) in contracts and JSON. `Timestamp` columns in SpacetimeDB.
-- **IDs:** SpacetimeDB `u64` auto-increment, represented as `string` in JSON/contracts (to avoid JS bigint issues). Convert at the boundary in `apps/web/lib/stdb` and the worker.
+- **IDs:** SpacetimeDB `u64` auto-increment, represented as `string` in JSON/contracts. Convert at the boundary in `apps/web/lib/stdb` and the worker. Identities are hex strings in JSON.
+- **Secrets:** `reporterSecret` (one per report) and `verificationSecret` (one per verification) are 32 random bytes, base64url, **generated in the browser** and kept in `localStorage`. The module stores only `sha256` hex. HTTP routes authorize with them (§8).
 - Every object that might be shown as real has `source: 'live' | 'synthetic' | 'fixture'`.
 - Every model-produced object has `modelId` and `promptVersion`.
 
-## 2. Common enums and report types (Part 2: `common.ts`, `report.ts`)
+## 2. Common, report and property types (Part 2)
+
+### 2.1 Common enums (`common.ts`)
 
 ```ts
 export const HazardSchema = z.enum(['flood','hurricane_wind','tornado','wildfire','earthquake','hail','other']);
@@ -45,31 +53,80 @@ export const LifeSafetyFlagSchema = z.enum([
 ]);
 export const VulnerabilitySchema = z.enum(['elderly','child_under_5','disability','medical_device','no_transport','pets','limited_english']);
 export const ReportStatusSchema = z.enum(['draft','queued','processing','assessed','needs_more_footage','failed']);
+export const VerificationStateSchema = z.enum(['pending','processing','verified','failed']);
 export const SourceSchema = z.enum(['live','synthetic','fixture']);
+```
 
-export const HouseholdSchema = z.object({
-  peopleCount: z.number().int().min(1).max(20),
-  vulnerabilities: z.array(VulnerabilitySchema),  // tailors safety guidance
-  selfReportedDanger: z.boolean(),             // "Is anyone in danger right now?" → 911 banner
-  homeSqft: z.number().int().min(200).max(10000).default(1800),
-  stories: z.number().int().min(1).max(4).default(1),
-  tenure: z.enum(['own','rent']),
-});
+### 2.2 Report input (`report.ts`)
 
+The reporter answers **only** what someone at the scene can know. Household, insurance and finances come later from the affected person (`AffectedIntake`, §4).
+
+```ts
 export const CreateReportInputSchema = z.object({
   hazard: HazardSchema,
-  lat: z.number().min(-90).max(90),
-  lng: z.number().min(-180).max(180),
-  addressText: z.string().max(200),
-  contactName: z.string().max(80).optional(),
-  contactPhone: z.string().max(30).optional(),
-  household: HouseholdSchema,
-  insurance: InsuranceInfoSchema,              // from finance.ts (§4)
-  personaId: z.string(),                       // synthetic financial persona chosen in the form
+  address: NormalizedAddressSchema,            // confirmed/edited by the reporter (§2.3)
+  deviceLat: z.number().min(-90).max(90).optional(),   // raw GPS at capture time, if granted
+  deviceLng: z.number().min(-180).max(180).optional(),
+  selfDanger: z.boolean(),                     // "Is anyone in danger right now?" → 911 banner
+  notes: z.string().max(500).optional(),       // e.g. "elderly man on porch", "water still rising"
+  isSelfReport: z.boolean(),                   // "Is this your property?" → redirect to /affected/start after submit
+  reporterSecretHash: z.string().length(64),   // sha256 hex of reporterSecret
 });
 ```
 
-## 3. Vision, assessment, agent trace (Part 3: `assessment.ts`, `agent.ts`)
+### 2.3 Property, address and area cells (`property.ts`, `packages/address`)
+
+```ts
+export const NormalizedAddressSchema = z.object({
+  line1: z.string().max(120),                  // "1234 N MAIN ST APT 2"
+  city: z.string().max(60),
+  state: z.string().length(2),                 // USPS state code
+  zip: z.string().regex(/^\d{5}$/),            // ZIP5 only
+  lat: z.number().nullable(),                  // geocode point; null only for source='manual' without coords
+  lng: z.number().nullable(),
+  normalized: z.string(),                      // canonical matching key, see rules below
+  source: z.enum(['census','nominatim','manual']),
+});
+
+export const AreaCellSchema = z.object({
+  cellId: z.string(),                          // "<row>:<col>", see cellId() below
+  reportCount72h: z.number().int().nonnegative(),
+  worstLevel: DamageLevelSchema,
+  lastReportAt: z.number().int(),
+});
+```
+
+**`packages/address`** (pure TS, zero runtime dependencies, Part 2):
+
+```text
+normalizeAddress(parts) → NormalizedAddress.normalized
+  1. uppercase; trim; collapse whitespace; strip punctuation except '#' (then '#' → 'APT')
+  2. street suffixes → USPS abbreviations: STREET ST, AVENUE AVE, ROAD RD, DRIVE DR, LANE LN, BOULEVARD BLVD,
+     COURT CT, CIRCLE CIR, PLACE PL, TERRACE TER, PARKWAY PKWY, HIGHWAY HWY, TRAIL TRL, WAY WAY
+  3. directionals: NORTH N, SOUTH S, EAST E, WEST W, NORTHEAST NE, NORTHWEST NW, SOUTHEAST SE, SOUTHWEST SW
+  4. unit designators: APARTMENT APT, SUITE STE, UNIT UNIT, BUILDING BLDG, FLOOR FL
+  5. ZIP+4 → ZIP5
+  normalized = `${line1} | ${city} | ${state} | ${zip}`
+
+parseLine1(line1) → { houseNumber: leading digits (+ optional letter), streetName: remaining tokens before the unit designator, unit? }
+
+matchAddresses(a, b) → boolean
+  a.normalized === b.normalized
+  OR (a.zip === b.zip AND houseNumber(a) === houseNumber(b) AND similarity(streetName(a), streetName(b)) ≥ 0.85)
+  similarity = 1 − levenshtein(x, y) / max(len(x), len(y))
+  Units: if both have a unit and they differ → false (different apartment)
+
+haversineM(lat1, lng1, lat2, lng2) → meters
+cellId(lat, lng): row = floor(lat / 0.00225); col = floor(lng / (0.00225 / cos(rowCenterLatRad)))   // ≈ 250 m cells
+cellBounds(cellId) → [[south, west], [north, east]] for drawing
+neighborCells(cellId, radiusCells) → string[]   // radius 4 ≈ 1 km for the affected area map
+```
+
+Property matching (in the module; §5): exact `normalized` match → else any property in the same or a neighboring cell within **30 m** of the geocode point → else create.
+
+## 3. Vision, assessment, agent trace, verification (Part 3)
+
+### 3.1 Findings and assessment (`assessment.ts`)
 
 ```ts
 export const FrameFindingSchema = z.object({
@@ -105,6 +162,8 @@ export const CostEstimateSchema = z.object({
   likelyCents: z.number().int().nonnegative(),
   highCents: z.number().int().nonnegative(),
   lineItems: z.array(CostLineItemSchema),
+  inputs: z.object({ homeSqft: z.number().int(), stories: z.number().int(), tenure: z.enum(['own','rent']),
+                     assumed: z.boolean() }),   // assumed=true → defaults were used; UI shows "assumed home size"
   costModelVersion: z.string(),                  // e.g. "cost-v1"
   disclaimer: z.literal('Illustrative estimate, not a contractor quote or insurance determination.'),
 });
@@ -121,6 +180,7 @@ export const DisasterDeclarationSchema = z.object({
 
 export const DamageAssessmentSchema = z.object({
   reportId: z.string(),
+  propertyId: z.string(),
   overallLevel: DamageLevelSchema,               // max component level, weighted by confidence ≥ 0.5 (code-computed)
   componentLevels: z.record(ComponentSchema, DamageLevelSchema),  // code-computed from findings
   lifeSafety: z.array(LifeSafetyFlagSchema),     // flags with any frame confidence ≥ 0.5 (code-computed)
@@ -128,7 +188,7 @@ export const DamageAssessmentSchema = z.object({
   confidence: z.number().min(0).max(1),          // mean confidence of usable findings (code-computed)
   usableFrameCount: z.number().int(),
   totalFrameCount: z.number().int(),
-  cost: CostEstimateSchema,                      // from estimate_repair_cost tool, never the model
+  cost: CostEstimateSchema,                      // estimate_repair_cost with ASSUMED defaults (§6); never the model
   declarations: z.array(DisasterDeclarationSchema),
   activeAlerts: z.array(z.object({ event: z.string(), severity: z.string(), headline: z.string() })),
   location: z.object({ stateCode: z.string(), countyName: z.string(), countyFips: z.string() }).optional(),
@@ -139,24 +199,69 @@ export const DamageAssessmentSchema = z.object({
   source: SourceSchema,
   createdAt: z.number().int(),
 });
+```
 
+**Code-computed vs. model-computed:** `overallLevel`, `componentLevels`, `lifeSafety`, `confidence` and `cost` are computed by code from the validated findings and tool results. The model's `finish` output supplies only `summary`, `recommendedActions`, `claimNotice` and an optional `hazard` correction. Code merges the two and validates the full `DamageAssessmentSchema`.
+
+### 3.2 Agent trace (`agent.ts`)
+
+```ts
 export const AgentStepSchema = z.object({
   reportId: z.string(),
   seq: z.number().int(),
   kind: z.enum(['pipeline','vision','model','tool_call','tool_result','error']),
   name: z.string(),                              // e.g. "extract_frames", "lookup_disaster_declarations"
   summary: z.string().max(400),                  // human-readable, redacted
-  visibility: z.enum(['public','owner']),        // 'owner' = contains personal/financial detail
+  visibility: z.enum(['reporter','affected']),   // 'reporter' = shown to the reporter AND affected; 'affected' = affected only
   durationMs: z.number().int().optional(),
   at: z.number().int(),
 });
 ```
 
-**Code-computed vs. model-computed:** `overallLevel`, `componentLevels`, `lifeSafety`, `confidence` and `cost` are computed by code from the validated findings and tool results. The model's `finish` output supplies only `summary`, `recommendedActions`, `claimNotice` and an optional `hazard` correction. Code merges the two and validates the full `DamageAssessmentSchema`.
+Rule: `kind = 'pipeline'` steps (Uploaded, Extracting frames, Analyzing 3/8, Estimating cost, Checking declarations, Done) use `visibility = 'reporter'`. Every other step uses `'affected'`. Reporter-visible summaries never mention costs, findings text or claim content.
 
-## 4. Finance (Part 4: `finance.ts`)
+### 3.3 ID-document verification (`verification.ts`)
 
 ```ts
+export const DocKindSchema = z.enum(['drivers_license','state_id','utility_bill','insurance_declarations']);
+export const VerificationFailReasonSchema = z.enum(['address_mismatch','unreadable','not_an_id','expired','rate_limited']);
+
+export const IdDocumentFieldsSchema = z.object({   // Nemotron VL output for the ID-document prompt
+  docKind: DocKindSchema,
+  fullName: z.string().max(120),
+  addressText: z.string().max(200),              // as printed; normalized by code, never stored
+  expiration: z.string().optional(),             // ISO date if printed (IDs)
+  isLikelyId: z.boolean(),                       // false → photo isn't an accepted document
+  confidence: z.number().min(0).max(1),
+  modelId: z.string(), promptVersion: z.string(),
+});
+
+export const VerificationResultSchema = z.object({
+  ok: z.boolean(),
+  failReason: VerificationFailReasonSchema.optional(),
+  nameOnDoc: z.string().max(120).optional(),     // the only extracted field persisted
+  matchedNormalized: z.string().optional(),      // property normalized address it matched (for logs/tests)
+});
+```
+
+**Decision rule** (deterministic, `packages/vision/src/verify/decide.ts`), evaluated in this order:
+
+1. `!isLikelyId` → `not_an_id`
+2. `confidence < 0.5` → `unreadable`
+3. docKind ∈ {drivers_license, state_id} and expiration < today → `expired`
+4. `!matchAddresses(normalize(addressText), property.address)` (§2.3) → `address_mismatch`
+5. otherwise → `ok`
+
+The ID image is deleted on every path (ARCHITECTURE §6.5).
+
+## 4. Finance and affected intake (Part 4: `finance.ts`)
+
+```ts
+export const HouseholdSchema = z.object({          // answered by the AFFECTED person, never the reporter
+  peopleCount: z.number().int().min(1).max(20),
+  vulnerabilities: z.array(VulnerabilitySchema), // tailors safety guidance on the affected view
+});
+
 export const AccountSchema = z.object({
   id: z.string(),
   type: z.enum(['checking','savings','cd','ira','mortgage','auto_loan','personal_loan','credit_card']),
@@ -190,6 +295,15 @@ export const InsuranceInfoSchema = z.object({
   deductibleCents: z.number().int().nonnegative().optional(),
   deductibleBps: z.number().int().nonnegative().optional(), // % deductible (e.g. hurricane), of dwelling coverage
   floodCovered: z.boolean().default(false),       // separate flood policy (e.g. NFIP)
+});
+
+export const AffectedIntakeSchema = z.object({     // saved via save_affected_intake (§5)
+  household: HouseholdSchema,
+  tenure: z.enum(['own','rent']),
+  homeSqft: z.number().int().min(200).max(10000).default(1800),
+  stories: z.number().int().min(1).max(4).default(1),
+  insurance: InsuranceInfoSchema,
+  personaId: z.string(),                          // synthetic demo persona
 });
 
 export const ScenarioSchema = z.object({
@@ -226,7 +340,8 @@ export const ForecastPointSchema = z.object({
 });
 
 export const RecoveryPlanSchema = z.object({
-  reportId: z.string(), profileId: z.string(),
+  propertyId: z.string(), reportId: z.string(), profileId: z.string(),
+  cost: CostEstimateSchema,                       // RECOMPUTED with intake homeSqft/stories/tenure (inputs.assumed=false)
   repairCostCents: z.object({ low: z.number().int(), likely: z.number().int(), high: z.number().int() }),
   expectedPayoutCents: z.object({ low: z.number().int(), likely: z.number().int(), high: z.number().int() }),
   gapCents: z.object({ low: z.number().int(), likely: z.number().int(), high: z.number().int() }),
@@ -243,7 +358,8 @@ export const RecoveryPlanSchema = z.object({
 });
 
 export const CoachMessageSchema = z.object({
-  reportId: z.string(), role: z.enum(['user','assistant']), text: z.string().max(2000), at: z.number().int(),
+  propertyId: z.string(), reportId: z.string(),
+  role: z.enum(['user','assistant']), text: z.string().max(2000), at: z.number().int(),
 });
 ```
 
@@ -251,46 +367,61 @@ export const CoachMessageSchema = z.object({
 
 Below are logical definitions. Part 2 translates them into the current TS module syntax (`spacetimedb/server`: `table`, `t`, `schema`, reducers). **VERIFY** the syntax against the 2.x docs. Column names in the module are `snake_case`; the generated bindings expose them in camelCase.
 
+**Who can read what.** *Reporter* = `report.reporter == sender`. *Verified* = a `verification` row with `identity == sender`, the row's property and `state == 'verified'`. *Self* = row identity == sender. *Service* = in `service_identity`.
+
 ### 5.1 Tables
 
-| Table | Vis. | Columns (pk first) | Notes |
+| Table | Vis. | Columns (pk first) | Readable by |
 |---|---|---|---|
-| `report` | public | `id u64 pk autoInc`, `owner Identity`, `created_at`, `updated_at`, `status`, `hazard`, `self_danger bool`, `life_safety_csv string`, `overall_level` (default `none`), `usable_frames u8`, `total_frames u8`, `status_reason string?`, `source` | Drives the live status timeline. No PII, no location, no finances |
-| `report_private` | private | `report_id pk`, `owner`, `address_text`, `lat f64`, `lng f64`, `contact_name?`, `contact_phone?`, `household_json`, `insurance_json`, `persona_id`, `owner_secret string` | Owner only |
-| `media_asset` | private | `id pk autoInc`, `report_id` (index), `kind 'video'|'image'`, `object_key`, `content_type`, `size_bytes u64`, `sha256`, `uploaded_at` | Owner only |
-| `frame` | private | `id pk autoInc`, `report_id` (index), `frame_index u8`, `t_sec f32`, `thumb_key`, `finding_json` (FrameFinding) | Owner only |
-| `assessment` | private | `report_id pk`, `json` (DamageAssessment), `created_at` | Owner only |
-| `recovery_plan` | private | `report_id pk`, `json` (RecoveryPlan), `created_at` | Owner only |
-| `agent_step` | private | `id pk autoInc`, `report_id` (index), `seq u16`, `kind`, `name`, `summary`, `visibility`, `duration_ms u32?`, `at` | Owner only. `visibility='owner'` steps are also redacted from logs |
-| `coach_message` | private | `id pk autoInc`, `report_id` (index), `role`, `text`, `at` | Owner only |
-| `job` | private | `id pk autoInc`, `kind 'analyze'|'coach'`, `report_id`, `payload_json`, `state 'queued'|'leased'|'done'|'failed'`, `attempts u8`, `lease_owner Identity?`, `lease_expires_at?`, `last_error?`, `created_at` | Service only |
-| `service_identity` | private | `identity pk`, `role 'admin'|'worker'` | |
-| `lease_tick` | scheduled | (interval 30 s) → `requeue_expired_jobs` | |
+| `property` | public | `id u64 pk autoInc`, `cell_id string` (index), `created_at` | everyone (no PII) |
+| `property_private` | private | `property_id pk`, `normalized string` (unique index), `line1`, `city`, `state`, `zip`, `lat f64?`, `lng f64?`, `county_fips string?` | Verified for this property; service |
+| `report` | public | `id u64 pk autoInc`, `reporter Identity` (index), `property_id` (index), `cell_id` (index), `created_at`, `updated_at`, `status`, `hazard`, `self_danger bool`, `life_safety_csv string`, `overall_level` (default `none`), `usable_frames u8`, `total_frames u8`, `status_reason string?`, `claimed bool`, `source` | everyone (no address, no coordinates, no finances) |
+| `report_private` | private | `report_id pk`, `reporter_secret_hash`, `is_self_report bool`, `address_line1`, `lat f64?`, `lng f64?` (device GPS or geocode), `notes string?` | Reporter of the report; Verified for its property; service |
+| `media_asset` | private | `id pk autoInc`, `report_id` (index), `kind 'video'|'image'`, `object_key`, `content_type`, `size_bytes u64`, `sha256`, `uploaded_at` | Verified for the report's property; service |
+| `frame` | private | `id pk autoInc`, `report_id` (index), `frame_index u8`, `t_sec f32`, `thumb_key`, `finding_json` (FrameFinding) | Verified; service |
+| `assessment` | private | `report_id pk`, `property_id` (index), `json` (DamageAssessment), `created_at` | Verified; service |
+| `agent_step` | private | `id pk autoInc`, `report_id` (index), `seq u16`, `kind`, `name`, `summary`, `visibility 'reporter'|'affected'`, `duration_ms u32?`, `at` | Reporter: rows with `visibility='reporter'`. Verified: all rows. Service |
+| `verification` | private | `id pk autoInc`, `identity` (index), `property_id` (index), `doc_kind`, `state`, `fail_reason?`, `name_on_doc?`, `secret_hash`, `object_key?` (cleared after the job), `attempt_no u8`, `created_at`, `decided_at?` | Self; service |
+| `affected_profile` | private | `id pk autoInc`, `identity` (index), `property_id`, `intake_json` (AffectedIntake), `updated_at` (unique on identity+property) | Self; service |
+| `recovery_plan` | private | `id pk autoInc`, `identity` (index), `property_id`, `report_id`, `json` (RecoveryPlan), `created_at` (unique on identity+property+report) | Self; service |
+| `coach_message` | private | `id pk autoInc`, `identity` (index), `property_id`, `report_id`, `role`, `text`, `at` | Self; service |
+| `area_cell_summary` | public | `cell_id pk`, `report_count_72h u32`, `worst_level`, `last_report_at` | everyone (aggregated) |
+| `job` | private | `id pk autoInc`, `kind 'analyze'|'verify_identity'|'plan'|'coach'`, `report_id u64?`, `property_id u64?`, `verification_id u64?`, `subject Identity?` (for plan/coach), `payload_json`, `state 'queued'|'leased'|'done'|'failed'`, `attempts u8`, `lease_owner Identity?`, `lease_expires_at?`, `last_error?`, `created_at` | Service |
+| `service_identity` | private | `identity pk`, `role 'admin'|'worker'` | Service |
+| `lease_tick` | scheduled | interval 30 s → `requeue_expired_jobs` | — |
+| `area_tick` | scheduled | interval 5 min → `refresh_area_cells` | — |
 
-**Visibility VERIFY (hour 1):** document here which mechanism grants the owning identity read access to its private rows above (views / RLS / filters), or note that the HTTP fallback in §8 is in use.
+**Visibility VERIFY (hour 1):** document here which mechanism enforces the "Readable by" column (views / RLS / filters keyed on `ctx.sender`), or note that the HTTP fallback `/api/private/[...]` (§8) is in use for the private tables.
 
 ### 5.2 Reducers
 
 | Reducer | Caller | Args | Effect / checks |
 |---|---|---|---|
-| `init` | system | — | Inserts the publisher into `service_identity(admin)`. Schedules `lease_tick` |
+| `init` | system | — | Inserts the publisher into `service_identity(admin)`. Schedules `lease_tick` and `area_tick` |
 | `admin_add_service` | admin | `identity, role` | |
-| `create_report` | anyone | `CreateReportInput` as JSON string | Validates (light checks in module; full Zod in web). Inserts `report` (status `draft`, `source='live'`) and `report_private` (random `owner_secret`) |
-| `attach_media` | owner | `report_id, kind, object_key, content_type, size_bytes, sha256` | Status must be `draft` or `needs_more_footage`. Max 8 images or 1 video |
-| `submit_report` | owner | `report_id` | Needs ≥1 media. Allowed from `draft`, `needs_more_footage` or `failed` (resubmit). Status → `queued`. Inserts `job(analyze)` |
-| `claim_job` | service | `job_id, lease_ms` | Only if `state='queued'` or the lease has expired. Sets lease. Report → `processing` |
+| `create_report` | anyone | `CreateReportInput` JSON | Light validation. Matches/creates the property (§2.3). Inserts `report` (status `draft`, `claimed` = property already has a verified identity, `source='live'`) and `report_private` |
+| `attach_media` | reporter | `report_id, kind, object_key, content_type, size_bytes, sha256` | Status must be `draft` or `needs_more_footage`. Max 8 images or 1 video |
+| `submit_report` | reporter | `report_id` | Needs ≥ 1 media. Allowed from `draft`, `needs_more_footage` or `failed`. Status → `queued`. Inserts `job(analyze)` |
+| `start_verification` | anyone | `address_json` (NormalizedAddress), `doc_kind`, `secret_hash` | Fails with `rate_limited` if the sender has ≥ `IDV_MAX_ATTEMPTS_PER_HOUR` verifications in the last hour. Matches/creates the property (§2.3) and inserts `verification(pending)` with its `property_id`. The client learns the property id from its own `verification` row (reducers return no data) |
+| `submit_verification` | self | `verification_id, object_key` | State must be `pending`. The key must start with `idv/<verification_id>/`. Stores the key. Inserts `job(verify_identity)` |
+| `record_verification` | service | `verification_id, ok, fail_reason?, name_on_doc?` | Sets `verified` / `failed`, `decided_at`; clears `object_key`. On ok: `claimed = true` on every report of the property |
+| `save_affected_intake` | verified | `property_id, intake_json, report_id?` | Upserts `affected_profile`. Picks `report_id` (default: most severe `assessed` report on the property). Inserts `job(plan)` with `subject = sender`. Error if there's no assessed report |
+| `ask_coach` | verified | `property_id, report_id, text` | Needs an existing `recovery_plan`. Inserts `coach_message(user)` + `job(coach)`. Max 1 pending coach job per identity |
+| `claim_job` | service | `job_id, lease_ms` | Only if `state='queued'` or the lease has expired. Sets lease. analyze → report `processing`; verify_identity → verification `processing` |
 | `record_frame` | service | `report_id, frame_index, t_sec, thumb_key, finding_json` | Upsert by (report_id, frame_index) |
 | `record_agent_step` | service | `report_id, seq, kind, name, summary, visibility, duration_ms?` | |
-| `record_assessment` | service | `report_id, json, overall_level, usable_frames, life_safety_csv, confidence` | Stores the assessment. Updates `report.overall_level`. Status → `needs_more_footage` if `usable_frames*2 < total`, else `assessed` (low confidence is a label, not a status) |
-| `record_recovery_plan` | service | `report_id, json` | |
-| `complete_job` | service | `job_id, ok, error?` | `ok` → done. Else attempts++ → requeue if < 2, else `failed` and report → `failed` with `status_reason` (page offers "Try again") |
-| `ask_coach` | owner | `report_id, text` | Inserts `coach_message(user)` + `job(coach)`. Rate limit: 1 pending coach job per report |
-| `record_coach_reply` | service | `report_id, text` | |
+| `record_assessment` | service | `report_id, json, overall_level, usable_frames, total_frames, life_safety_csv` | Stores the assessment. Updates the `report` columns. Status → `needs_more_footage` if `usable_frames*2 < total_frames`, else `assessed`. Updates `area_cell_summary` for the cell |
+| `record_recovery_plan` | service | `identity, property_id, report_id, json` | Upsert |
+| `record_coach_reply` | service | `identity, property_id, report_id, text` | |
+| `complete_job` | service | `job_id, ok, error?` | `ok` → done. Else attempts++ → requeue if < 2, else `failed` (analyze → report `failed` + `status_reason`; verify_identity → verification `failed` / `unreadable`) |
 | `requeue_expired_jobs` | scheduled | — | |
+| `refresh_area_cells` | scheduled | — | Recomputes `area_cell_summary` from `report` rows with `status='assessed'` created in the last 72 h; deletes empty cells |
 
 ## 6. Repair cost model (Part 3: `packages/damage`, `costModelVersion = "cost-v1"`)
 
-All values are **illustrative defaults** and labeled as such in the UI. They're configurable in `packages/damage/src/costTable.ts`. If a citable public figure is found, cite it in SOURCES.md.
+All values are **illustrative defaults** and labeled as such in the UI.
+
+**Two runs.** The `analyze` job runs the model with **assumed defaults** (`homeSqft 1800, stories 1, tenure 'own'`, so `inputs.assumed = true`; the UI shows "assumed home size"). The `plan` job reruns it with the affected person's intake values (`assumed = false`) and stores the result in `RecoveryPlan.cost`. The stored assessment is never modified. They're configurable in `packages/damage/src/costTable.ts`. If a citable public figure is found, cite it in SOURCES.md.
 
 ```text
 replacementCostPerSqftCents = 15000            // $150/sqft, illustrative
@@ -314,7 +445,7 @@ monthlyOutflow = monthlyEssentialExpensesCents + monthlyDebtPayments
 deductible = deductibleOverrideCents ?? deductibleCents ?? round(dwellingCoverageCents × deductibleBps / 10000) ?? 0
 
 expectedPayout(case):
-  structureCost, contentsCost from the assessment line items for that case (scale line items by low/high factor)
+  structureCost, contentsCost from the RECOMPUTED plan cost line items for that case (scale line items by the low/high factor)
   if policyType ∈ {none, unknown} → 0, note
   floodExcluded = hazard == 'flood' && !floodCovered → structure and contents payout 0, note "Flood damage: standard homeowners/renters policies typically exclude flood — check your policy."
   homeowners: max(0, min(structureCost, dwellingCoverage) + min(contentsCost, contentsCoverage) − deductible)
@@ -352,32 +483,37 @@ forecast (day 0..90, daily):
 All arithmetic is integer cents with Math.round at each multiplication. Never accumulate floats.
 ```
 
-`simulate(profile, assessment, insurance, scenario) → { forecast, indicators, gapCents, firstShortfallDay, totalCostOfFundsCents }` is pure, runs in the browser, and finishes in < 20 ms.
+`simulate(profile, cost, intake, declarations, scenario) → { forecast, indicators, gapCents, firstShortfallDay, totalCostOfFundsCents }` is pure, runs in the browser, and finishes in < 20 ms.
 
-## 8. HTTP API (Part 4 unless noted)
+## 8. HTTP API
 
-| Method + path | Auth | Request | Response |
-|---|---|---|---|
-| `POST /api/uploads/presign` | `reportId` + `ownerSecret` header `x-owner-secret` | `{ reportId, contentType: 'video/mp4'|'video/quicktime'|'image/jpeg'|'image/png'|'image/webp', sizeBytes, sha256 }` | `{ putUrl, objectKey, expiresAt }`. Rejects > 200 MB video / 15 MB image |
-| `GET /api/media/[...key]` | owner secret (`x-owner-secret`), or the owner-view approach Part 2 picks | — | 302 to a presigned GET (10 min) |
-| `GET /api/health` | none | — | `{ ok, web: true, stdb: bool, storage: bool, version }` |
-| `GET /api/reports/[id]/private` | `x-owner-secret` | — | **Only if the §5 visibility fallback is chosen** (owned by Part 2) |
+| Method + path | Owner | Auth | Request | Response |
+|---|---|---|---|---|
+| `GET /api/geocode?q=<address>` | P2 | none (rate limited per IP) | — | `NormalizedAddress[]` via the US Census Geocoder (`source='census'`) |
+| `GET /api/geocode?lat=&lng=` | P2 | none (rate limited, ≤ 1 upstream req/s) | — | `NormalizedAddress[]` via Nominatim reverse (`source='nominatim'`) |
+| `POST /api/uploads/presign` (kind `media`) | P4 | `reporterSecret` in the body; the route checks `sha256 == report_private.reporter_secret_hash` via a service read | `{ kind:'media', reportId, reporterSecret, contentType: 'video/mp4'|'video/quicktime'|'image/jpeg'|'image/png'|'image/webp', sizeBytes, sha256 }` | `{ putUrl, objectKey, expiresAt }`. Rejects > 200 MB video / 15 MB image |
+| `POST /api/uploads/presign` (kind `idv`) | P4 | `verificationSecret`; checked against `verification.secret_hash`; state must be `pending` | `{ kind:'idv', verificationId, verificationSecret, contentType: 'image/jpeg'|'image/png'|'image/webp', sizeBytes }` | `{ putUrl, objectKey: 'idv/<verificationId>/<uuid>.<ext>', expiresAt }`. Max 15 MB; images only |
+| `GET /api/media/[...key]` | P4 | header `x-verification-id` + `x-verification-secret`; the verification must be `verified`, and the key must belong to a report on that verification's property | — | 302 to a presigned GET (10 min). **Always 403 for `idv/` keys.** Reporters have no media access |
+| `GET /api/health` | P4 | none | — | `{ ok, web: true, stdb: bool, storage: bool, version }` |
+| `GET /api/private/[...]` | P2 | reporter or verification secret | — | **Only if the §5 visibility fallback is chosen.** Returns exactly the rows the "Readable by" column allows |
 
-Object keys: `media/<reportId>/<sha256>.<ext>`, `frames/<reportId>/<frameIndex>.jpg`.
+Object keys: `media/<reportId>/<sha256>.<ext>`, `frames/<reportId>/<frameIndex>.jpg`, `idv/<verificationId>/<uuid>.<ext>` (deleted by the verify job; 1-day lifecycle backstop).
 
 ## 9. Worker interfaces (Part 3)
 
 ```ts
 // apps/worker/src/handlers/types.ts
 export interface JobContext {
-  job: { id: string; kind: 'analyze' | 'coach'; reportId: string; payload: unknown };
-  stdb: ServiceConnection;          // typed reducer calls from packages/stdb-bindings
+  job: { id: string; kind: 'analyze' | 'verify_identity' | 'plan' | 'coach';
+         reportId?: string; propertyId?: string; verificationId?: string; subject?: string; payload: unknown };
+  stdb: ServiceConnection;          // typed reducer calls + service reads from packages/stdb-bindings
   storage: StoragePort;             // from packages/storage (Part 4)
   nim: NimClient;                   // from packages/agent
-  log: Logger;
-  step(s: Omit<AgentStep, 'reportId' | 'seq' | 'at'>): Promise<void>; // auto seq + record_agent_step
+  log: Logger;                      // never log IdDocumentFields or finance JSON
+  step(s: Omit<AgentStep, 'reportId' | 'seq' | 'at'>): Promise<void>; // analyze only: auto seq + record_agent_step
 }
 export type JobHandler = (ctx: JobContext) => Promise<void>;
+// registry (apps/worker/src/handlers/index.ts): analyze, verify_identity (P3) · plan, coach (P4)
 
 // packages/agent/src/tools/types.ts
 export interface AgentTool<I, O> {
@@ -385,9 +521,21 @@ export interface AgentTool<I, O> {
   description: string;               // shown to the model
   input: z.ZodType<I>;               // converted to JSON Schema for `tools`
   output: z.ZodType<O>;
-  visibility: 'public' | 'owner';    // for trace redaction
+  visibility: 'reporter' | 'affected';  // trace visibility of this tool's steps (all tools: 'affected')
   run(input: I, ctx: JobContext): Promise<O>;
 }
+
+// packages/damage (Part 3), also used by Part 4's plan handler
+export function estimateRepairCost(args: { componentLevels: Record<Component, DamageLevel>;
+  homeSqft?: number; stories?: number; tenure?: 'own'|'rent' }): CostEstimate;   // missing inputs → defaults, assumed=true
+
+// packages/address (Part 2)
+export function normalizeAddress(a: Omit<NormalizedAddress,'normalized'>): NormalizedAddress;
+export function matchAddresses(a: NormalizedAddress, b: NormalizedAddress): boolean;
+export function haversineM(lat1: number, lng1: number, lat2: number, lng2: number): number;
+export function cellId(lat: number, lng: number): string;
+export function cellBounds(cellId: string): [[number, number], [number, number]];
+export function neighborCells(cellId: string, radiusCells: number): string[];
 
 // packages/storage (Part 4)
 export interface StoragePort {
@@ -395,15 +543,19 @@ export interface StoragePort {
   presignGet(key: string, ttlSec?: number): Promise<string>;
   getObject(key: string): Promise<Buffer>;
   putObject(key: string, body: Buffer, contentType: string): Promise<void>;
+  deleteObject(key: string): Promise<void>;     // used by verify_identity in `finally`
   ping(): Promise<boolean>;
 }
 
 // packages/finance (Part 4)
-export function buildRecoveryPlan(args: { reportId: string; profile: FinancialProfile; insurance: InsuranceInfo;
-  assessment: DamageAssessment; tenure: 'own'|'rent' }): RecoveryPlan;          // without coachSummary
-export function simulate(args: { /* same */ ; scenario: Scenario }): SimulationResult;
+export function buildRecoveryPlan(args: { propertyId: string; reportId: string; intake: AffectedIntake;
+  profile: FinancialProfile; assessment: DamageAssessment; cost: CostEstimate /* recomputed */ }): RecoveryPlan; // without coachSummary
+export function simulate(args: { profile: FinancialProfile; intake: AffectedIntake; cost: CostEstimate;
+  declarations: DisasterDeclaration[]; hazard: Hazard; scenario: Scenario }): SimulationResult;
 export function getPersona(id: string): FinancialProfile;
 export const PERSONAS: FinancialProfile[];
+export const planHandler: JobHandler;   // packages/finance/src/jobs/plan-handler.ts
+export const coachHandler: JobHandler;  // packages/finance/src/coach/handler.ts
 ```
 
 ## 10. Environment variables (`.env.example`, Part 4)
@@ -414,8 +566,8 @@ export const PERSONAS: FinancialProfile[];
 | `APP_DOMAIN` | caddy | bare domain for TLS, e.g. `example.tech` |
 | `NEXT_PUBLIC_STDB_URI` | web | Maincloud websocket URI (public, not secret) |
 | `NEXT_PUBLIC_STDB_MODULE` | web | module/database name |
-| `STDB_URI`, `STDB_MODULE` | worker, scripts | same values |
-| `STDB_SERVICE_TOKEN` | worker | token of the worker identity (**secret**) |
+| `STDB_URI`, `STDB_MODULE` | web (server), worker, scripts | same values |
+| `STDB_SERVICE_TOKEN` | worker, web (server routes) | token of the service identity (**secret**) |
 | `NVIDIA_API_KEY` | worker | **secret** |
 | `NVIDIA_BASE_URL` | worker | `https://integrate.api.nvidia.com/v1` |
 | `NEMOTRON_VL_MODEL` | worker | `nvidia/nemotron-nano-12b-v2-vl` (VERIFY) |
@@ -423,13 +575,17 @@ export const PERSONAS: FinancialProfile[];
 | `S3_ENDPOINT` | web, worker | Vultr Object Storage endpoint, e.g. `https://<region>.vultrobjects.com` |
 | `S3_REGION`, `S3_BUCKET` | web, worker | |
 | `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | web, worker | **secret** |
+| `NOMINATIM_USER_AGENT` | web | a generic app name + site URL, e.g. `ProjectAftermath/0.1 (+https://<domain>)`. No personal email |
+| `CENSUS_GEOCODER_BENCHMARK` | web | `Public_AR_Current` |
+| `IDV_MAX_ATTEMPTS_PER_HOUR` | module config / web | `3` (mirrored as a constant in the module) |
 | `WORKER_CONCURRENCY` | worker | `2` |
 | `VL_CONCURRENCY` | worker | `4` |
 | `USE_FIXTURES` | worker | `false`; `true` = return labeled fixture model output (dev only) |
 
 ## 11. Fixtures
 
-- Location: `fixtures/<domain>/*.json`, owned by the domain owner (`fixtures/report` P2, `fixtures/assessment` P3, `fixtures/finance` P4).
+- Location: `fixtures/<domain>/*.json`, owned by the domain owner: `fixtures/report` and `fixtures/property` (P2, including captured Census/Nominatim responses), `fixtures/assessment` and `fixtures/verification` (P3), `fixtures/finance` (P4).
 - Every fixture validates against its schema in a unit test, and has `source: "fixture"`.
-- Real model outputs captured during development go in `fixtures/assessment/captured/` with the model ID, and are used as regression tests for the Zod parsers.
-- Media files are **not** committed. `fixtures/media/README.md` lists the source URL, license and object-storage key for each demo clip.
+- Real model outputs captured during development go in `fixtures/assessment/captured/` and `fixtures/verification/captured/` with the model ID, and are used as regression tests for the Zod parsers.
+- **Verification fixtures use only specimen/sample ID images** (clearly marked "SAMPLE"/"SPECIMEN") or JSON field outputs. Never commit or upload a real person's ID. A team member's own ID may be used live in the demo with consent, and is never committed.
+- Media files are **not** committed. `fixtures/media/README.md` lists the source URL, license and object-storage key for each demo clip and specimen image.

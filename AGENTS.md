@@ -38,6 +38,11 @@ Four people are building this repo at the same time, each with their own LLM. Th
 - Never put secrets in `NEXT_PUBLIC_*` variables or in client components.
 - Never commit anything under `HackTX template to use/`. It is reference material and contains secrets.
 - Synthetic or fixture data must carry `source: "synthetic"` or `source: "fixture"` and show a visible badge in the UI. Never pass fixture output off as a live model or API result.
+- **Identity verification is demo-grade.** Label it "Demo identity check — not production-grade verification" wherever it appears. Never describe it as KYC.
+- Test and demo only with **specimen/sample IDs or a team member's own ID with their consent**. Never use, fetch or commit anyone else's real ID.
+- ID images (`idv/` object keys) are **deleted immediately after extraction**. Never log their contents or the extracted fields beyond name + match result, never put them in fixtures, traces or screenshots, and never commit them. Fixture verification data uses specimen images only.
+- Only verified affected persons may read a property's report details. The reporter sees safety + status only. Never widen access "for convenience".
+- Nearby-area data is shown **only as aggregated cells** (about 250 m), never as other people's pins or addresses.
 - AI damage and cost figures are **estimates**. Financial output is **educational, not financial advice**. Life-safety UI always shows "If you are in immediate danger, call 911." Keep those disclaimers.
 
 ## 5. Code style (so diffs stay small)

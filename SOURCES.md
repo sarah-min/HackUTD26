@@ -18,7 +18,7 @@ Source: `HackTX template to use/Public HackUTD Opening Ceremony Slides.pdf` (loc
 
 Not found in the slides: any limit on the number of tracks a team may select. **VERIFY** in the Hackerpack/Discord.
 
-**How honestly we fit State Farm (p57):** we no longer do multi-report triage or coordination dashboards. Our fit rests on (1) letting anyone at the scene document damage in about a minute, (2) automatic life-safety hazard detection with a 911 prompt, and (3) an auto-drafted first-notice-of-loss claim summary. This is weak on "identify those with the most urgent needs" across thousands of people and on "coordinate assistance"; don't claim those parts.
+**How honestly we fit State Farm (p57):** there's no multi-report triage or coordination dashboard. Our fit rests on (1) anyone at the scene can report damage for a family that has evacuated, (2) a verified hand-off so the actual resident receives it, (3) an aggregated area map of nearby reports, (4) automatic life-safety hazard detection with a 911 prompt, and (5) an auto-drafted first-notice-of-loss claim summary. It's weak on "identify those with the most urgent needs" across thousands of people and on "coordinate assistance"; don't claim those parts.
 
 ## NVIDIA / Nemotron
 
@@ -40,7 +40,7 @@ Not found in the slides: any limit on the number of tracks a team may select. **
 | Reducers | https://spacetimedb.com/docs/functions/reducers | Reducers have full read-write access to all tables (public and private) via `ReducerContext` |
 | Chat app tutorial | https://spacetimedb.com/docs/tutorials/chat-app | `schema({ user, message })` pattern; `ctx.db.<table>` accessors |
 | **API style caveat** | — | The current 2.x style imports from `spacetimedb/server` and uses `schema` / `table` / `t` builders. Older 1.x examples (`import { spacetimedb, table, t } from 'spacetimedb'`, `table({ name, public })`) are outdated, so ignore them. **VERIFY** against the docs for the installed CLI version |
-| Per-identity visibility (views / RLS) | docs | **VERIFY** (Part 2, hour 1): how the report owner reads private rows; see ARCHITECTURE §5 |
+| Per-identity visibility (views / RLS) | docs | **VERIFY** (Part 2, hour 1): how verified affected persons (and reporters, for their own rows) read private rows; see ARCHITECTURE §5 |
 | Scheduled reducers | docs | **VERIFY** the syntax for `lease_tick` (job lease requeue) |
 | Maincloud credit | Slide p49 | Code `HACKUTD2026`, one per GitHub account |
 
@@ -53,6 +53,24 @@ Not found in the slides: any limit on the number of tracks a team may select. **
 | FCC Area API | `https://geo.fcc.gov/api/census/area?lat={lat}&lon={lng}&format=json` | `reverse_geocode` → state and county FIPS | **VERIFY** |
 | DisasterAssistance.gov | https://www.disasterassistance.gov | FEMA IHP "check eligibility" link | Link only |
 | SBA disaster loans | https://www.sba.gov/funding-programs/disaster-assistance | SBA "check eligibility" link | Link only. Never invent rates |
+
+## Geocoding, maps and identity
+
+| Item | Source | Use | Status |
+|---|---|---|---|
+| US Census Geocoder (forward) | https://geocoding.geo.census.gov/geocoder/ (e.g. `/geocoder/locations/onelineaddress?address=…&benchmark=Public_AR_Current&format=json`) | `/api/geocode?q=`: affected person's address → normalized address + lat/lng | Free, no key. **VERIFY** the benchmark name and response shape |
+| Nominatim (OSM) reverse geocoding | https://nominatim.org/release-docs/latest/api/Reverse/ · usage policy https://operations.osmfoundation.org/policies/nominatim/ | `/api/geocode?lat&lng`: reporter GPS → suggested street address | Policy: max **1 request/s**, a descriptive `User-Agent` (generic app name), no bulk use, show attribution. **VERIFY** |
+| Leaflet | https://leafletjs.com | `<PinMap>` / `<CellMap>` | Pin an exact version |
+| OpenStreetMap tiles | https://operations.osmfoundation.org/policies/tiles/ | Basemap for both maps | Attribution required ("© OpenStreetMap contributors"); low volume only; no prefetch/bulk. **VERIFY** |
+| Stripe Identity | https://stripe.com/identity | **Not used.** Production path for real ID verification | Stretch only |
+| Persona | https://withpersona.com | **Not used.** Alternative production IDV provider | Stretch only |
+| Specimen / sample IDs | e.g. state DMV "sample license" images or AAMVA design references | Testing and the demo of the ID check | Use only images published as specimens/samples, or a team member's own ID with consent. **VERIFY** each image's terms and record it below. Never commit ID images |
+
+Specimen IDs used:
+
+| # | Description | Source URL | Terms | Added by |
+|---|---|---|---|---|
+| 1 | | | | |
 
 ## Hosting and domain
 
@@ -88,3 +106,7 @@ Never commit media files. Add a row for every clip used:
 - [ ] OpenFEMA / NWS / FCC field names and response shapes (Part 3)
 - [ ] Devpost track-selection limit; exact event dates and deadlines (everyone)
 - [ ] License of each demo clip (whoever adds it)
+- [ ] Census Geocoder benchmark/response shape; Nominatim policy compliance (Part 2)
+- [ ] Nemotron VL accuracy on specimen IDs (name/address extraction) (Part 3)
+- [ ] Vultr Object Storage lifecycle-rule support for the `idv/` prefix (Part 4)
+- [ ] Terms of each specimen ID image (whoever adds it)
