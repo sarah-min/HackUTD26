@@ -76,7 +76,7 @@ Pick by preference: P1 is frontend/mobile UX, P2 is backend/realtime and the gat
 
 ## P1: Reporter View & Shared UI
 
-**Owner: unassigned.** Make filming and submitting someone's property fast and calm on a phone, keep the reporter informed with safety and status only, and own the shared look (UI kit, map and safety components). Also own the root scaffold so the others can start within 30 minutes.
+**Owner: Faith.** Make filming and submitting someone's property fast and calm on a phone, keep the reporter informed with safety and status only, and own the shared look (UI kit, map and safety components). Also own the root scaffold so the others can start within 30 minutes.
 
 | # | Deliverable | Files | Depends on | Acceptance check |
 |---|---|---|---|---|
@@ -120,7 +120,7 @@ fixtures/ui/** scripts/smoke-ui.ts
 
 ## P2: Backend & Affected View
 
-**Owner: unassigned.** Own every table and reducer, the rule that only a verified affected person sees a property's details, address normalization and geocoding, and the affected flow from address to verified property to report page.
+**Owner: Sidd.** Own every table and reducer, the rule that only a verified affected person sees a property's details, address normalization and geocoding, and the affected flow from address to verified property to report page.
 
 | # | Deliverable | Files | Depends on | Acceptance check |
 |---|---|---|---|---|
@@ -168,7 +168,7 @@ CONTRACTS.md §1 §2 §5
 
 ## P3: AI Pipeline (Nemotron)
 
-**Owner: unassigned.** Turn real footage into a validated damage assessment, and an ID photo into a deterministic verified/failed result, through Nemotron VL and a multi-step Nemotron agent with tools, every step visible in the trace.
+**Owner: Sarah** Turn real footage into a validated damage assessment, and an ID photo into a deterministic verified/failed result, through Nemotron VL and a multi-step Nemotron agent with tools, every step visible in the trace.
 
 | # | Deliverable | Files | Depends on | Acceptance check |
 |---|---|---|---|---|
@@ -210,7 +210,7 @@ CONTRACTS.md: assessment/agent/verification, cost model, worker interfaces secti
 
 ## P4: Recovery Navigator & Infra
 
-**Owner: unassigned.** Give the verified affected person a clear financial picture and a next move (PNC), and run everything on Vultr behind the GoDaddy domain.
+**Owner: Roselyn** Give the verified affected person a clear financial picture and a next move (PNC), and run everything on Vultr behind the GoDaddy domain.
 
 | # | Deliverable | Files | Depends on | Acceptance check |
 |---|---|---|---|---|
