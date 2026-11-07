@@ -18,7 +18,7 @@ Source: `HackTX template to use/Public HackUTD Opening Ceremony Slides.pdf` (loc
 
 Not found in the slides: any limit on the number of tracks a team may select. **VERIFY** in the Hackerpack/Discord.
 
-**How honestly we fit State Farm (p57):** there's no multi-report triage or coordination dashboard. Our fit rests on (1) anyone at the scene can report damage for a family that has evacuated, (2) a verified hand-off so the actual resident receives it, (3) an aggregated area map of nearby reports, (4) automatic life-safety hazard detection with a 911 prompt, and (5) an auto-drafted first-notice-of-loss claim summary. It's weak on "identify those with the most urgent needs" across thousands of people and on "coordinate assistance"; don't claim those parts.
+**How honestly we fit State Farm (p57):** there's no multi-report triage or coordination dashboard. Our fit rests on (1) anyone at the scene can report damage for a family that has evacuated, (2) a verified hand-off so the actual resident receives it, (3) an aggregated area map of nearby reports that highlights where life-safety hazards cluster, (4) automatic life-safety hazard detection with a 911 prompt, and (5) an auto-drafted first-notice-of-loss claim summary. The hazard map partly answers "identify those with the most urgent needs" at the area level. It doesn't rank individuals, and it doesn't "coordinate assistance"; don't claim those parts.
 
 ## NVIDIA / Nemotron
 

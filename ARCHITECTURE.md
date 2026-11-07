@@ -197,7 +197,7 @@ sequenceDiagram
   - **VERIFY (Part 2, hour 1):** the SpacetimeDB 2.x mechanism for per-identity reads of private tables (views / RLS / client-visibility filters).
   - **Preferred:** views keyed on `ctx.sender`, joined to `verification`.
   - **Fallback:** Next.js route `GET /api/private/[...]` (Part 2) that reads with the service token and authorizes with the client-generated secret (reporter secret or verification secret; only SHA-256 hashes are stored in the module). Record whichever path works in CONTRACTS.md §5 and tell the team.
-- **Area map data.** `area_cell_summary` (public) is updated incrementally by `record_assessment` (report count, worst level, last report time per ~250 m cell). A scheduled `refresh_area_cells` reducer (every 5 min) recomputes the 72-hour window from `report`. No public table holds an address or exact coordinates. `report` carries only `cell_id`.
+- **Area map data.** `area_cell_summary` (public) is updated incrementally by `record_assessment` (report count, worst level, hazard-report count, severe-hazard count, distinct hazard flags only when the cell has ≥3 reports, and last report time per ~250 m cell). A scheduled `refresh_area_cells` reducer (every 5 min) recomputes the 72-hour window from `report`. No public table holds an address or exact coordinates. `report` carries only `cell_id`.
 - **JSON columns for nested AI/finance output.** Assessment, findings, plan and intake are stored as JSON strings validated against `packages/contracts` by the writer. Scalar columns needed for filtering and subscriptions (status, level, claimed, cell, state) are real columns. Schema migrations stay rare.
 - **Concurrency.** `claim_job` runs inside a reducer transaction, so two workers can't take the same job. `start_verification` enforces a limit of 3 per identity per rolling hour.
 - **Publishing.** Use `spacetime publish` to Maincloud. For breaking schema changes during the hackathon, use `--delete-data`, announced first; test data is lost. Bindings are generated into `packages/stdb-bindings` and committed.
@@ -302,7 +302,7 @@ The SpacetimeDB connection provider and typed hooks live in `apps/web/lib/stdb/*
 | Map | Route | Data | Who sees it |
 |---|---|---|---|
 | `<PinMap>` "My submissions" | `/reporter` | The reporter's own reports. Coordinates come from their own `report_private`. Color by `overall_level` (none grey · affected yellow · minor orange · major red · destroyed black). Badge: claimed / unclaimed | The reporter only |
-| `<CellMap>` "Recent reports in your area" | `/affected/property/[id]` | Their own property pin (exact) plus `area_cell_summary` cells within ~1 km from the last 72 h, shaded by worst level, with a count tooltip. **No other pins or addresses** | The affected person (cells are public data; the pin needs verification) |
+| `<CellMap>` "Recent reports in your area" | `/affected/property/[id]` | Their own property pin (exact) plus `area_cell_summary` cells within ~1 km from the last 72 h, with a **Damage / Hazards toggle**: Damage shades by worst level; Hazards shades by hazard-report count (amber/orange/red) and puts a ⚠ on cells with severe hazards (trapped, injury, fire, gas). The tooltip shows counts, and hazard types only when the cell has ≥3 reports. **No other pins or addresses** | The affected person (cells are public data; the pin needs verification) |
 
 ## 10. Privacy notes
 

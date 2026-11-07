@@ -51,6 +51,8 @@ export const LifeSafetyFlagSchema = z.enum([
   'structural_collapse','downed_power_line','standing_water_interior',     // serious
   'road_blocked'                                                           // access
 ]);
+export const SEVERE_FLAGS  = ['person_trapped','injury_visible','active_fire','gas_leak_suspected'] as const;
+export const SERIOUS_FLAGS = ['structural_collapse','downed_power_line','standing_water_interior'] as const;
 export const VulnerabilitySchema = z.enum(['elderly','child_under_5','disability','medical_device','no_transport','pets','limited_english']);
 export const ReportStatusSchema = z.enum(['draft','queued','processing','assessed','needs_more_footage','failed']);
 export const VerificationStateSchema = z.enum(['pending','processing','verified','failed']);
@@ -92,9 +94,14 @@ export const AreaCellSchema = z.object({
   cellId: z.string(),                          // "<row>:<col>", see cellId() below
   reportCount72h: z.number().int().nonnegative(),
   worstLevel: DamageLevelSchema,
+  hazardReportCount72h: z.number().int().nonnegative(),  // reports in the cell with ≥1 life-safety flag
+  severeHazardCount72h: z.number().int().nonnegative(),  // reports with ≥1 SEVERE_FLAGS flag
+  hazardFlags: z.array(LifeSafetyFlagSchema),            // distinct flags seen in the window; EMPTY unless reportCount72h ≥ 3 (privacy)
   lastReportAt: z.number().int(),
 });
 ```
+
+**Area-map hazard rule.** Counts come from `report.life_safety_csv` of reports with `status='assessed'` in the last 72 h. `hazardFlags` is filled only when the cell has at least 3 reports, so a hazard type can't be pinned to one house. Otherwise the UI just says "hazard reported". Hazard shading: 0 → none, 1 → amber, 2–4 → orange, ≥5 → red; any `severeHazardCount72h > 0` adds a ⚠ marker.
 
 **`packages/address`** (pure TS, zero runtime dependencies, Part 2):
 
@@ -385,7 +392,7 @@ Below are logical definitions. Part 2 translates them into the current TS module
 | `affected_profile` | private | `id pk autoInc`, `identity` (index), `property_id`, `intake_json` (AffectedIntake), `updated_at` (unique on identity+property) | Self; service |
 | `recovery_plan` | private | `id pk autoInc`, `identity` (index), `property_id`, `report_id`, `json` (RecoveryPlan), `created_at` (unique on identity+property+report) | Self; service |
 | `coach_message` | private | `id pk autoInc`, `identity` (index), `property_id`, `report_id`, `role`, `text`, `at` | Self; service |
-| `area_cell_summary` | public | `cell_id pk`, `report_count_72h u32`, `worst_level`, `last_report_at` | everyone (aggregated) |
+| `area_cell_summary` | public | `cell_id pk`, `report_count_72h u32`, `worst_level`, `hazard_report_count_72h u32`, `severe_hazard_count_72h u32`, `hazard_flags_csv` (empty unless ≥3 reports), `last_report_at` | everyone (aggregated) |
 | `job` | private | `id pk autoInc`, `kind 'analyze'|'verify_identity'|'plan'|'coach'`, `report_id u64?`, `property_id u64?`, `verification_id u64?`, `subject Identity?` (for plan/coach), `payload_json`, `state 'queued'|'leased'|'done'|'failed'`, `attempts u8`, `lease_owner Identity?`, `lease_expires_at?`, `last_error?`, `created_at` | Service |
 | `service_identity` | private | `identity pk`, `role 'admin'|'worker'` | Service |
 | `lease_tick` | scheduled | interval 30 s → `requeue_expired_jobs` | — |

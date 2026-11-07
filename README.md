@@ -34,7 +34,7 @@ Behind the scenes, Nemotron VL reads the footage, and a Nemotron agent calls too
 | **PNC** | "360° Financial Health Navigator": one clear view of the whole financial picture and the next move | Recovery Navigator: 3+ health indicators, 90-day balance forecast, "what-if" funding simulator, coach |
 | **NVIDIA** | "Use Nemotron Beyond a Chatbot": multi-step workflows, tool integration, real-world use | Nemotron VL on damage frames **and** ID documents, plus a Nemotron agent loop over tools, with a visible run trace |
 | **Spacetime** | The reactive backend: tables, functions, auth, sync | The whole backend is a SpacetimeDB module, including verification-gated access. The reporter and the affected person on two devices see progress and the "claimed" badge live |
-| **State Farm** | "The Worst Day, at Scale" | Anyone at the scene can report for an evacuated family; verified hand-off to the resident; area map; hazard detection + 911 prompt; auto-drafted claim summary. Partial fit: no multi-report triage (see IDEA.md) |
+| **State Farm** | "The Worst Day, at Scale" | Anyone at the scene can report for an evacuated family; verified hand-off to the resident; area map highlighting where life-safety hazards cluster; hazard detection + 911 prompt; auto-drafted claim summary. Partial fit: no per-person ranking or coordination dashboard (see IDEA.md) |
 | **Vultr** (MLH) | Best use of Vultr | Web and worker on a Vultr VM; footage, frames and short-lived ID images on Vultr Object Storage |
 | **GoDaddy Registry** (MLH) | Best domain | Production domain registered via GoDaddy Registry |
 
