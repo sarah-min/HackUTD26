@@ -14,18 +14,30 @@ export function addr(line1: string, lat: number | null, lng: number | null, extr
 export const BASE_LAT = 32.7767;
 export const BASE_LNG = -96.797;
 
-export function setup() {
+/**
+ * `security: 'off'` (DEFAULT) writes security_config { hold_duplicate_claims: false }: many legacy tests verify two different
+ * identities on the same property, which the duplicate-claim rule (default ON in production) would hold. Tests of the
+ * hardening itself pass `{ security: 'defaults' }` (no security_config row = the production defaults).
+ */
+export function setup(opts: { security?: 'off' | 'defaults' } = {}) {
   const clock = new TestClock(T0);
   const h = createModuleTestHarness(mod.default, mod as unknown as Record<string, unknown>, { clock });
   const internal = TestAuth.internal();
   const call = <A>(auth: TestAuth, reducer: (ctx: any, args: A) => void, args: A) =>
     h.withReducerTx(auth, ctx => reducer(ctx, args));
   call(internal, mod.init as any, {});
+  if ((opts.security ?? 'off') === 'off') {
+    call(internal, mod.admin_set_security_config as any, {
+      hold_duplicate_claims: false,
+      max_verification_starts_per_hour_global: undefined,
+      max_verification_starts_per_property_per_day: undefined,
+    });
+  }
 
   const user = (name: string) =>
     TestAuth.fromJwtPayload(JSON.stringify({ iss: 'https://test.local', sub: name, aud: 'hack' }), ConnectionId.random());
   const idOf = (auth: TestAuth) => h.viewContext(auth).sender;
-  const view = <R>(auth: TestAuth, v: (ctx: any, params: {}) => R) => v(h.viewContext(auth), {});
+  const view = (auth: TestAuth, v: (ctx: any, params: {}) => any): any => v(h.viewContext(auth), {});
 
   const worker = user('worker');
   call(internal, mod.admin_add_service as any, { identity: idOf(worker).toHexString(), role: 'worker' });
@@ -117,5 +129,40 @@ export function setup() {
     return h.db.verification.id.find(v.id)!;
   };
 
-  return { h, clock, internal, call, user, idOf, view, worker, advanceMs, createReport, upload, attach, assess, verify, jobsFor };
+  // ---- email accounts ----
+  /** Sets the email config as admin (the module's own identity). Omitted fields keep their value. */
+  const configureEmail = (mode: 'demo' | 'brevo' = 'demo', extra: Record<string, unknown> = {}) =>
+    call(internal, mod.admin_set_email_config as any, {
+      mode,
+      brevo_api_key: undefined,
+      sender_email: undefined,
+      require_stepup: undefined,
+      daily_send_cap: undefined,
+      ...extra,
+    });
+  const BREVO = { brevo_api_key: 'xkeysib-TESTKEY0123456789abcdef', sender_email: 'noreply@aftermath.example' };
+  const requestCode = (auth: TestAuth, email: string, purpose: string) =>
+    (mod.request_email_code as any)(h.procedureContext(auth), { email, purpose }) as {
+      ok: boolean; error: string; challenge_id: bigint; retry_after_s: number;
+    };
+  const verifyCode = (auth: TestAuth, challengeId: bigint, code: string) =>
+    (mod.verify_email_code as any)(h.procedureContext(auth), { challenge_id: challengeId, code }) as {
+      ok: boolean; error: string; attempts_left: number; purpose: string;
+    };
+  /** The demo code shown to `auth` (demo mode). */
+  const demoCode = (auth: TestAuth): string | undefined => view(auth, mod.my_demo_code as any)[0]?.code;
+  /** request + verify with the on-screen demo code. Returns the verify result. */
+  const emailFlow = (auth: TestAuth, email: string, purpose: string) => {
+    advanceMs(31_000); // clear the resend cooldown
+    const r = requestCode(auth, email, purpose);
+    if (!r.ok) throw new Error(`request failed: ${r.error}`);
+    return verifyCode(auth, r.challenge_id, demoCode(auth)!);
+  };
+  /** Fires the 60 s account_tick as the module itself. */
+  const tick = () => call(internal, mod.account_maintenance as any, { arg: { scheduled_id: 1n, scheduled_at: { tag: 'Interval', value: 0n } } });
+
+  return {
+    h, clock, internal, call, user, idOf, view, worker, advanceMs, createReport, upload, attach, assess, verify, jobsFor,
+    configureEmail, BREVO, requestCode, verifyCode, demoCode, emailFlow, tick,
+  };
 }

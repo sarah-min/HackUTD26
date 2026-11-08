@@ -6,6 +6,8 @@
   "description": "Dev/admin scripts. smoke-p2 + dev-fake-worker (Part 2) target the -dev database only.",
   "scripts": {
     "smoke:p2": "tsx --tsconfig tsconfig.run.json smoke-p2.ts",
+    "smoke:accounts": "tsx --tsconfig tsconfig.run.json smoke-accounts.ts",
+    "live:email": "tsx --tsconfig tsconfig.run.json live-email.ts",
     "fake-worker": "tsx --tsconfig tsconfig.run.json dev-fake-worker.ts",
     "verify:identity": "tsx --tsconfig tsconfig.run.json verify-identity.ts",
     "seed:demo": "tsx --tsconfig tsconfig.run.json seed-demo.ts",

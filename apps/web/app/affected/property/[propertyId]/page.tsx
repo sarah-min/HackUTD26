@@ -34,6 +34,9 @@ import {
   toAreaCell,
 } from '@/components/affected/helpers';
 import { useMediaUrl } from '@/components/affected/media';
+import { AccountLink } from '../../_account/AccountLink';
+import { EnrollCard } from '../../_account/EnrollCard';
+import { StepupGate } from '../../_account/StepupGate';
 
 function ReportThumb({ reportId }: { reportId: bigint }) {
   const { frames } = useVerifiedReportData(reportId);
@@ -144,10 +147,13 @@ export default function AffectedPropertyPage() {
 
   return (
     <AppShell>
-      <header>
-        <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-blue-700">Affected</p>
-        <h1 className="mt-0.5 text-lg font-bold tracking-[-0.02em] text-slate-950">Your home</h1>
-        {addressLine ? <p className="mt-1 text-[12px] text-slate-500">{addressLine}</p> : null}
+      <header className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-blue-700">Affected</p>
+          <h1 className="mt-0.5 text-lg font-bold tracking-[-0.02em] text-slate-950">Your home</h1>
+          {addressLine ? <p className="mt-1 text-[12px] text-slate-500">{addressLine}</p> : null}
+        </div>
+        <AccountLink />
       </header>
 
       {verified && anyHazard ? (
@@ -172,6 +178,8 @@ export default function AffectedPropertyPage() {
         </section>
       ) : null}
 
+      {verified ? <EnrollCard /> : null}
+
       {!verified ? (
         <section className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4">
           <p className="text-[13px] font-bold text-slate-900">
@@ -188,36 +196,38 @@ export default function AffectedPropertyPage() {
       ) : null}
 
       {verified ? (
-        <section className="space-y-2">
-          <div className="flex items-baseline justify-between gap-3">
-            <h2 className="text-[13px] font-bold text-slate-900">Reports for your home</h2>
-            {newestAssessed ? (
-              <Link
-                href={`/affected/property/${idToString(propertyId)}/recovery`}
-                className="shrink-0 rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-bold text-blue-800"
-              >
-                Recovery Navigator
-              </Link>
-            ) : null}
-          </div>
-          {reports.length === 0 ? (
-            <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4">
-              <p className="text-[13px] text-slate-700">No reports for your address yet.</p>
-              <Link
-                href={`/report/new?self=1&address=${encodeURIComponent(addressLine ?? '')}`}
-                className="block rounded-xl bg-blue-700 px-4 py-3 text-center text-[13px] font-bold text-white"
-              >
-                Film it yourself
-              </Link>
+        <StepupGate>
+          <section className="space-y-2">
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 className="text-[13px] font-bold text-slate-900">Reports for your home</h2>
+              {newestAssessed ? (
+                <Link
+                  href={`/affected/property/${idToString(propertyId)}/recovery`}
+                  className="shrink-0 rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-bold text-blue-800"
+                >
+                  Recovery Navigator
+                </Link>
+              ) : null}
             </div>
-          ) : (
-            <ul className="space-y-2">
-              {reports.map((r) => (
-                <ReportItem key={idToString(r.id)} r={r} />
-              ))}
-            </ul>
-          )}
-        </section>
+            {reports.length === 0 ? (
+              <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4">
+                <p className="text-[13px] text-slate-700">No reports for your address yet.</p>
+                <Link
+                  href={`/report/new?self=1&address=${encodeURIComponent(addressLine ?? '')}`}
+                  className="block rounded-xl bg-blue-700 px-4 py-3 text-center text-[13px] font-bold text-white"
+                >
+                  Film it yourself
+                </Link>
+              </div>
+            ) : (
+              <ul className="space-y-2">
+                {reports.map((r) => (
+                  <ReportItem key={idToString(r.id)} r={r} />
+                ))}
+              </ul>
+            )}
+          </section>
+        </StepupGate>
       ) : null}
 
       <section className="space-y-2">

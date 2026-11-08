@@ -32,6 +32,18 @@ export const T = {
   myAffectedProfiles: tables.myAffectedProfiles,
   myRecoveryPlans: tables.myRecoveryPlans,
   myCoachMessages: tables.myCoachMessages,
+
+  // Email accounts (affected persons only; spacetimedb/src/views_account.ts, CONTRACTS §5.3). All sender-scoped.
+  myAccount: tables.myAccount, // 0 or 1 row: { id, emailMasked, createdAt } when this device is signed in
+  myDevices: tables.myDevices, // devices on my account: { identityHex, label, linkedAt, lastSeenAt, isCurrent }
+  myStepup: tables.myStepup, // exactly 1 row: { deviceIdentity, linked, active, stepupUntil?, requireStepup }
+  myEmailChallenge: tables.myEmailChallenge, // my open code challenge: { id, purpose, expiresAt, attemptsLeft, deliveryState, deliveryError? }
+  myDemoCode: tables.myDemoCode, // DEMO MODE ONLY: { challengeId, purpose, code }. Label: "Demo mode: code shown on screen. Not a real email."
+  myAuthStatus: tables.myAuthStatus, // exactly 1 row: { mode: 'off' | 'demo' | 'brevo', configured }
+
+  // Security hardening (spacetimedb/src/views_security.ts, CONTRACTS §5.4). Sender-scoped.
+  myClaimConflicts: tables.myClaimConflicts, // someone else tried to verify MY property: { id, propertyId, createdAt, status: 'open' | 'approved' | 'rejected' } (nothing about them)
+  myAccessLog: tables.myAccessLog, // audit of reads/grants on MY properties, newest 50: { id, propertyId, kind: 'blob' | 'verify' | 'claim', at, mine }
 } as const;
 
 /**
@@ -51,6 +63,11 @@ export const R = {
   // File storage lives in this database (no S3): begin_upload, then upload_chunk for each 512 KiB piece.
   beginUpload: reducers.beginUpload,
   uploadChunk: reducers.uploadChunk,
+  // Email accounts: unlink this device / another device of my account / rename this device / delete my account.
+  signOutDevice: reducers.signOutDevice,
+  removeDevice: reducers.removeDevice,
+  setDeviceLabel: reducers.setDeviceLabel,
+  deleteAccount: reducers.deleteAccount,
 } as const;
 
 /**
@@ -62,6 +79,9 @@ export const P = {
   readBlob: procedures.readBlob,
   geocodeAddress: procedures.geocodeAddress,
   geocodePoint: procedures.geocodePoint,
+  // Email accounts. Both RETURN their outcome ({ ok, error, ... }) instead of throwing; see CONTRACTS §5.3 for the error codes.
+  requestEmailCode: procedures.requestEmailCode,
+  verifyEmailCode: procedures.verifyEmailCode,
 } as const;
 
 // Row types. VERIFY after spacetime generate: the generator's exported type names.
@@ -80,4 +100,14 @@ export type {
   AffectedProfile as AffectedProfileRow,
   RecoveryPlan as RecoveryPlanRow,
   CoachMessage as CoachMessageRow,
+  MyAccountRow as AccountRow,
+  MyDeviceRow as DeviceRow,
+  MyStepupRow as StepupRow,
+  MyEmailChallengeRow as EmailChallengeRow,
+  MyDemoCodeRow as DemoCodeRow,
+  AuthStatusRow as AuthStatusRow,
+  RequestEmailCodeResult as RequestEmailCodeResult,
+  VerifyEmailCodeResult as VerifyEmailCodeResult,
+  MyClaimConflictRow as ClaimConflictRow,
+  MyAccessLogRow as AccessLogRow,
 } from '@hack/stdb-bindings/types';

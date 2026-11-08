@@ -1,6 +1,9 @@
 // Scheduled reducers (CONTRACTS §5.1 lease_tick / area_tick).
 import { spacetimedb } from '../schema';
 import { lease_tick, area_tick } from '../tables/system';
+import { account_tick } from '../tables/accounts';
+import { runAccountMaintenance } from '../account_maintenance';
+import { runSecurityMaintenance } from '../security';
 import { refreshAllCells } from '../cells';
 import { failAttempt, leaseExpired } from '../jobs';
 import { fail } from '../constants';
@@ -47,5 +50,16 @@ export const refresh_area_cells = spacetimedb.reducer(
     requireScheduler(ctx.senderAuth.isInternal, ctx.sender, ctx.databaseIdentity);
     refreshAllCells(ctx);
     purgeExpiredNotices(ctx);
+  }
+);
+
+/** Every 60 s: clear expired step-ups, close expired email challenges, purge stale email addresses and demo codes, trim the security ledgers. */
+export const account_maintenance = spacetimedb.reducer(
+  { onSchedule: account_tick },
+  { arg: account_tick.rowType },
+  ctx => {
+    requireScheduler(ctx.senderAuth.isInternal, ctx.sender, ctx.databaseIdentity);
+    runAccountMaintenance(ctx.db, ctx.timestamp.microsSinceUnixEpoch);
+    runSecurityMaintenance(ctx.db, ctx.timestamp.microsSinceUnixEpoch); // start ledger (24 h) + audit log (30 d)
   }
 );
