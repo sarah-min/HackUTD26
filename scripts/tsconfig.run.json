@@ -1,0 +1,11 @@
+{
+  "//": "Runtime-only (tsx): files outside scripts/ (the generated bindings) import bare 'spacetimedb', which Node can't resolve from there. Map it to this folder's copy. Typechecking uses tsconfig.json.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "spacetimedb": ["./node_modules/spacetimedb/dist/index.mjs"],
+      "@hack/stdb-bindings": ["../packages/stdb-bindings/src/index.ts"],
+      "@hack/address": ["../packages/address/src/index.ts"]
+    }
+  }
+}

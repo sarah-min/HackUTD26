@@ -7,6 +7,7 @@ Four people are building this repo at the same time, each with their own LLM. Th
 1. Read `IDEA.md`, `ARCHITECTURE.md`, `CONTRACTS.md`, `IMPLEMENTATION_PLAN.md` and `WORKFLOW.md`.
 2. Ask your human which part they own (1–4). Find that part's **Owned files** list in `IMPLEMENTATION_PLAN.md`.
 3. Read your own `status/partN.md` and skim the other three, so you know what has already been built.
+   - **If your task touches the database, uploads, the worker or the affected pages, read `status/part2.md` → "Handoff to other parts" and `packages/stdb-bindings/README.md` first.** The backend is live; don't re-implement or edit Part 2's files.
 4. Run `git fetch && git rebase origin/main` before starting a task.
 
 ## 1. Ownership is the main rule

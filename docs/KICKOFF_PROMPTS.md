@@ -67,7 +67,7 @@ Never edit files outside your list; the worker registry belongs to P3, so ask th
 ## Resume prompt (any part, new session)
 
 ```text
-Resume work on PART <N>. Re-read AGENTS.md and the P<N> section of IMPLEMENTATION_PLAN.md, then status/part<N>.md (newest first) and skim the other status files for anything that unblocks or affects me. Run `git fetch && git rebase origin/main` (or tell me to), then `pnpm check`. Tell me which task (T<N>.x) is next, what fixtures I'm still using that can now be replaced with real integrations, and any open requests to or from other parts. Then continue with the next task. Only edit my owned files.
+Resume work on PART <N>. Re-read AGENTS.md and the P<N> section of IMPLEMENTATION_PLAN.md, then status/part<N>.md (newest first) and skim the other status files for anything that unblocks or affects me. Read status/part2.md → "Handoff to other parts" and packages/stdb-bindings/README.md before any backend work (the SpacetimeDB backend is live; use the dev database aftermath-hackutd-dev). Run `git fetch && git rebase origin/main` (or tell me to), then `pnpm check`. Tell me which task (T<N>.x) is next, what fixtures I'm still using that can now be replaced with real integrations, and any open requests to or from other parts. Then continue with the next task. Only edit my owned files.
 ```
 
 ## Merge-conflict prompt (when a rebase stops)

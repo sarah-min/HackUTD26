@@ -1,0 +1,73 @@
+{
+  "source": "fixture",
+  "schema": "DamageAssessmentSchema",
+  "description": "Sample output of scripts/dev-fake-worker.ts (assessment). DEV ONLY, not a real AI result.",
+  "data": {
+    "reportId": "2",
+    "propertyId": "2",
+    "overallLevel": "destroyed",
+    "componentLevels": {
+      "roof": "destroyed",
+      "exterior_walls": "minor",
+      "windows_doors": "minor"
+    },
+    "lifeSafety": [
+      "standing_water_interior",
+      "road_blocked"
+    ],
+    "hazard": "hurricane_wind",
+    "confidence": 0.76,
+    "usableFrameCount": 3,
+    "totalFrameCount": 3,
+    "cost": {
+      "lowCents": 3260250,
+      "likelyCents": 4657500,
+      "highCents": 6520500,
+      "lineItems": [
+        {
+          "component": "roof",
+          "level": "destroyed",
+          "basis": "[FIXTURE] 1800 sqft \u00d7 $150/sqft \u00d7 15% roof share",
+          "likelyCents": 4050000
+        },
+        {
+          "component": "exterior_walls",
+          "level": "minor",
+          "basis": "[FIXTURE] 1800 sqft \u00d7 $150/sqft \u00d7 15% \u00d7 15%",
+          "likelyCents": 607500
+        }
+      ],
+      "inputs": {
+        "homeSqft": 1800,
+        "stories": 1,
+        "tenure": "own",
+        "assumed": true
+      },
+      "costModelVersion": "cost-v1",
+      "disclaimer": "Illustrative estimate, not a contractor quote or insurance determination."
+    },
+    "declarations": [],
+    "activeAlerts": [
+      {
+        "event": "[FIXTURE] Flash Flood Warning",
+        "severity": "Severe",
+        "headline": "[FIXTURE] Simulated alert"
+      }
+    ],
+    "location": {
+      "stateCode": "TX",
+      "countyName": "[FIXTURE] County",
+      "countyFips": "48113"
+    },
+    "summary": "[FIXTURE] Simulated assessment from the dev fake worker: destroyed roof damage. Not a real AI result.",
+    "recommendedActions": [
+      "[FIXTURE] Stay clear of the hazard and call 911 if anyone is in danger."
+    ],
+    "claimNotice": "[FIXTURE] Draft first notice of loss (simulated).",
+    "modelId": "fake-worker",
+    "visionModelId": "fake-worker",
+    "promptVersion": "fixture",
+    "source": "fixture",
+    "createdAt": 1794093835300
+  }
+}

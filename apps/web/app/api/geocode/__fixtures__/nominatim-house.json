@@ -1,0 +1,12 @@
+{
+  "place_id": 1234567, "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+  "osm_type": "way", "osm_id": 7654321, "lat": "30.2746652", "lon": "-97.7403505", "category": "building",
+  "type": "government", "place_rank": 30, "importance": 0.4, "addresstype": "building", "name": "Texas State Capitol",
+  "display_name": "Texas State Capitol, 1100, Congress Avenue, Downtown, Austin, Travis County, Texas, 78701, United States",
+  "address": {
+    "building": "Texas State Capitol", "house_number": "1100", "road": "Congress Avenue", "neighbourhood": "Downtown",
+    "city": "Austin", "county": "Travis County", "state": "Texas", "ISO3166-2-lvl4": "US-TX", "postcode": "78701-2428",
+    "country": "United States", "country_code": "us"
+  },
+  "boundingbox": ["30.2735", "30.2758", "-97.7414", "-97.7393"]
+}
