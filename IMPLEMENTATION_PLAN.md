@@ -14,7 +14,7 @@ There are two views:
 | **P1. Reporter View & Shared UI** | Landing, capture flow, reporter status page, "My submissions" map, plus the shared UI kit, map and safety components | Anyone can film and submit a property in under 2 minutes on a phone and watch the status live |
 | **P2. Backend & Affected View** | SpacetimeDB module (all tables and reducers), property matching, geocoding, and the affected-person flow (address → verify → property → report page) | A verified affected person sees exactly their property's reports and nothing else; everything updates live |
 | **P3. AI Pipeline (Nemotron)** | Worker, frames, Nemotron VL damage findings, the Nemotron agent and tools, ID-document reading, plus the `<DamageReport>` and `<AgentTrace>` components | Real footage becomes a validated assessment with a visible trace; an ID photo becomes a deterministic verified/failed result |
-| **P4. Recovery Navigator & Infra** | Finance engine, intake, Navigator page, what-if, coach, plus storage, uploads, Vultr deployment and the domain | A verified affected person gets a recovery plan with a working what-if simulator, all on the live HTTPS domain |
+| **P4. Recovery Navigator & storage APIs** | Finance engine, intake, Navigator page, what-if, coach, plus S3-compatible storage client and upload/media/health routes. **Hosting/Brev is Part 3** (not Vultr) | A verified affected person gets a recovery plan with a working what-if simulator on the live HTTPS app |
 
 Pick by preference: P1 is frontend/mobile UX, P2 is backend/realtime and the gated UX, P3 is AI and agents, P4 is fintech logic plus infra.
 
@@ -197,25 +197,26 @@ packages/contracts/src/assessment.ts packages/contracts/src/agent.ts packages/co
 apps/web/components/agent-trace/** apps/web/components/damage-report/**
 fixtures/assessment/** fixtures/verification/** fixtures/media/README.md
 scripts/smoke-nim.ts
+infra/** compose.yaml Dockerfile* .dockerignore   # Brev/hosting (moved from P4; not Vultr)
 CONTRACTS.md: assessment/agent/verification, cost model, worker interfaces sections
 ```
 
-**First 60 minutes:** T3.1 + T3.3 on a FEMA public-domain image; post the verified model IDs and whether native tool calling works.
+**First 60 minutes:** T3.1 + T3.3 on a FEMA public-domain image; post the verified model IDs and whether native tool calling works. Hosting: Brev (not Vultr).
 
-**Interfaces.** *Gives:* `<AgentTrace>`, `<DamageReport>`, `pipeline` step names (`uploaded`, `extract_frames`, `analyze_frames`, `estimate_cost`, `check_declarations`, `finalize`), the `verify_identity` result, and `estimateRepairCost()` for P4. *Receives:* service reducers and the `job` table (P2), `normalizeAddress` (P2), `StoragePort` (P4), P4's handlers and tool, `<HazardList>` (P1).
+**Interfaces.** *Gives:* `<AgentTrace>`, `<DamageReport>`, `pipeline` step names (`uploaded`, `extract_frames`, `analyze_frames`, `estimate_cost`, `check_declarations`, `finalize`), the `verify_identity` result, and `estimateRepairCost()` for P4; deployed HTTPS URL / Brev env. *Receives:* service reducers and the `job` table (P2), `normalizeAddress` (P2), `StoragePort` (P4), P4's handlers and tool, `<HazardList>` (P1).
 
-**Done when:** a real 60 s clip reaches `assessed` in under 90 s with a ≥ 6-step trace and no invented dollar figures; a specimen ID verifies and a mismatched one fails with the right reason; ID objects are deleted.
+**Done when:** a real 60 s clip reaches `assessed` in under 90 s with a ≥ 6-step trace and no invented dollar figures; a specimen ID verifies and a mismatched one fails with the right reason; ID objects are deleted; web+worker reachable on Brev HTTPS.
 
 ---
 
-## P4: Recovery Navigator & Infra
+## P4: Recovery Navigator & storage APIs
 
-**Owner: Roselyn** Give the verified affected person a clear financial picture and a next move (PNC), and run everything on Vultr behind the GoDaddy domain.
+**Owner: Roselyn** Give the verified affected person a clear financial picture and a next move (PNC). Object storage client + upload APIs stay P4. **Do not use Vultr.** Deploy/hosting on **Brev is Part 3**.
 
 | # | Deliverable | Files | Depends on | Acceptance check |
 |---|---|---|---|---|
-| T4.1 | Vultr VM + Docker + Caddy; Object Storage bucket + CORS; domain (code `MLHUTD84`) → A record | `infra/**`, `docs/DEPLOYMENT.md` | none | `https://<domain>/api/health` serves P1's scaffold |
-| T4.2 | `packages/storage` `StoragePort` (presignPut/Get, get/put/delete, ping) | `packages/storage/**` | T4.1 | Round-trip test against the bucket |
+| T4.1 | _(removed)_ Hosting was Vultr; now **Part 3 / Brev**. P4 only documents S3-compatible bucket + CORS expectations in `docs/DEPLOYMENT.md` | `docs/DEPLOYMENT.md` | P3 host URL | `/api/health` reachable on the deployed URL |
+| T4.2 | `packages/storage` `StoragePort` (presignPut/Get, get/put/delete, ping) | `packages/storage/**` | S3-compatible bucket (any provider) | Round-trip test against the bucket (or `STORAGE_DRIVER=memory` in dev) |
 | T4.3 | `/api/uploads/presign` (`kind=media`/`idv`, limits, key layout), `/api/media/[...key]` (verified only; never `idv/`), `/api/health` | `app/api/uploads/**`, `api/media/**`, `api/health/**` | T4.2, T2.5 | Oversize/wrong type rejected; `idv/` → 403 |
 | T4.4 | Contracts `finance.ts` incl. `AffectedIntake`, `Household` | `packages/contracts/src/finance.ts` | T2.1 | Compiles |
 | T4.5 | ≥ 3 synthetic personas + `getPersona` | `packages/finance/src/personas/**` | T4.4 | Each validates |
@@ -226,7 +227,7 @@ CONTRACTS.md: assessment/agent/verification, cost model, worker interfaces secti
 | T4.10 | Recovery page: intake → `save_affected_intake`; report picker; indicators; gap; forecast (Recharts); ranked options | `app/affected/property/[propertyId]/recovery/**` | T2.13 | Verified only; works on a phone |
 | T4.11 | What-if panel: repair case, payout delay, deductible, income loss, funding mix → `simulate()` | same + `components/finance/**` | T4.7 | The chart redraws instantly |
 | T4.12 | Coach: chat UI → `ask_coach`; `coach` handler grounded in the plan JSON | same + `packages/finance/src/coach/**` | T3.1 | Answers use plan figures only |
-| T4.13 | `.env.example`, `infra/deploy.sh`, restart policies, cost ledger in `status/part4.md` | `infra/**`, `.env.example` | T4.1 | Redeploy after a merge < 5 min |
+| T4.13 | `.env.example` (incl. `S3_*`, `STDB_WEB_TOKEN`); cost notes in `status/part4.md`. Deploy scripts owned by P3 | `.env.example`, `docs/DEPLOYMENT.md` | P3 Brev | Env names documented; health works once hosted |
 | T4.14 | Tests: indicators, forecast, ranking, integer cents, presign limits, media gating | P4 packages | — | `pnpm check` green |
 
 **Owned files**
@@ -237,16 +238,18 @@ packages/contracts/src/finance.ts
 apps/web/app/affected/property/[propertyId]/recovery/**
 apps/web/components/finance/**
 apps/web/app/api/uploads/** apps/web/app/api/media/** apps/web/app/api/health/**
-infra/** compose.yaml Dockerfile* .dockerignore .env.example docs/DEPLOYMENT.md
+.env.example docs/DEPLOYMENT.md
 fixtures/finance/**
 CONTRACTS.md: finance, finance formulas, HTTP API, env sections
 ```
 
-**First 60 minutes:** T4.1 started (VM, bucket, domain); T4.2 + T4.3 presign working; personas + `buildRecoveryPlan` against a fixture assessment.
+**Not P4 (moved):** `infra/**`, compose/Dockerfiles, Brev/VM/domain provisioning → **Part 3**.
 
-**Interfaces.** *Gives:* `StoragePort`, presign/media/health routes, `buildRecoveryPlan`, `simulate`, `getPersona`, `plan`/`coach` handlers, the `build_recovery_plan` tool, `<RecoverySummaryCard>`, the deployed URL and env. *Receives:* the intake reducers and `recovery_plan` table (P2), `estimateRepairCost` and the registries (P3), the scaffold (P1).
+**First 60 minutes:** T4.2 + T4.3 storage/presign; personas + `buildRecoveryPlan` against a fixture assessment. Coordinate S3 endpoint with P3’s host.
 
-**Done when:** a verified affected person completes intake on a phone and sees 5 indicators, the gap, a forecast and ranked options; a what-if slider redraws instantly; the coach answers from the plan; everything runs on the HTTPS domain.
+**Interfaces.** *Gives:* `StoragePort`, presign/media/health routes, `buildRecoveryPlan`, `simulate`, `getPersona`, `plan`/`coach` handlers, the `build_recovery_plan` tool, `<RecoverySummaryCard>`, env var names. *Receives:* the intake reducers and `recovery_plan` table (P2), `estimateRepairCost` and the registries (P3), the scaffold (P1), deployed HTTPS URL (P3/Brev).
+
+**Done when:** a verified affected person completes intake on a phone and sees 5 indicators, the gap, a forecast and ranked options; a what-if slider redraws instantly; the coach answers from the plan; the app is reachable on the HTTPS host P3 provides.
 
 ---
 

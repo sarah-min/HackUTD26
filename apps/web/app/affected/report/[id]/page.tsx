@@ -7,6 +7,7 @@ import { useParams } from 'next/navigation';
 import { idFromString, idToString, useReport, useVerifiedFor } from '@/lib/stdb';
 import { AgentTrace, Banner911, DamageReport, HazardList, RecoverySummaryCard } from '@/components/affected/external';
 import { DAMAGE_LEVEL_TEXT, STATUS_TEXT, parseFlagsCsv, parseLevel } from '@/components/affected/helpers';
+import { AppShell } from '@/components/chrome/AppShell';
 
 export default function AffectedReportPage() {
   const params = useParams<{ id: string }>();
@@ -14,19 +15,47 @@ export default function AffectedReportPage() {
   const { report, ready } = useReport(reportId);
   const { verified, ready: verReady } = useVerifiedFor(report?.propertyId ?? null);
 
-  if (reportId === null) return <main className="px-4 py-6">That link isn't valid.</main>;
-  if (!ready || (report && !verReady)) return <main className="px-4 py-6 text-gray-600">Loading…</main>;
-  if (!report) return <main className="px-4 py-6">We couldn't find that report.</main>;
+  if (reportId === null) {
+    return (
+      <AppShell>
+        <p className="text-[13px] text-slate-700">That link isn&apos;t valid.</p>
+      </AppShell>
+    );
+  }
+  if (!ready || (report && !verReady)) {
+    return (
+      <AppShell>
+        <p className="text-sm text-slate-600">Loading…</p>
+      </AppShell>
+    );
+  }
+  if (!report) {
+    return (
+      <AppShell>
+        <p className="text-[13px] text-slate-700">We couldn&apos;t find that report.</p>
+      </AppShell>
+    );
+  }
 
   if (!verified) {
     return (
-      <main className="mx-auto max-w-md space-y-3 px-4 py-6">
-        <h1 className="text-xl font-semibold">Verify to see this report</h1>
-        <p className="text-sm text-gray-600">Only the verified resident of this address can open the full damage report.</p>
-        <Link href="/affected/start" className="inline-block rounded-lg bg-black px-4 py-3 font-medium text-white">
-          I've been affected
+      <AppShell>
+        <header>
+          <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-blue-700">Affected</p>
+          <h1 className="mt-0.5 text-lg font-bold tracking-[-0.02em] text-slate-950">
+            Verify to see this report
+          </h1>
+          <p className="mt-1 text-[12px] text-slate-500">
+            Only the verified resident of this address can open the full damage report.
+          </p>
+        </header>
+        <Link
+          href="/affected/start"
+          className="block rounded-xl bg-blue-700 px-4 py-3 text-center text-[13px] font-bold text-white"
+        >
+          I&apos;ve been affected
         </Link>
-      </main>
+      </AppShell>
     );
   }
 
@@ -35,19 +64,31 @@ export default function AffectedReportPage() {
   const flags = parseFlagsCsv(report.lifeSafetyCsv);
 
   return (
-    <main className="mx-auto max-w-2xl space-y-5 px-4 py-6">
-      <Link href={`/affected/property/${propertyId}`} className="text-sm underline">
+    <AppShell>
+      <Link
+        href={`/affected/property/${propertyId}`}
+        className="text-[12px] font-bold text-blue-700 underline"
+      >
         ← Your home
       </Link>
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold">{DAMAGE_LEVEL_TEXT[parseLevel(report.overallLevel)]}</h1>
-        <p className="text-sm text-gray-600">
+      <header>
+        <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-blue-700">
+          Damage report
+        </p>
+        <h1 className="mt-0.5 text-lg font-bold tracking-[-0.02em] text-slate-950">
+          {DAMAGE_LEVEL_TEXT[parseLevel(report.overallLevel)]}
+        </h1>
+        <p className="mt-1 text-[12px] text-slate-500">
           {report.hazard.replace(/_/g, ' ')} · {STATUS_TEXT[report.status] ?? report.status}
-          {report.source !== 'live' && <span className="ml-2 rounded bg-gray-200 px-1 text-xs">{report.source}</span>}
+          {report.source !== 'live' ? (
+            <span className="ml-2 rounded bg-slate-100 px-1 text-[10px] font-bold uppercase text-slate-600">
+              {report.source}
+            </span>
+          ) : null}
         </p>
       </header>
 
-      {(report.selfDanger || flags.length > 0) && (
+      {report.selfDanger || flags.length > 0 ? (
         <Banner911
           reason={
             report.selfDanger
@@ -55,22 +96,25 @@ export default function AffectedReportPage() {
               : 'The footage shows a possible life-safety hazard.'
           }
         />
-      )}
+      ) : null}
       <HazardList flags={flags} />
 
-      {report.status === 'needs_more_footage' && (
-        <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
-          The footage wasn't clear enough for a full assessment. You can film your home yourself to add a report.
+      {report.status === 'needs_more_footage' ? (
+        <p className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-[12px] text-amber-900">
+          The footage wasn&apos;t clear enough for a full assessment. You can film your home
+          yourself to add a report.
         </p>
-      )}
+      ) : null}
 
       <DamageReport reportId={id} />
-      {report.status === 'assessed' && <RecoverySummaryCard propertyId={propertyId} reportId={id} />}
+      {report.status === 'assessed' ? (
+        <RecoverySummaryCard propertyId={propertyId} reportId={id} />
+      ) : null}
       <AgentTrace reportId={id} mode="full" />
 
-      <p className="text-xs text-gray-500">
+      <p className="text-[11px] text-slate-500">
         AI estimate, not an insurance determination or inspection.
       </p>
-    </main>
+    </AppShell>
   );
 }
