@@ -94,7 +94,7 @@ async function main(): Promise<void> {
   const runner = new Runner({ stdb, storage, nim, log, handlers, concurrency: 2, pollMs: 300 });
 
   const reporter = await anon('reporter', [
-    'SELECT * FROM report', 'SELECT * FROM my_reports', 'SELECT * FROM my_agent_steps', 'SELECT * FROM area_notice',
+    'SELECT * FROM my_reports', 'SELECT * FROM my_agent_steps', 'SELECT * FROM area_notice',
   ]);
   const R = reporter.conn;
   const mine = (row: { reporter: { toHexString(): string } }) => hex(row.reporter) === reporter.idHex;
@@ -102,7 +102,7 @@ async function main(): Promise<void> {
   await R.reducers.createReport({
     inputJson: JSON.stringify({ hazard: 'flood', address, selfDanger: false, isSelfReport: false, reporterSecretHash: sha256(randomBytes(32)), notes: 'P3 E2E TEST (fixture)' }),
   });
-  const report = await waitFor('report row', () => [...R.db.report.iter()].find(mine), 15_000);
+  const report = await waitFor('report row', () => [...R.db.myReports.iter()].find(mine), 15_000);
   if (!check('reporter creates a report', !!report)) return;
   const reportId = report!.id;
   // > 512 KiB so the upload spans several chunks.
@@ -117,8 +117,8 @@ async function main(): Promise<void> {
 
   runner.start();
   try {
-    const assessed = await waitFor('report status assessed', () => [...R.db.report.iter()].find((r) => r.id === reportId && r.status === 'assessed'), 90_000);
-    const last = [...R.db.report.iter()].find((r) => r.id === reportId);
+    const assessed = await waitFor('report status assessed', () => [...R.db.myReports.iter()].find((r) => r.id === reportId && r.status === 'assessed'), 90_000);
+    const last = [...R.db.myReports.iter()].find((r) => r.id === reportId);
     if (!check('worker analyzes the report (status → assessed)', !!assessed, `status=${last?.status}`)) return;
     const reporterSteps = [...R.db.myAgentSteps.iter()].filter((s) => s.reportId === reportId);
     check('reporter sees only reporter-visible pipeline steps', reporterSteps.length > 0 && reporterSteps.every((s) => s.visibility === 'reporter'), `${reporterSteps.length} steps`);
@@ -127,7 +127,8 @@ async function main(): Promise<void> {
     check('area notices table readable by an unverified visitor', true, `${notices.length} notices in view`);
 
     // Affected person verifies with a placeholder ID image (fixture extraction).
-    const stranger = await anon('stranger', ['SELECT * FROM report']);
+    const stranger = await anon('stranger', ['SELECT * FROM my_reports']);
+    check('a stranger sees no reports (report is private)', [...stranger.conn.db.myReports.iter()].length === 0);
     const asStranger = await stranger.conn.procedures.readBlob({ objectKey: photoKey, seq: 0 });
     check('an unverified stranger cannot read the footage', !asStranger.ok && asStranger.error === 'forbidden');
     stranger.conn.disconnect();
