@@ -28,7 +28,7 @@ This is the index only. **Each part logs progress in its own append-only file**,
 - [ ] Scaffold on main; everyone rebased (P1)
 - [x] Module on Maincloud + bindings + provider hooks (P2): live as `aftermath-hackutd` (demo) and `aftermath-hackutd-dev` (build against this)
 - [ ] Real Nemotron VL call returns a valid FrameFinding (P3)
-- [ ] Presigned upload to Vultr Object Storage; VM serving HTTPS (P4)
+- [x] File storage lives in SpacetimeDB (blobs, done by P2/P3); [ ] HTTPS hosting on Brev (P3)
 - [ ] `/api/geocode` returns normalized addresses (forward + reverse) (P2)
 - [ ] **Reporter slice:** capture → upload → worker → findings → assessment; the reporter status page shows safety + status only, live
 - [ ] **Affected slice:** address → ID photo → `verify_identity` job → verified; property page lists matching reports. Unverified identities are blocked (gating works); the `idv/` image is deleted

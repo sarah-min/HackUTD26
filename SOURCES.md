@@ -11,10 +11,12 @@ Source: `HackTX template to use/Public HackUTD Opening Ceremony Slides.pdf` (loc
 | **PNC** | p20 | "360° Financial Health Navigator… How could AI help someone see their whole financial picture, make sense of it & feel confident about their next move?" Suggested answers: "A Conversational Coach", "3+ Health Assessment Indicators", "Forecast Balances & Financial Obligations", "'What if' Simulator", "Something no one has thought of yet!" Prizes: PS5 Slim / Ninja CREAMi / AirPods Pro 3 |
 | **State Farm** | p57 | "The Worst Day, at Scale — Intelligent Catastrophe Response. When a major disaster affects thousands of people simultaneously, how might we use AI and technology to identify those with the most urgent needs, coordinate assistance, and ensure no one is overlooked?" Prizes: Beats Studio Pro / RC drone / portable monitor |
 | **NVIDIA** | p64 | "Use Nemotron Beyond a Chatbot. In addition to using Nemotron, your project must include: Beyond a Chatbot (not just responding directly to prompts); Multi-step workflows (agents that plan and execute complex tasks); Tool integration (using external APIs and services intelligently); Real-world applicability (solving actual problems)." Prizes: 1st 2× RTX 5080 + $200 Brev credits; 2nd 1× RTX 5080 + $200 Brev credits + swag |
-| **Spacetime** | p49 | "The reactive backend. Build the whole thing by Sunday. A database that runs your server logic inside it and streams every change to connected clients in real time — tables, functions, auth, hosting and sync in one system." "No glue code", "Agents love it", "Multiplayer by default". 100,000 TeV free Maincloud credit (~$38), code **`HACKUTD2026`**, one per GitHub account |
-| **GoDaddy Registry** (MLH) | p87 | "Best Domain from GoDaddy Registry." Code **`MLHUTD84`**; mlh.link/godaddyregistry |
-| **Vultr** (MLH) | p88 | "Best Use of Vultr — the ultimate developer toolkit for building on the cloud." mlh.link/vultr |
+| **Spacetime** *(not a submission track; still our backend)* | p49 | "The reactive backend. Build the whole thing by Sunday. A database that runs your server logic inside it and streams every change to connected clients in real time — tables, functions, auth, hosting and sync in one system." "No glue code", "Agents love it", "Multiplayer by default". 100,000 TeV free Maincloud credit (~$38), code **`HACKUTD2026`**, one per GitHub account |
+| **GoDaddy Registry** (MLH) *(not a submission track)* | p87 | "Best Domain from GoDaddy Registry." Code **`MLHUTD84`**; mlh.link/godaddyregistry |
+| **Vultr** (MLH) *(not a submission track)* | p88 | "Best Use of Vultr — the ultimate developer toolkit for building on the cloud." mlh.link/vultr |
 | **Schedule** | p105–108 | Sponsor workshops 1:30–8:00 PM; initial Devpost deadline **11:00 PM**; final Devpost deadline **12:00 PM**; judging 1–4 PM. **VERIFY** the dates and full schedule in the Hackerpack |
+
+**We submit to State Farm, PNC and NVIDIA only.** The other rows are kept as reference.
 
 Not found in the slides: any limit on the number of tracks a team may select. **VERIFY** in the Hackerpack/Discord.
 
@@ -76,9 +78,9 @@ Specimen IDs used:
 
 | Item | Source | Status |
 |---|---|---|
-| Vultr credit / onboarding | mlh.link/vultr | **VERIFY** the credit amount |
-| Vultr Object Storage (S3-compatible) | https://docs.vultr.com/products/cloud-storage/object-storage | Works with `@aws-sdk/client-s3`. **VERIFY** the endpoint hostname for the chosen region and CORS support |
-| GoDaddy Registry domain | mlh.link/godaddyregistry, code `MLHUTD84` | **VERIFY** which TLDs the code covers |
+| *(not needed, not a track)* Vultr credit / onboarding | mlh.link/vultr | **VERIFY** the credit amount |
+| *(not needed; storage is in SpacetimeDB)* Vultr Object Storage (S3-compatible) | https://docs.vultr.com/products/cloud-storage/object-storage | Works with `@aws-sdk/client-s3`. **VERIFY** the endpoint hostname for the chosen region and CORS support |
+| *(optional, not a track)* GoDaddy Registry domain | mlh.link/godaddyregistry, code `MLHUTD84` | **VERIFY** which TLDs the code covers |
 | Caddy automatic HTTPS | https://caddyserver.com/docs/automatic-https | Needs ports 80/443 open and the A record live |
 
 ## Media (demo footage)
@@ -101,12 +103,12 @@ Never commit media files. Add a row for every clip used:
 - [ ] Which Nemotron agent model supports reliable OpenAI-style tool calling (Part 3)
 - [ ] SpacetimeDB 2.x private-row visibility mechanism (views/RLS), or use the HTTP fallback (Part 2)
 - [ ] SpacetimeDB scheduled reducer syntax and Maincloud publish/identity token flow (Part 2)
-- [ ] Vultr Object Storage regional endpoint and CORS config (Part 4)
-- [ ] Vultr event credit amount; GoDaddy Registry code TLD coverage (Part 4)
+- [x] ~~Vultr Object Storage regional endpoint and CORS config~~ (not needed: storage is in SpacetimeDB)
+- [x] ~~Vultr credit; GoDaddy code TLD coverage~~ (not submission tracks)
 - [ ] OpenFEMA / NWS / FCC field names and response shapes (Part 3)
 - [ ] Devpost track-selection limit; exact event dates and deadlines (everyone)
 - [ ] License of each demo clip (whoever adds it)
 - [ ] Census Geocoder benchmark/response shape; Nominatim policy compliance (Part 2)
 - [ ] Nemotron VL accuracy on specimen IDs (name/address extraction) (Part 3)
-- [ ] Vultr Object Storage lifecycle-rule support for the `idv/` prefix (Part 4)
+- [x] ~~Vultr lifecycle rules for `idv/`~~ (not needed: the module deletes ID images itself)
 - [ ] Terms of each specimen ID image (whoever adds it)
