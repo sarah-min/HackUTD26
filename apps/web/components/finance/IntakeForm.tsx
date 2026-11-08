@@ -7,6 +7,7 @@ import {
 } from '@hack/contracts/finance';
 import type { Vulnerability } from '@hack/contracts/common';
 import { PERSONAS } from '@hack/finance';
+import { FinanceDisclaimer } from './FinanceDisclaimer';
 
 const VULNS: { id: Vulnerability; label: string }[] = [
   { id: 'elderly', label: 'Elderly' },
@@ -75,9 +76,8 @@ export function IntakeForm({
     <form className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4" onSubmit={submit}>
       <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-blue-700">Intake</p>
       <h2 className="text-[15px] font-bold text-slate-950">Household &amp; coverage</h2>
-      <p className="text-[11px] text-amber-800">
-        Synthetic demo profiles — educational, not financial advice.
-      </p>
+      <FinanceDisclaimer />
+      <p className="text-[11px] text-amber-800">Synthetic demo profiles — labeled fixture data.</p>
 
       <label className="block space-y-1">
         <span className="text-[12px] font-semibold text-slate-700">Demo persona</span>

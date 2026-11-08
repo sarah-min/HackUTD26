@@ -4,9 +4,47 @@ Owner: Roselyn. Append-only, newest entry first. Format is in [STATUS.md](../STA
 
 ## Requests to other parts (open)
 
+- **P2 (Sidd) — blocking analyze locally:** register this worker identity on **both** DBs (minted via `pnpm --filter @hack/worker identity` on Roselyn’s machine; token is only in gitignored `.env.local` / `~/.config/aftermath/worker-token`):
+  ```
+  spacetime call --server maincloud aftermath-hackutd-dev admin_add_service '"c20050ec1127b417108012e8359d013e783d4186e6a0bad9f1c4a0db7c448468"' '"worker"'
+  spacetime call --server maincloud aftermath-hackutd admin_add_service '"c20050ec1127b417108012e8359d013e783d4186e6a0bad9f1c4a0db7c448468"' '"worker"'
+  ```
+  Until then `pnpm --dir scripts fake-worker` connects but cannot see/claim `svc_jobs`.
 - **P3 (Nemotron / Brev):** Register `planHandler` and `coachHandler` from `@hack/finance` in `apps/worker/src/handlers/index.ts` (one import + one registry line each). Hosting stays Brev. Live HTTPS URL when ready.
 - **P2:** Confirm web identity registered as `web` if any legacy `/api/*` auth is kept. `RecoverySummaryCard` is already flipped on reconcile-p4.
-- **P1:** Confirm workspace members `@hack/finance` + `@hack/storage` + `@hack/damage` on main.
+- **P1:** Confirm workspace members `@hack/finance` + `@hack/storage` + `@hack/damage` on main. **Also:** `part4/updatedfront-ui` prioritizes Updatedfront Mapbox maps inside `components/map/**` and the Updatedfront home/shell. Plan still listed Leaflet — please confirm Mapbox is OK for demo or re-home ownership.
+
+## 2026-11-08 02:05: Fix stuck Connecting + start fake-worker (branch part4/updatedfront-ui)
+
+- **Shipped:** Rebased onto `origin/main` (PR #8 report privacy: stop subscribing to private `report`; use `my_*` / `svc_reports`). Cleared inline comment pollution on `STDB_MODULE` in local `.env.local`. Minted worker identity, set `DEV_WORKER_TOKEN` / `STDB_SERVICE_TOKEN` from `~/.config/aftermath/worker-token`, restarted Next (`:3000` webpack) and `pnpm --dir scripts fake-worker` (connected + watching). `ReportStatus` shows clearer connect/worker waiting copy.
+- **Verify:** Hard-refresh `http://localhost:3000/report/<id>` — should leave “Connecting…” once Live. Typecheck `@hack/web` clean. Fake-worker log shows `connected … watching for jobs`.
+- **Fixtures still faked:** analyze still needs a **registered** worker (or Brev P3) to leave `queued`.
+- **Requests to other parts:** P2 register identity above (blocking).
+- **Blocked on:** P2 `admin_add_service` for that hex.
+
+## 2026-11-08 08:30: Photo EXIF GPS → reverse geocode on report capture (branch part4/updatedfront-ui)
+
+- **Shipped:** `exifr` + `photoGps.ts`; selecting geotagged evidence on `/report/new` reads GPS (client-side, no EXIF logged) and reverse-geocodes via SpacetimeDB `geocode_point` into the confirmed address. Hint + status note in Location/Evidence UI. Autofill remains the manual path when EXIF is missing.
+- **Verify:** Upload a JPEG with GPS → Location fills / note appears. Upload a stripped screenshot → “No GPS…” note; pick Mapbox suggestion instead.
+- **Fixtures still faked:** none.
+- **Requests to other parts:** P1 — touched `ReportCapture` / report helpers for EXIF flow.
+- **Blocked on:** none.
+
+## 2026-11-08 07:25: Mapbox Address Autofill on Location inputs (branch part4/updatedfront-ui)
+
+- **Shipped:** `@mapbox/search-js-react` + `MapboxAddressInput` wired into reporter capture Location and `/affected/start` home address. Selecting a suggestion fills the field and runs the existing SpacetimeDB geocode so `NormalizedAddress` stays census/nominatim.
+- **Verify:** Set `NEXT_PUBLIC_MAPBOX_TOKEN` (Search/Autofill enabled) in `.env.local`, restart web, type on `/report/new` or `/affected/start` — suggestions appear; pick one → canonical match list / confirmed address.
+- **Fixtures still faked:** none new.
+- **Requests to other parts:** P1/P2 — touched `ReportCapture` + `affected/start` for autofill.
+- **Blocked on:** real Mapbox pk. token with Address Autofill product enabled.
+
+## 2026-11-08 07:10: Prioritize Updatedfront Mapbox + phone UI (branch part4/updatedfront-ui)
+
+- **Shipped:** Ported Mapbox building-highlight map into `apps/web/components/map/` (`MapboxDamageMap`, damage/geo helpers). `PinMap` + `CellMap` now use Mapbox 3D (Leaflet left unused). Home uses Updatedfront wide landing (no phone shell). `AppShell` / header match Updatedfront 480px phone frame + safe-area CSS. `NEXT_PUBLIC_MAPBOX_TOKEN` in `.env.example`.
+- **Verify:** Set `NEXT_PUBLIC_MAPBOX_TOKEN` in `.env.local`, `pnpm --filter @hack/web typecheck`, `pnpm --filter @hack/web dev` → `/` looks like Updatedfront home; `/reporter` and `/affected/property/...` show Mapbox building map (token required).
+- **Fixtures still faked:** CellMap area fill uses synthetic neighborhood shading when no live cells. Recovery/coach still as before.
+- **Requests to other parts:** P1 confirm Mapbox vs Leaflet plan; touches `components/map/**` + home/chrome (reconcile ownership).
+- **Blocked on:** real Mapbox pk. token in local env.
 
 ## 2026-11-08 06:20: Recovery Navigator UI + plan/coach handlers (branch reconcile-p4)
 

@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect } from 'react';
-import { CircleMarker, MapContainer, Popup, TileLayer, useMap } from 'react-leaflet';
-import { damageLevelHex } from '@/lib/format';
-import './leaflet.css';
+import { useMemo } from 'react';
+import { DamageLegend, MapboxDamageMap, type BuildingHighlight, type MapMarkerSpec } from './MapboxDamageMap';
+import { DEFAULT_CENTER } from './mapboxGeo';
+import type { DamageStatus } from './mapboxDamage';
 
 export type MapPin = {
   id: string;
@@ -15,25 +15,42 @@ export type MapPin = {
   href?: string;
 };
 
-function FitPins({ pins }: { pins: MapPin[] }) {
-  const map = useMap();
-  useEffect(() => {
-    if (pins.length === 0) return;
-    if (pins.length === 1) {
-      map.setView([pins[0]!.lat, pins[0]!.lng], 15);
-      return;
-    }
-    map.fitBounds(
-      pins.map((p) => [p.lat, p.lng] as [number, number]),
-      { padding: [36, 36], maxZoom: 16 },
-    );
-  }, [map, pins]);
-  return null;
+function toStatus(level: string): DamageStatus {
+  const key = level.toLowerCase();
+  if (key === 'destroyed' || key === 'severe') return 'severe';
+  if (key === 'major' || key === 'moderate') return 'moderate';
+  if (key === 'minor' || key === 'affected') return 'minor';
+  return 'none';
 }
 
-/** Reporter "My submissions" pin map — only this identity's reports. */
+/** Reporter "My submissions" map — Updatedfront Mapbox building highlights + pins. */
 export function PinMap({ pins }: { pins: MapPin[] }) {
-  const center = pins[0] ? ([pins[0].lat, pins[0].lng] as [number, number]) : ([32.78, -96.8] as [number, number]);
+  const center = pins[0] ? { lng: pins[0].lng, lat: pins[0].lat } : DEFAULT_CENTER;
+
+  const highlights: BuildingHighlight[] = useMemo(
+    () =>
+      pins.map((p) => ({
+        id: p.id,
+        lng: p.lng,
+        lat: p.lat,
+        status: toStatus(p.level),
+      })),
+    [pins],
+  );
+
+  const markers: MapMarkerSpec[] = useMemo(
+    () =>
+      pins.map((p) => ({
+        id: p.id,
+        lng: p.lng,
+        lat: p.lat,
+        status: toStatus(p.level),
+        variant: 'pin',
+        label: p.claimed ? 'Claimed' : p.label,
+        ariaLabel: p.label,
+      })),
+    [pins],
+  );
 
   if (pins.length === 0) {
     return (
@@ -45,37 +62,21 @@ export function PinMap({ pins }: { pins: MapPin[] }) {
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
-      <MapContainer center={center} zoom={13} className="z-0 h-64 w-full" scrollWheelZoom={false}>
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      <div className="relative h-[420px] w-full bg-[#111922]">
+        <MapboxDamageMap
+          center={center}
+          highlights={highlights}
+          markers={markers}
+          zoom={16.2}
+          pitch={55}
+          bearing={-20}
+          className="absolute inset-0"
         />
-        <FitPins pins={pins} />
-        {pins.map((p) => (
-          <CircleMarker
-            key={p.id}
-            center={[p.lat, p.lng]}
-            pathOptions={{
-              color: p.claimed ? '#059669' : damageLevelHex(p.level),
-              fillColor: damageLevelHex(p.level),
-              fillOpacity: 0.9,
-              weight: 2,
-            }}
-            radius={9}
-          >
-            <Popup>
-              <p className="text-xs font-semibold">{p.label}</p>
-              <p className="text-xs capitalize">{p.level}</p>
-              {p.claimed ? <p className="text-xs font-bold text-emerald-700">Claimed</p> : null}
-              {p.href ? (
-                <a className="text-xs font-bold text-blue-700 underline" href={p.href}>
-                  Open report
-                </a>
-              ) : null}
-            </Popup>
-          </CircleMarker>
-        ))}
-      </MapContainer>
+        <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-xl border border-white/15 bg-[#0f172a]/85 px-3 py-2 text-white shadow-lg backdrop-blur-md">
+          <p className="mb-1 text-[8px] font-bold uppercase tracking-[0.12em] text-slate-300">Damage</p>
+          <DamageLegend className="text-slate-100" />
+        </div>
+      </div>
     </div>
   );
 }

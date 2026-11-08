@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import type { RecoverySummaryCardProps } from '@/components/affected/placeholders/types';
 import { formatCents } from '@/lib/format';
 import { idFromString } from '@/lib/stdb';
+import { FinanceDisclaimer } from './FinanceDisclaimer';
 import { useRecoveryData } from './useRecoveryData';
 
 /**
@@ -37,6 +38,7 @@ export function RecoverySummaryCard({ propertyId, reportId }: RecoverySummaryCar
     >
       <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-blue-700">Recovery</p>
       <h2 className="mt-0.5 text-[15px] font-bold text-slate-950">Recovery Navigator</h2>
+      <FinanceDisclaimer />
 
       {!ready ? (
         <p className="mt-2 text-[12px] text-slate-500">Loading plan…</p>
@@ -50,12 +52,10 @@ export function RecoverySummaryCard({ propertyId, reportId }: RecoverySummaryCar
               Watch: <span className="font-semibold">{worst.label}</span> ({worst.status})
             </p>
           ) : null}
-          <p className="mt-2 text-[11px] text-slate-500">{plan.disclaimer}</p>
         </>
       ) : (
         <p className="mt-2 text-[12px] leading-relaxed text-slate-500">
-          Educational estimate using a synthetic demo profile. Not financial advice. Complete
-          intake to see coverage gap, indicators, and next steps.
+          Complete intake to see coverage gap, indicators, and next steps.
         </p>
       )}
 

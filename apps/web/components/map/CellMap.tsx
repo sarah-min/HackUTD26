@@ -1,123 +1,115 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
-import { CircleMarker, MapContainer, Polygon, Popup, TileLayer, useMap } from 'react-leaflet';
+import { useMemo } from 'react';
 import { cellBounds } from '@hack/address';
 import type { CellMapProps } from '@/components/affected/placeholders/types';
-import { DAMAGE_LEVEL_RANK } from '@hack/contracts/common';
-import { damageLevelHex } from '@/lib/format';
-import './leaflet.css';
+import { DamageLegend, MapboxDamageMap, type BuildingHighlight, type MapMarkerSpec } from './MapboxDamageMap';
+import type { DamageStatus } from './mapboxDamage';
+import { demoStatusFor } from './mapboxGeo';
 
-function FitBounds({
-  center,
-  cells,
-}: {
-  center: { lat: number; lng: number };
-  cells: CellMapProps['cells'];
-}) {
-  const map = useMap();
-  useEffect(() => {
-    const pts: [number, number][] = [[center.lat, center.lng]];
-    for (const c of cells) {
-      const [[south, west], [north, east]] = cellBounds(c.cellId);
-      pts.push([south, west], [north, east]);
-    }
-    if (pts.length === 1) {
-      map.setView(pts[0]!, 15);
-      return;
-    }
-    map.fitBounds(pts, { padding: [28, 28], maxZoom: 16 });
-  }, [map, center, cells]);
+function toStatus(level: string): DamageStatus {
+  const key = level.toLowerCase();
+  if (key === 'destroyed' || key === 'severe') return 'severe';
+  if (key === 'major' || key === 'moderate') return 'moderate';
+  if (key === 'minor' || key === 'affected') return 'minor';
+  return 'none';
+}
+
+function hazardStatus(cell: CellMapProps['cells'][number]): DamageStatus | null {
+  if (cell.severeHazardCount72h > 0) return 'severe';
+  if (cell.hazardReportCount72h >= 5) return 'severe';
+  if (cell.hazardReportCount72h >= 2) return 'moderate';
+  if (cell.hazardReportCount72h >= 1) return 'minor';
   return null;
 }
 
-function cellFill(cell: CellMapProps['cells'][number], mode: CellMapProps['mode']): string {
-  if (mode === 'damage') {
-    if (DAMAGE_LEVEL_RANK[cell.worstLevel] <= 0) return 'transparent';
-    return damageLevelHex(cell.worstLevel);
-  }
-  const n = cell.hazardReportCount72h;
-  if (n <= 0) return 'transparent';
-  if (n === 1) return '#f59e0b';
-  if (n <= 4) return '#ea580c';
-  return '#dc2626';
-}
-
-/** Aggregated ~250 m cells for the affected area view (IMPLEMENTATION_PLAN T1.5). */
+/** Aggregated area map — Updatedfront Mapbox 3D buildings prioritized over Leaflet. */
 export function CellMap({ center, ownPin, cells, mode }: CellMapProps) {
-  const polygons = useMemo(
-    () =>
-      cells.map((c) => {
-        const [[south, west], [north, east]] = cellBounds(c.cellId);
-        return {
-          cell: c,
-          positions: [
-            [south, west],
-            [south, east],
-            [north, east],
-            [north, west],
-          ] as [number, number][],
-          fill: cellFill(c, mode),
-        };
-      }),
-    [cells, mode],
-  );
+  const mapCenter = { lng: center.lng, lat: center.lat };
+
+  const highlights: BuildingHighlight[] = useMemo(() => {
+    const fromCells = cells.flatMap((c) => {
+      const [[south, west], [north, east]] = cellBounds(c.cellId);
+      const status =
+        mode === 'damage' ? toStatus(c.worstLevel) : (hazardStatus(c) ?? ('none' as DamageStatus));
+      if (mode === 'damage' && status === 'none') return [];
+      if (mode === 'hazards' && !hazardStatus(c)) return [];
+      return [
+        {
+          id: c.cellId,
+          lng: (west + east) / 2,
+          lat: (south + north) / 2,
+          status,
+        },
+      ];
+    });
+    if (ownPin) {
+      fromCells.push({
+        id: 'residence',
+        lng: ownPin.lng,
+        lat: ownPin.lat,
+        status: 'verified',
+      });
+    }
+    return fromCells;
+  }, [cells, mode, ownPin]);
+
+  const markers: MapMarkerSpec[] = useMemo(() => {
+    if (!ownPin) return [];
+    return [
+      {
+        id: 'residence',
+        lng: ownPin.lng,
+        lat: ownPin.lat,
+        status: 'verified',
+        variant: 'residence',
+        label: 'Your residence',
+      },
+    ];
+  }, [ownPin]);
+
+  const areaFill = useMemo(() => {
+    if (cells.length > 0) return undefined;
+    // Demo neighborhood fill only when live cells are empty — labeled synthetic below.
+    return {
+      center: mapCenter,
+      radiusMeters: 280,
+      statusFor: demoStatusFor(mapCenter, 280),
+    };
+  }, [cells.length, mapCenter.lat, mapCenter.lng]);
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
-      <MapContainer
-        center={[center.lat, center.lng]}
-        zoom={14}
-        className="z-0 h-64 w-full"
-        scrollWheelZoom={false}
-      >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      <div className="relative h-[460px] w-full bg-[#111922] md:h-[520px]">
+        <MapboxDamageMap
+          center={mapCenter}
+          highlights={highlights}
+          markers={markers}
+          areaFill={areaFill}
+          zoom={16.4}
+          pitch={58}
+          bearing={-22}
+          className="absolute inset-0"
         />
-        <FitBounds center={center} cells={cells} />
-        {polygons.map(({ cell, positions, fill }) =>
-          fill === 'transparent' ? null : (
-            <Polygon
-              key={cell.cellId}
-              pathOptions={{ color: fill, weight: 1, fillColor: fill, fillOpacity: 0.35 }}
-              positions={positions}
-            >
-              <Popup>
-                <p className="text-xs font-semibold">
-                  {cell.reportCount72h} report{cell.reportCount72h === 1 ? '' : 's'} (72h)
-                </p>
-                {mode === 'damage' ? (
-                  <p className="text-xs">Worst: {cell.worstLevel}</p>
-                ) : (
-                  <>
-                    <p className="text-xs">Hazard reports: {cell.hazardReportCount72h}</p>
-                    {cell.severeHazardCount72h > 0 ? (
-                      <p className="text-xs font-bold text-red-700">⚠ Severe hazard flagged</p>
-                    ) : null}
-                    {cell.hazardFlags.length > 0 ? (
-                      <p className="text-xs">{cell.hazardFlags.join(', ')}</p>
-                    ) : cell.hazardReportCount72h > 0 ? (
-                      <p className="text-xs">Hazard reported</p>
-                    ) : null}
-                  </>
-                )}
-              </Popup>
-            </Polygon>
-          ),
-        )}
-        {ownPin ? (
-          <CircleMarker
-            center={[ownPin.lat, ownPin.lng]}
-            pathOptions={{ color: '#1d4ed8', fillColor: '#2563eb', fillOpacity: 1 }}
-            radius={8}
-          >
-            <Popup>Your location</Popup>
-          </CircleMarker>
-        ) : null}
-      </MapContainer>
+        <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-xl border border-white/15 bg-[#0f172a]/85 px-3 py-2 text-white shadow-lg backdrop-blur-md">
+          <p className="mb-1 text-[8px] font-bold uppercase tracking-[0.12em] text-slate-300">
+            {mode === 'damage' ? 'Damage' : 'Hazards'}
+          </p>
+          <DamageLegend
+            className="text-slate-100"
+            statuses={mode === 'hazards' ? ['minor', 'moderate', 'severe', 'verified'] : undefined}
+          />
+        </div>
+      </div>
       <p className="bg-slate-50 px-3 py-1.5 text-[10px] text-slate-500">
         Aggregated cells only — no other people&apos;s pins or addresses.
+        {cells.length === 0 ? (
+          <>
+            {' '}
+            <span className="font-semibold text-amber-700">Synthetic neighborhood shading</span> until
+            live cells arrive.
+          </>
+        ) : null}
       </p>
     </div>
   );

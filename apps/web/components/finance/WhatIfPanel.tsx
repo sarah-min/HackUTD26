@@ -1,6 +1,7 @@
 'use client';
 
 import type { Scenario } from '@hack/contracts/finance';
+import { FinanceDisclaimer } from './FinanceDisclaimer';
 
 export function WhatIfPanel({
   scenario,
@@ -13,9 +14,8 @@ export function WhatIfPanel({
     <section className="rounded-2xl border border-slate-200 bg-white p-4">
       <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-blue-700">What-if</p>
       <h2 className="mt-0.5 text-[15px] font-bold text-slate-950">Adjust assumptions</h2>
-      <p className="mt-1 text-[11px] text-slate-500">
-        Updates the chart instantly in this browser. Educational estimate — not financial advice.
-      </p>
+      <FinanceDisclaimer />
+      <p className="mt-1 text-[11px] text-slate-500">Updates the chart instantly in this browser.</p>
 
       <label className="mt-3 block space-y-1">
         <span className="text-[12px] font-semibold text-slate-700">Repair case</span>

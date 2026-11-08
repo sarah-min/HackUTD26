@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { AgentTrace } from '@/components/agent-trace';
 import { AppShell } from '@/components/chrome/AppShell';
@@ -15,6 +16,8 @@ import type { LifeSafetyFlag } from '@hack/contracts/common';
 import { DAMAGE_LEVEL_LABEL, REPORT_STATUS_LABEL, damageLevelClasses } from '@/lib/format';
 import { EvidencePanel } from './EvidencePanel';
 import { RetrySubmit } from './RetrySubmit';
+
+const SLOW_MS = 10_000;
 
 function parseFlags(csv: string): LifeSafetyFlag[] {
   if (!csv.trim()) return [];
@@ -31,6 +34,16 @@ export function ReportStatus({ reportIdParam }: { reportIdParam: string }) {
   const addressPrefill = params.get('address') ?? '';
   const { isActive, error: connError } = useStdb();
   const { report, ready } = useReport(reportId);
+  const [slow, setSlow] = useState(false);
+
+  useEffect(() => {
+    if (isActive && ready) {
+      setSlow(false);
+      return;
+    }
+    const t = window.setTimeout(() => setSlow(true), SLOW_MS);
+    return () => window.clearTimeout(t);
+  }, [isActive, ready]);
 
   if (reportId === null) {
     return (
@@ -43,12 +56,43 @@ export function ReportStatus({ reportIdParam }: { reportIdParam: string }) {
     );
   }
 
-  if (!ready || !isActive) {
+  if (connError) {
+    return (
+      <AppShell>
+        <p className="text-[13px] font-semibold text-red-700">Could not reach Aftermath live data.</p>
+        <p className="mt-1 text-[12px] text-slate-600">{connError.message}</p>
+        <button
+          className="mt-3 rounded-xl bg-slate-900 px-4 py-2.5 text-[13px] font-bold text-white"
+          onClick={() => window.location.reload()}
+          type="button"
+        >
+          Retry connection
+        </button>
+      </AppShell>
+    );
+  }
+
+  if (!isActive || !ready) {
     return (
       <AppShell>
         <p className="text-sm text-slate-600">
-          Connecting… {connError ? connError.message : null}
+          {slow ? 'Still connecting to live data…' : 'Connecting…'}
         </p>
+        {slow ? (
+          <div className="mt-3 space-y-2 text-[12px] text-slate-500">
+            <p>Check that you are online and that the header shows Live.</p>
+            <button
+              className="rounded-xl bg-slate-900 px-4 py-2.5 text-[13px] font-bold text-white"
+              onClick={() => window.location.reload()}
+              type="button"
+            >
+              Reload page
+            </button>
+            <Link className="block text-[13px] font-bold text-blue-700 underline" href="/reporter">
+              Open My submissions
+            </Link>
+          </div>
+        ) : null}
       </AppShell>
     );
   }
@@ -57,7 +101,10 @@ export function ReportStatus({ reportIdParam }: { reportIdParam: string }) {
     return (
       <AppShell>
         <p className="text-slate-700">No report found for this identity (or still syncing).</p>
-        <Link className="inline-block text-[13px] font-bold text-blue-700 underline" href="/reporter">
+        <p className="mt-1 text-[12px] text-slate-500">
+          If you just submitted, wait a moment or check My submissions for the draft.
+        </p>
+        <Link className="mt-3 inline-block text-[13px] font-bold text-blue-700 underline" href="/reporter">
           My submissions
         </Link>
       </AppShell>
@@ -67,6 +114,7 @@ export function ReportStatus({ reportIdParam }: { reportIdParam: string }) {
   const flags = parseFlags(report.lifeSafetyCsv);
   const status = report.status;
   const needsEvidence = status === 'draft' || status === 'needs_more_footage';
+  const waitingOnWorker = status === 'queued' || status === 'processing';
 
   return (
     <AppShell>
@@ -100,6 +148,13 @@ export function ReportStatus({ reportIdParam }: { reportIdParam: string }) {
         </p>
         {report.statusReason != null && String(report.statusReason) !== '' ? (
           <p className="mt-2 text-[12px] text-amber-800">{String(report.statusReason)}</p>
+        ) : null}
+        {waitingOnWorker || status === 'draft' ? (
+          <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-950">
+            Analysis runs on the worker (Brev Nemotron or local{' '}
+            <code className="font-semibold">pnpm --dir scripts fake-worker</code>). If nothing
+            moves for a minute, the worker is probably not running.
+          </p>
         ) : null}
       </section>
 

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { RecoveryPlan } from '@hack/contracts/finance';
 import { coachReplyFromPlan } from '@hack/finance';
+import { FinanceDisclaimer } from './FinanceDisclaimer';
 
 type Msg = { role: 'user' | 'assistant'; text: string };
 
@@ -61,9 +62,8 @@ export function CoachChat({
     <section className="rounded-2xl border border-slate-200 bg-white p-4">
       <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-blue-700">Coach</p>
       <h2 className="mt-0.5 text-[15px] font-bold text-slate-950">Ask about this plan</h2>
-      <p className="mt-1 text-[11px] text-slate-500">
-        Answers use plan figures only. Educational — not financial advice.
-      </p>
+      <FinanceDisclaimer />
+      <p className="mt-1 text-[11px] text-slate-500">Answers use plan figures only.</p>
       <ul className="mt-3 max-h-56 space-y-2 overflow-y-auto">
         {messages.map((m, i) => (
           <li
