@@ -1,5 +1,12 @@
 # Technical Architecture
 
+> **Update 2026-11-08: this document still describes the earlier REST/object-storage design in places.** Current state:
+> SpacetimeDB is the whole backend. File storage (`begin_upload`/`upload_chunk`, `read_blob`) and address lookup
+> (`geocode_address`/`geocode_point`) are module functions, so `/api/uploads/presign`, `/api/media` and `/api/geocode`
+> and Vultr Object Storage are no longer used (hosting is on Brev, owned by Part 3). The `report` table is private;
+> read it through `my_reports`, `my_property_reports` (verified owner) or `svc_reports` (worker). Authoritative
+> details: `CONTRACTS.md` §5 and §8 and `status/part2.md`. Submission tracks are State Farm, PNC and NVIDIA only.
+
 > **Update 2026-11-07 (branch `backend-spacetimedb-brev`):** SpacetimeDB is the whole backend (data, jobs, auth, file storage, address lookup). No S3 bucket, no Vultr VM, no backend API routes. Nemotron (vLLM) and the worker run together on one NVIDIA Brev GPU instance (`apps/worker/brev/`). See CONTRACTS §8 and `status/part3.md`.
 
 

@@ -27,6 +27,9 @@ export const FAIL_REASON_TEXT: Record<string, string> = {
   not_an_id: "That doesn't look like one of the accepted documents.",
   expired: 'That document is expired.',
   rate_limited: 'Too many attempts. Please wait an hour and try again.',
+  needs_review: "We couldn't automatically confirm this document. Try another document or a clearer photo.",
+  duplicate_claim: 'This address has already been verified by someone else, so your request is on hold for review.',
+  review_rejected: "We couldn't verify this request. If this is your home, contact support or try again with a different document.",
 };
 
 export const DAMAGE_LEVEL_TEXT: Record<DamageLevel, string> = {

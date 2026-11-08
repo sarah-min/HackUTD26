@@ -1,8 +1,7 @@
 // GET /api/media/[...key] — verified affected only; never serves idv/ (CONTRACTS.md §8). Owner: Part 4.
 import { NextResponse, type NextRequest } from 'next/server';
 import { createStorageFromEnv, isIdvKey } from '@hack/storage';
-import { hashesEqual } from '../../uploads/limits';
-import { sha256HexSync } from '../../uploads/presign/parse';
+import { hashesEqual, sha256HexSync } from '../../uploads/limits';
 import { lookupMediaIndex, lookupVerificationAuth } from '../../_lib/webAuth';
 
 export const dynamic = 'force-dynamic';

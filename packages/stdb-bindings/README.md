@@ -117,6 +117,28 @@ The SDK call is `conn.reducers.<camelName>({ ...args })` or `useReducer(R.<camel
 | `saveAffectedIntake` | `{ propertyId: bigint, intakeJson: string (AffectedIntake JSON, ≤ 20 000 chars), reportId?: bigint }` | verified for the property | Report = the given one (must be `assessed` and on this property) or the most severe `assessed` report (newest on ties). Upserts `affected_profile`. Enqueues `plan` | `unauthorized: verify for this property first`, `intake_json too large`, `intake_json must be a JSON object`, `report is not on this property`, `report is not assessed yet`, `no assessed report for this property yet` |
 | `askCoach` | `{ propertyId: bigint, reportId: bigint, text: string (1–2000) }` | verified for the property | A recovery plan must exist for (me, property, report). Max one pending coach job per identity. Inserts the user message and enqueues `coach` with payload `{"text": …}` | `unauthorized: verify for this property first`, `text must be 1–2000 chars`, `no recovery plan yet for this report`, `a coach reply is already pending` |
 
+### Email accounts (affected persons; full contract in CONTRACTS.md §5.3)
+
+Inert until an admin configures email. Hooks are in `apps/web/lib/stdb/hooks.ts`: `useAuthStatus`, `useAccount`, `useDevices`, `useStepup`, `useEmailChallenge`, `useDemoCode`, `useRequestEmailCode`, `useVerifyEmailCode`, `useSignOutDevice`, `useRemoveDevice`, `useSetDeviceLabel`, `useDeleteAccount`. Flow order and error codes: `status/part2.md` (2026-11-08 email accounts entry).
+
+| Call | Args | Result |
+|---|---|---|
+| procedure `requestEmailCode` | `{ email: string, purpose: 'enroll'\|'signin'\|'stepup' }` | `{ ok, error, challengeId, retryAfterS }` (returned, not thrown) |
+| procedure `verifyEmailCode` | `{ challengeId: bigint, code: string }` | `{ ok, error, attemptsLeft, purpose }` (returned, not thrown) |
+| reducers `signOutDevice`, `deleteAccount` | `{}` | throw `not_signed_in` |
+| reducer `removeDevice` | `{ identityHex: string }` | throws `device not found on your account` |
+| reducer `setDeviceLabel` | `{ label: string (1-40) }` | throws `not_signed_in` |
+| views `myAccount` (`emailMasked`), `myDevices`, `myStepup`, `myEmailChallenge`, `myDemoCode`, `myAuthStatus` | | sender-scoped, see CONTRACTS.md §5.3 |
+
+`readBlob` now also returns `error: 'stepup_required'` for an owner who needs a step-up (only when an admin turned `require_stepup` on).
+
+### Security hardening (CONTRACTS.md §5.4)
+
+- Hooks: `useClaimConflicts` (view `myClaimConflicts`: `{ id, propertyId, createdAt, status }`, "someone else tried to verify your address", no claimant details) and `useAccessLog` (view `myAccessLog`: `{ id, propertyId, kind: 'blob'|'verify'|'claim', at, mine }`, newest 50).
+- A `verification` row can now end `state: 'failed'` with `failReason` `'needs_review'` (worker flagged the ID, held for an admin) or `'duplicate_claim'` (the property already has a different verified owner, held for an admin). Show both as "held for review". `'review_rejected'` = an admin rejected the hold. Only the module writes `duplicate_claim` / `review_rejected`; `recordVerification` accepts `needs_review` but not those two.
+- `startVerification` can also fail with `rate_limited: too many verification attempts, try again later` (global or per-property cap). Match on `rate_limited`.
+- Admin reducers (not for the browser): `adminResolveClaim({ conflictId, approve })`, `adminResolveVerification({ verificationId, approve })`, `adminSetSecurityConfig({ holdDuplicateClaims?, maxVerificationStartsPerHourGlobal?, maxVerificationStartsPerPropertyPerDay? })`. Admin-only views `adminSecurityConfig`, `adminClaimConflicts`.
+
 ### Service reducers (worker / admin only)
 
 All of these first check `service_identity` and fail with `unauthorized: service only`. Identity args are **64-char hex strings** (`identity.toHexString()`; a `0x` prefix is accepted), and anything else fails with `invalid identity hex (expected 64 hex chars)`.
@@ -128,7 +150,7 @@ All of these first check `service_identity` and fail with `unauthorized: service
 | `recordFrame` | `{ reportId: bigint, frameIndex: number, tSec: number, thumbKey: string, findingJson: string }` | Upsert by (report, frameIndex) | `report not found` |
 | `recordAgentStep` | `{ reportId: bigint, seq: number, kind: 'pipeline'\|'vision'\|'model'\|'tool_call'\|'tool_result'\|'error', name: string, summary: string, visibility: 'reporter'\|'affected', durationMs?: number }` | Insert. `name` is cut to 80 chars, `summary` to 400. `visibility:'reporter'` steps show on the reporter's status timeline | `report not found`, `invalid kind: …`, `invalid visibility: …` |
 | `recordAssessment` | `{ reportId: bigint, json: string, overallLevel: DamageLevel, usableFrames: number, totalFrames: number, lifeSafetyCsv: string }` | Upserts `assessment`. Report → `needs_more_footage` if `usable*2 < total`, else `assessed`. Copies the level, frames and flags onto the public row. Recomputes the area cell | `report not found`, `invalid overall_level: …`, `invalid life_safety flag: …`, `usable_frames > total_frames` |
-| `recordVerification` | `{ verificationId: bigint, ok: boolean, failReason?: 'address_mismatch'\|'unreadable'\|'not_an_id'\|'expired'\|'rate_limited', nameOnDoc?: string (≤ 120) }` | State → `verified` / `failed`. Clears `objectKey`. On ok, every report on the property gets `claimed = true` | `verification not found`, `already decided: <s>`, `fail_reason required when ok=false`, `invalid fail_reason: …`, `name_on_doc too long` |
+| `recordVerification` | `{ verificationId: bigint, ok: boolean, failReason?: 'address_mismatch'\|'unreadable'\|'not_an_id'\|'expired'\|'rate_limited'\|'needs_review', nameOnDoc?: string (≤ 120) }` | State → `verified` / `failed`. Clears `objectKey`. On ok, every report on the property gets `claimed = true` | `verification not found`, `already decided: <s>`, `fail_reason required when ok=false`, `invalid fail_reason: …`, `name_on_doc too long` |
 | `recordRecoveryPlan` | `{ identity: hex, propertyId: bigint, reportId: bigint, json: string }` | Upsert by (identity, property, report) | identity hex error |
 | `recordCoachReply` | `{ identity: hex, propertyId: bigint, reportId: bigint, text: string }` | Inserts an assistant message (text cut to 2000) | identity hex error |
 | `recordAreaNotices` | `{ propertyId: bigint, countyFips: string (5 digits), noticesJson: string }` | Sets `property.countyFips` if empty, then **replaces** every notice for that county (§6) | `invalid county_fips (expected 5 digits)`, `property not found`, `notices_json is not valid JSON`, `notices_json must be an array`, `too many notices (max 20)`, `notice <i> is not an object`, `notice <i> needs a title`, `invalid notice kind: …`, `invalid notice <i> effectiveAt` / `expiresAt` |

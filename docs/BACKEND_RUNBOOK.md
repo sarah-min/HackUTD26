@@ -92,13 +92,22 @@ pnpm verify:identity -- STDB_SERVICE_TOKEN [aftermath-hackutd]
 
 ## 5. Seed data
 
-`scripts/seed-demo.ts` is being written by another agent. **It may not exist yet (unverified).** If it does:
+`scripts/seed-demo.ts` exists and works (verified live on dev and prod, 2026-11-08). It creates 11 fixture reports in 3 cells near UT Dallas through the real reducers.
 
 ```bash
-cd scripts && pnpm seed:demo        # or: pnpm --filter @hack/scripts seed:demo
+cd scripts && pnpm seed:demo -- --dry-run     # print the plan only
+cd scripts && pnpm seed:demo                  # seed dev (refuses non -dev databases)
 ```
 
-Seed rows must be labelled `fixture`. Don't seed prod without the script's explicit prod flag. Without seed data, the area map is empty until real reports exist.
+**Prod:** the script refuses unless you pass `--i-know-this-is-prod`, and it needs a worker identity. Register the dev fake worker on prod temporarily (`admin_add_service "<DEV_WORKER_IDENTITY>" '"worker"'`), run `STDB_MODULE=aftermath-hackutd pnpm seed:demo -- --i-know-this-is-prod`, then remove it again with `spacetime sql --server maincloud aftermath-hackutd "DELETE FROM service_identity WHERE identity = 0x<DEV_WORKER_IDENTITY>"`.
+
+**After every seed, mark the reports as fixture** (`create_report` hardcodes `source = 'live'`, and the seed can't change it). Run this on each seeded database, and only when every report in it is seed data:
+
+```bash
+spacetime sql --server maincloud <db> "UPDATE report SET source = 'fixture' WHERE source = 'live'"
+```
+
+The map only counts the last 72 hours, so seed again close to the demo. Re-seeding needs a wipe first, because the script skips cells that already have their reports. Without seed data, the area map is empty until real reports exist.
 
 ## 6. Smoke test
 
@@ -164,3 +173,142 @@ This **destroys every report, verification, plan and service identity.** Announc
 | Address search fails | Census or Nominatim unavailable (module geocode procedures) | Retry. If it persists, enter the address by hand. Check upstream status |
 | Verification stuck `pending` | `verify_identity` job queued with no worker | Restart the worker. A decided verification deletes its ID image |
 | Reporter sees nothing in "My submissions" | Wrong browser or cleared storage (the secret lives in the browser) | Same browser profile that filed the report |
+
+## 12. Gotchas
+
+- **Scheduled reducers and the host scheduler (fixed 2026-11-08, PR #11).** `requeue_expired_jobs` and `refresh_area_cells` (`spacetimedb/src/reducers/scheduled.ts`) were rejecting the host scheduler with `unauthorized: scheduled only`, because `ctx.senderAuth.isInternal` is false on a live host. The guard now also accepts `ctx.sender == ctx.databaseIdentity`. Published to dev and prod 2026-11-08 ~12:15 UTC. To check: `spacetime logs -s maincloud <db>` should show no `scheduled only` errors, and expired leases should requeue with `last_error` `lease expired`.
+- **Seed assessments** now carry all 9 `componentLevels`. The live dev (12) and prod (11) rows were patched with a SQL UPDATE.
+- **A local worker claims ANY open job.** Before running one against dev, check `SELECT id,kind,state FROM job` for teammates' queued jobs.
+
+## 13. Email accounts (Brevo)
+
+Passwordless accounts for affected persons; the contract is CONTRACTS.md §5.3. **Everything is inert until an admin sets `email_config`** (no row = `my_auth_status.mode` is `off`, `request_email_code` returns `email_not_configured`). Step-up for full reports is **off by default** (`require_stepup = false`) so the UI keeps working until the account flow ships.
+
+**Why not SMS.** The first design sent the code by SMS through Photon. US SMS to real phones needs a registered 10DLC campaign (carrier A2P registration), which takes days to weeks and could not be done in time, so that path was dropped and the Photon adapter deleted. Email through Brevo's HTTP API needs only a verified sender address.
+
+### Modes
+
+| Mode | What happens | Use |
+|---|---|---|
+| `demo` | No API call. The code is exposed ONLY to the requesting identity through `my_demo_code`. UI label: "Demo mode: code shown on screen. Not a real email." **No security: anyone who knows an email address can sign in to its account.** | dev, rehearsals, demo without a mail account |
+| `brevo` | `request_email_code` sends a real email through Brevo from inside the module (`ctx.http`). | live test and production, after the live test below passes |
+
+Daily credit protection: `daily_send_cap` (default 200, rolling 24 h of real challenges). Other limits are fixed in `spacetimedb/src/account_constants.ts`. Brevo's free plan has its own daily send limit; keep `daily_send_cap` at or below it.
+
+### Brevo setup (Sidd, one time)
+
+1. Create a Brevo account (https://app.brevo.com) and log in.
+2. **Verify a sender.** Dashboard: Senders, domains & dedicated IPs, Senders, Add a sender. Use an address whose inbox you can open. Free-mail addresses (gmail.com and similar) may be refused as a sender or land in spam because of the provider's DMARC policy, so prefer an address on a domain you control (add its SPF/DKIM DNS records when Brevo asks). Click the confirmation link Brevo emails you. Until the sender shows as verified, sends fail with `brevo:400:...` or `brevo:403:...`. For better delivery add your own domain and its SPF/DKIM/DMARC DNS records (optional for the hackathon).
+3. **Create an API key.** Dashboard: SMTP & API, API Keys, Generate a new API key (v3 key, starts with `xkeysib-`). Copy it once.
+4. Put the two values in the gitignored `.env.local` (never in git, never in `.env.example`, never in chat): `BREVO_API_KEY=...` and `BREVO_SENDER_EMAIL=...` (the verified sender). `scripts/live-email.ts` reads them from there. The module itself gets them only through `admin_set_email_config`.
+5. If Brevo shows an IP allow-list prompt (Security, Authorised IPs), deactivate blocking or allow Maincloud's egress, otherwise calls from the module return 401.
+
+### Set the config (key never lands in shell history)
+
+`spacetime call` takes Option args as `{"some":v}` / `{"none":[]}`. The order is `mode, brevo_api_key?, sender_email?, require_stepup?, daily_send_cap?`.
+
+```bash
+D=aftermath-hackutd-dev          # prod only after the dev live test passes
+N='{"none":[]}'
+
+# demo mode (no key needed)
+spacetime call --server maincloud $D admin_set_email_config '"demo"' $N $N $N $N
+
+# brevo mode: read -s keeps the key out of history and the screen
+read -rs BREVO_KEY; echo
+spacetime call --server maincloud $D admin_set_email_config '"brevo"' \
+  "{\"some\":\"$BREVO_KEY\"}" '{"some":"verified-sender@yourdomain.com"}' $N $N
+unset BREVO_KEY
+
+# turn step-up for full reports on / off (omitted values keep their current setting)
+spacetime call --server maincloud $D admin_set_email_config '"demo"' $N $N '{"some":true}' $N
+```
+
+- `read -s` is a shell builtin, so the key is not in `~/.zsh_history`. While `spacetime call` runs, the key is briefly visible in the process list to your own user. Don't do this on a shared machine. Never paste the key into chat, a file or `.env.example`.
+- The key is write-only: no view returns it. Check the config without printing it: `spacetime sql --server maincloud $D "SELECT * FROM admin_email_config"` (booleans `has_key`, `has_sender_email`, `has_pepper`, plus `mode`, `require_stepup`, `daily_send_cap`; only the admin identity gets a row). **Do not run `SELECT * FROM email_config`**: as the database owner your CLI can read private tables and it would print the key and pepper.
+- The first call generates `hash_pepper` and it is never rotated (rotating would orphan every account's `email_hash`). A wipe-republish deletes `email_config` and all accounts.
+- `admin_set_email_config` (or the first `request_email_code`) creates the 60 s `account_tick` schedule if it is missing. Check: `SELECT * FROM account_tick` has one row.
+
+### How Brevo sending works (and what is unverified)
+
+`spacetimedb/src/email_brevo.ts` (`sendEmailViaBrevo`) is the only Brevo code: one call, `POST https://api.brevo.com/v3/smtp/email`, headers `api-key`, `content-type: application/json`, `accept: application/json`, body `{sender:{name:"Project Aftermath",email}, to:[{email}], subject, textContent, htmlContent}`. Success is HTTP 201 with `{messageId}`. A 201 means Brevo accepted it, not that it reached the inbox (there is no delivery webhook here, so a bounce or spam-folder delivery still shows as `sent`). Failure is non-fatal: the challenge gets `delivery_state = 'failed'` and a short `delivery_error` built from the status and Brevo's `code` string only (`brevo:401:unauthorized`, `brevo:429:too_many_requests`, `brevo:network`; never the key, a body or the address), visible in `my_email_challenge`, so the UI can offer a resend or demo. No tracking, no links.
+
+**Unverified.** This API shape is best knowledge of Brevo's v3 transactional API and has **never run against the live service**. The unit tests only check what we send and how responses are mapped (mocked `ctx.http`). It is verified only by the live test below. If the live test shows a different shape, only `email_brevo.ts` changes.
+
+### Live test (dev only, your own inbox)
+
+Needs `BREVO_API_KEY` and `BREVO_SENDER_EMAIL` in `.env.local`, the `spacetime` CLI logged in as the dev admin, and a token file for a dev identity that is already verified for a property (for example the scratchpad `aff.token`, verified for property 2). The scripts never print the key or the token. Use only your own address.
+
+```bash
+cd scripts
+pnpm live:email config                          # sets brevo mode from .env.local
+pnpm live:email request you@example.com ./aff.token   # sends the email; prints delivery_state / delivery_error (address printed masked)
+pnpm live:email verify 123456 ./aff.token       # the code from the inbox: enrolls the account
+pnpm live:email cleanup ./aff.token             # deletes the account, sets the config back to demo
+```
+
+If `request` prints `failed`, read `delivery_error`: `brevo:401:unauthorized` = bad key (or IP blocking, step 5 above), `brevo:400:invalid_parameter` / `brevo:403:...` = sender not verified or the body shape was rejected, `brevo:429:...` = Brevo rate limit, `brevo:network` = the module could not reach api.brevo.com. `spacetime logs --server maincloud aftermath-hackutd-dev` shows module errors. Open questions the live test answers: the exact success status and error `code` strings, whether a free-mail sender is accepted, and inbox vs spam placement.
+
+### Smoke test
+
+```bash
+cd scripts && pnpm smoke:accounts     # dev only, demo mode, ~2 minutes (30 s resend cooldowns), needs `spacetime login` as the dev admin
+```
+
+Covers enroll, a wrong code, sign out, sign in on a second identity (property access follows the account), an unknown email (decoy), step-up with `require_stepup` off then on, `read_blob` with `stepup_required`, and `delete_account`. It leaves the dev config in demo mode with `require_stepup = false`. It never calls Brevo.
+
+### Schema migration note (phone to email, 2026-11-08)
+
+The phone design had briefly been published to dev. The email conversion renames `phone_challenge` to `email_challenge`, `sms_config` to `email_config`, and changes the columns of `account` (`phone_hash`, `phone_last_4` replaced by `email_hash`, `email_masked`). A plain publish is rejected for `account` ("Removing a column phone_hash from table account requires a manual migration"). Dev holds only smoke-test accounts, but `--delete-data` would also wipe the seeded data and service identities, so it needs explicit approval. See `status/part2.md` for the options and what was decided.
+
+### Gotchas
+
+- **Step-up is only as fresh as the 60 s tick.** Views have no clock, so a step-up that expired is cleared by `account_maintenance` within about a minute; `read_blob` (a procedure) checks the clock exactly.
+- **Demo mode is not security.** Don't leave a prod database in `demo` with real people's accounts.
+- **Codes are derived from a secret pepper, not taken from `ctx.random`**, because the module's random source is seeded from the call timestamp (not secret). See `spacetimedb/src/email_flow.ts`.
+- **An address can be locked out by someone else**: 5 wrong codes lock it for 15 min, and 3 requests per hour per address apply to anyone. Accepted for a demo-grade check.
+- **Signin never reveals whether an email has an account**, but `enroll` does say `email_already_registered` (only verified owners can reach it).
+- **A failed Brevo send on a real signin shows `failed`; a decoy always shows `sent`** (it never sends). This only leaks if Brevo is failing.
+- **Gmail-style aliases are different accounts.** `a+x@gmail.com`, `a.b@gmail.com` and `ab@gmail.com` hash differently (no provider-specific normalization). The user must type the same address they enrolled with.
+- **Env names (not secrets) for the team:** `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`. Only `scripts/live-email.ts` reads them; the web app and worker never need them. `.env.example` is owned by Part 4.
+
+## 12. Security hardening: duplicate claims, caps, audit log (2026-11-08)
+
+What it does (full contract: CONTRACTS.md §5.4): a second identity that passes the ID check on a property that already has a verified owner is HELD instead of getting access; `start_verification` has a global per-hour and a per-property per-day cap; owner reads are audit-logged. All state is in private tables (`security_config`, `claim_conflict`, `access_log`, `verification_start`).
+
+### Security config
+
+Defaults when no `security_config` row exists: `hold_duplicate_claims = true`, 120 verification starts per hour across all identities, 6 starts per property per day. `spacetime call` takes Option args as `{"some":v}` / `{"none":[]}`; order is `hold_duplicate_claims?, max_verification_starts_per_hour_global?, max_verification_starts_per_property_per_day?`.
+
+```bash
+D=aftermath-hackutd-dev    # prod: aftermath-hackutd
+N='{"none":[]}'
+spacetime sql --server maincloud $D "SELECT * FROM admin_security_config"          # effective values (admin identity only), is_default = no row yet
+spacetime call --server maincloud $D admin_set_security_config '{"some":false}' $N $N   # duplicate rule OFF (dev/demo)
+spacetime call --server maincloud $D admin_set_security_config '{"some":true}' $N $N    # duplicate rule ON (prod)
+spacetime call --server maincloud $D admin_set_security_config $N '{"some":300}' '{"some":20}'   # raise the caps for a load test
+```
+
+**Deliberate demo trade-off (read this).** The shared dev/demo team repeatedly verifies the SAME specimen address from different browsers. With the duplicate rule on, the second browser would be held. So on **dev and the demo database the flag is OFF** (set it after every wipe-republish, which deletes `security_config`). **On prod it stays ON** (the default; do not set it off there). With it off, any identity that passes the ID check becomes an owner of the property, which is the pre-hardening behavior. The caps stay on in both places; if teammates hit `too many verification attempts` while demoing, raise them with the last command above rather than turning them off. The per-property cap also lets someone burn a victim property's daily budget with junk attempts: an admin raises the cap if that happens.
+
+### Resolving held claims and reviews
+
+```bash
+spacetime sql --server maincloud $D "SELECT id, property_id, existing_verification_id, new_verification_id, status FROM admin_claim_conflicts WHERE status = 'open'"
+spacetime call --server maincloud $D admin_resolve_claim 7 true      # approve: the claimant becomes a verified owner too
+spacetime call --server maincloud $D admin_resolve_claim 7 false     # reject: stays failed, fail_reason review_rejected
+
+# verifications the worker held with fail_reason 'needs_review' (ID tamper cues). Admin-owned CLI can read the private table:
+spacetime sql --server maincloud $D "SELECT id, property_id, state, fail_reason, created_at FROM verification WHERE fail_reason = 'needs_review'"
+spacetime call --server maincloud $D admin_resolve_verification 42 true    # approve (still subject to the duplicate rule)
+spacetime call --server maincloud $D admin_resolve_verification 42 false   # reject
+```
+
+Do not `SELECT name_on_doc` into chats or tickets: held rows keep the extracted name privately so you can compare it, and it is dropped on reject. The existing owner sees the open conflict through `my_claim_conflicts` (id, time, status only). To look at the audit log of a property: `spacetime sql --server maincloud $D "SELECT kind, at, property_id FROM access_log WHERE property_id = 25"` (identities and object keys exist in the table; do not paste them anywhere).
+
+### Gotchas
+
+- **Held verifications use the existing `failed` state.** The UI must map `fail_reason` `needs_review` / `duplicate_claim` to "held for review" and `review_rejected` to "couldn't be verified". `packages/contracts` `VerificationFailReasonSchema` is owned by Part 3 and still lacks these values (request to Part 3: add `needs_review`, `duplicate_claim`, `review_rejected`).
+- **Failed attempts count toward the caps** (a start is a start). The 3-per-hour per-identity limit is unchanged.
+- **Tests:** `setup()` in `spacetimedb/test/helpers.ts` writes `security_config { hold_duplicate_claims: false }` by default, because older tests verify two different identities on one property. `spacetimedb/test/security.test.ts` uses `setup({ security: 'defaults' })`.
+- **Purges** run in the 60 s `account_maintenance` tick: `verification_start` after 24 h, `access_log` after 30 days. The caps count by timestamp, so they stay correct between ticks.

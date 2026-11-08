@@ -154,9 +154,8 @@ export function RecoveryNavigator({ propertyIdParam }: { propertyIdParam: string
   if (!verified) {
     return (
       <AppShell>
-        <header>
-          <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-blue-700">Recovery</p>
-          <h1 className="mt-0.5 text-lg font-bold tracking-[-0.02em] text-slate-950">
+        <header className="space-y-2">
+          <h1 className="text-lg font-bold tracking-[-0.02em] text-slate-950">
             Verify to open Recovery Navigator
           </h1>
           <FinanceDisclaimer />
@@ -177,19 +176,17 @@ export function RecoveryNavigator({ propertyIdParam }: { propertyIdParam: string
 
   return (
     <AppShell>
-      <Link
-        href={`/affected/property/${idToString(propertyId)}`}
-        className="text-[12px] font-bold text-blue-700 underline"
-      >
-        ← Your home
-      </Link>
-
-      <header>
-        <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-blue-700">Recovery</p>
-        <h1 className="mt-0.5 text-lg font-bold tracking-[-0.02em] text-slate-950">
-          Recovery Navigator
-        </h1>
+      <header className="space-y-2">
+        <h1 className="text-lg font-bold tracking-[-0.02em] text-slate-950">Recovery Navigator</h1>
         <FinanceDisclaimer />
+        <p>
+          <Link
+            href={`/affected/property/${idToString(propertyId)}`}
+            className="text-[12px] font-semibold text-slate-600 underline decoration-slate-300 underline-offset-2 hover:text-blue-700"
+          >
+            Back to your property
+          </Link>
+        </p>
       </header>
 
       {assessed.length > 1 ? (

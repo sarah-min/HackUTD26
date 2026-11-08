@@ -4,15 +4,26 @@ Owner: Roselyn. Append-only, newest entry first. Format is in [STATUS.md](../STA
 
 ## Requests to other parts (open)
 
-- **P2 (Sidd) — blocking analyze locally:** register this worker identity on **both** DBs (minted via `pnpm --filter @hack/worker identity` on Roselyn’s machine; token is only in gitignored `.env.local` / `~/.config/aftermath/worker-token`):
-  ```
-  spacetime call --server maincloud aftermath-hackutd-dev admin_add_service '"c20050ec1127b417108012e8359d013e783d4186e6a0bad9f1c4a0db7c448468"' '"worker"'
-  spacetime call --server maincloud aftermath-hackutd admin_add_service '"c20050ec1127b417108012e8359d013e783d4186e6a0bad9f1c4a0db7c448468"' '"worker"'
-  ```
-  Until then `pnpm --dir scripts fake-worker` connects but cannot see/claim `svc_jobs`.
-- **P3 (Nemotron / Brev):** Register `planHandler` and `coachHandler` from `@hack/finance` in `apps/worker/src/handlers/index.ts` (one import + one registry line each). Hosting stays Brev. Live HTTPS URL when ready.
-- **P2:** Confirm web identity registered as `web` if any legacy `/api/*` auth is kept. `RecoverySummaryCard` is already flipped on reconcile-p4.
+- **P2 (Sidd):** `c20050ec1127b417108012e8359d013e783d4186e6a0bad9f1c4a0db7c448468` is registered as worker on **dev**; still needs the same on **prod** (`aftermath-hackutd`) if we run against it. Local fake-worker restarted on `aftermath-hackutd-dev` after stale connection (report 14 / job 18).
+- **P3 (Nemotron / Brev):** Hosting stays Brev. Live HTTPS URL when ready. **Check the job queue before starting a local worker on shared dev.** (`planHandler` / `coachHandler` already registered on main.)
+- **P2:** Confirm web identity registered as `web` if any legacy `/api/media` auth is kept. `RecoverySummaryCard` is already flipped on reconcile-p4.
 - **P1:** Confirm workspace members `@hack/finance` + `@hack/storage` + `@hack/damage` on main. **Also:** `part4/updatedfront-ui` prioritizes Updatedfront Mapbox maps inside `components/map/**` and the Updatedfront home/shell. Plan still listed Leaflet — please confirm Mapbox is OK for demo or re-home ownership.
+
+## 2026-11-08 07:50: Remove fixture Recovery Navigator preview (branch part4/remove-recovery-preview)
+
+- **Shipped:** Deleted `RecoveryFixturePreview` and `/affected/property/[propertyId]/recovery/preview` (dummy route that should not have shipped).
+- **Verify:** `/affected/property/0/recovery/preview` → 404; live `/recovery` unchanged.
+- **Fixtures still faked:** none new.
+- **Requests to other parts:** none.
+- **Blocked on:** none.
+
+## 2026-11-08 06:45: Plan subject filter + delete presign + restart fake-worker (branch part4/updatedfront-ui)
+
+- **Shipped:** `planHandler` matches `svc_affected_profiles` by **propertyId + subject identity** (no cross-over between two verified people). Deleted `apps/web/app/api/uploads/presign/**`; moved `sha256HexSync` into `uploads/limits.ts` for legacy `/api/media`. CONTRACTS §8 marks presign removed. Restarted `pnpm --dir scripts fake-worker` on `aftermath-hackutd-dev` with registered `c20050ec…` token (restored mashed `.env.local` newlines).
+- **Verify:** `pnpm --filter @hack/finance typecheck`; fake-worker log shows `connected … watching`; open report 14 — should leave `queued` once claimed. `GET /api/uploads/presign` → 404.
+- **Fixtures still faked:** fake-worker analyze/plan/coach outputs.
+- **Requests to other parts:** P2 register worker on prod if needed; P3 register plan/coach handlers.
+- **Blocked on:** none for these three asks.
 
 ## 2026-11-08 02:05: Fix stuck Connecting + start fake-worker (branch part4/updatedfront-ui)
 

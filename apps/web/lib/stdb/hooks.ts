@@ -1,9 +1,10 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useSpacetimeDB, useTable, useReducer } from 'spacetimedb/react';
+import { useCallback } from 'react';
+import { useSpacetimeDB, useTable, useReducer, useProcedure } from 'spacetimedb/react';
 import type { Identity } from 'spacetimedb';
-import { T, R, type VerificationRow } from './bindings';
+import { T, R, P, type VerificationRow } from './bindings';
 
 export { useReducer, R, T };
 
@@ -162,4 +163,118 @@ export function useReportSteps(reportId: bigint | null) {
     [steps, reportId],
   );
   return { steps: sorted, ready };
+}
+
+// ── Email accounts (affected persons; reporters never need one) ───────────────────────────────────
+// Flow order, all against spacetimedb/src/reducers/accounts.ts:
+//   1. useAuthStatus(): mode 'off' means accounts are unavailable (hide the UI); 'demo' means show the on-screen code.
+//   2. enroll  (verified owner, no account):  requestEmailCode(email, 'enroll')  -> verifyEmailCode(challengeId, code)
+//      signin  (new device, existing account): requestEmailCode(email, 'signin')  -> verifyEmailCode(challengeId, code)
+//      stepup  (signed-in device, step-up needed): requestEmailCode(email, 'stepup') -> verifyEmailCode(...); the user types the email again
+//   3. Both calls return { ok, error, ... } and never throw for expected failures.
+//      request errors: email_not_configured | invalid_purpose | invalid_email | locked | not_verified_owner | already_signed_in |
+//        email_already_registered | not_signed_in | email_mismatch | cooldown | rate_limited_email | rate_limited_identity | daily_cap
+//      verify errors: not_found | invalid_code (attemptsLeft) | locked | expired | already_signed_in | email_already_registered |
+//        not_verified_owner | not_signed_in | email_mismatch
+//   Label for the identity step: "Demo identity check — not production-grade verification." Codes in demo mode: "Demo mode: code shown on screen. Not a real email."
+
+/** This device's account (null when not signed in). */
+export function useAccount() {
+  const [rows, ready] = useTable(T.myAccount);
+  return { account: rows[0] ?? null, ready };
+}
+
+/** Devices on my account, current device first. */
+export function useDevices() {
+  const [rows, ready] = useTable(T.myDevices);
+  const devices = useMemo(() => [...rows].sort((a, b) => Number(b.isCurrent) - Number(a.isCurrent)), [rows]);
+  return { devices, ready };
+}
+
+/**
+ * Step-up state of this device. `required` = the module enforces step-up for full reports (email_config.require_stepup);
+ * `active` = a step-up is currently in effect (cleared by the module within ~60 s of expiry); `linked` = device is signed in.
+ * When required && !active, full-report views are empty: push the user to enroll (not linked) or step up (linked).
+ */
+export function useStepup() {
+  const [rows, ready] = useTable(T.myStepup);
+  const row = rows[0];
+  return {
+    required: row?.requireStepup ?? false,
+    active: row?.active ?? false,
+    linked: row?.linked ?? false,
+    until: row?.stepupUntil ?? null,
+    ready,
+  };
+}
+
+/** My open code challenge (null when none). Expiry is clock-based on the client: compare `expiresAt` to Date.now(). */
+export function useEmailChallenge() {
+  const [rows, ready] = useTable(T.myEmailChallenge);
+  return { challenge: rows[0] ?? null, ready };
+}
+
+/** DEMO MODE only: the code for my open challenge, to show on screen. Always null in brevo mode. */
+export function useDemoCode() {
+  const [rows, ready] = useTable(T.myDemoCode);
+  return { demoCode: rows[0] ?? null, ready };
+}
+
+/** Which delivery mode applies: 'off' (not configured), 'demo' (code on screen) or 'brevo' (real email). */
+export function useAuthStatus() {
+  const [rows, ready] = useTable(T.myAuthStatus);
+  return { mode: (rows[0]?.mode ?? 'off') as 'off' | 'demo' | 'brevo', configured: rows[0]?.configured ?? false, ready };
+}
+
+/** requestEmailCode(email, purpose) -> { ok, error, challengeId, retryAfterS }. */
+export function useRequestEmailCode() {
+  const call = useProcedure(P.requestEmailCode);
+  return useCallback((email: string, purpose: 'enroll' | 'signin' | 'stepup') => call({ email, purpose }), [call]);
+}
+
+/** verifyEmailCode(challengeId, code) -> { ok, error, attemptsLeft, purpose }. */
+export function useVerifyEmailCode() {
+  const call = useProcedure(P.verifyEmailCode);
+  return useCallback((challengeId: bigint, code: string) => call({ challengeId, code }), [call]);
+}
+
+/** Reducer wrappers. They throw on error (e.g. 'not_signed_in'). */
+export function useSignOutDevice() {
+  const call = useReducer(R.signOutDevice);
+  return useCallback(() => call(), [call]);
+}
+export function useRemoveDevice() {
+  const call = useReducer(R.removeDevice);
+  return useCallback((identityHex: string) => call({ identityHex }), [call]);
+}
+export function useSetDeviceLabel() {
+  const call = useReducer(R.setDeviceLabel);
+  return useCallback((label: string) => call({ label }), [call]);
+}
+/** Deletes my account, all device links and pending challenges. Verifications and reports stay. */
+export function useDeleteAccount() {
+  const call = useReducer(R.deleteAccount);
+  return useCallback(() => call(), [call]);
+}
+
+/**
+ * Security warnings for properties I own (CONTRACTS §5.4): `open` = conflicts where someone else tried to verify my address
+ * and was held for review. The rows carry no claimant details. Suggested copy: "Someone else tried to verify your address.
+ * They did not get access; it is held for review."
+ */
+export function useClaimConflicts() {
+  const [rows, ready] = useTable(T.myClaimConflicts);
+  const conflicts = useMemo(() => [...rows].sort((a, b) => (a.id < b.id ? 1 : -1)), [rows]);
+  return { conflicts, open: conflicts.filter((c) => c.status === 'open'), ready };
+}
+
+/**
+ * Audit log of who-did-what-when on my properties, newest first (max 50): kind 'blob' (media/frames opened),
+ * 'verify' (ownership granted), 'claim' (account sign-in bound a property). `mine` = done by one of my account's devices.
+ * Never shows other identities.
+ */
+export function useAccessLog() {
+  const [rows, ready] = useTable(T.myAccessLog);
+  const entries = useMemo(() => [...rows].sort((a, b) => (a.id < b.id ? 1 : -1)), [rows]);
+  return { entries, ready };
 }

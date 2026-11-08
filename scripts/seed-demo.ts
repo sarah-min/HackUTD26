@@ -14,6 +14,7 @@
  *   reporter (anonymous identity): create_report -> attach_media (fixture key) -> submit_report
  *   worker (DEV_WORKER_TOKEN): claim_job -> record_frame x2 -> record_assessment -> complete_job
  */
+import { costFor, type Level } from './seed-assessment';
 import { readFileSync } from 'node:fs';
 import { createHash, randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -178,33 +179,18 @@ async function connect(name: string, token: string | undefined, queries: string[
 }
 
 function fixtureAssessment(reportId: bigint, propertyId: bigint, hazard: string, s: Seed) {
-  const fraction: Record<string, number> = { affected: 0.05, minor: 0.15, major: 0.5, destroyed: 1 };
-  const structure = 1800 * 15000;
-  const roof = Math.round(structure * 0.15 * fraction[s.level]!);
-  const walls = Math.round(structure * 0.15 * 0.15);
-  const likely = roof + walls;
+  const { levels, cost } = costFor(s.level as Level);
   return {
     reportId: String(reportId),
     propertyId: String(propertyId),
     overallLevel: s.level,
-    componentLevels: { roof: s.level, exterior_walls: 'minor', windows_doors: 'minor' },
+    componentLevels: levels,
     lifeSafety: s.flags,
     hazard,
     confidence: 0.76,
     usableFrameCount: 3,
     totalFrameCount: 3,
-    cost: {
-      lowCents: Math.round(likely * 0.7),
-      likelyCents: likely,
-      highCents: Math.round(likely * 1.4),
-      lineItems: [
-        { component: 'roof', level: s.level, basis: '[FIXTURE] 1800 sqft x $150/sqft x 15% roof share', likelyCents: roof },
-        { component: 'exterior_walls', level: 'minor', basis: '[FIXTURE] simulated', likelyCents: walls },
-      ],
-      inputs: { homeSqft: 1800, stories: 1, tenure: 'own', assumed: true },
-      costModelVersion: 'cost-v1',
-      disclaimer: 'Illustrative estimate, not a contractor quote or insurance determination.',
-    },
+    cost,
     declarations: [],
     activeAlerts: [],
     location: { stateCode: 'TX', countyName: '[FIXTURE] County', countyFips: '48113' },

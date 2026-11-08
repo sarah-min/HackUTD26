@@ -2,7 +2,6 @@
 
 import type { RecoveryPlan, SimulationResult } from '@hack/contracts/finance';
 import { formatCents } from '@/lib/format';
-import { FinanceDisclaimer } from './FinanceDisclaimer';
 import { ForecastChart } from './ForecastChart';
 
 const STATUS_CLASS = {
@@ -33,7 +32,6 @@ export function PlanView({
             {plan.source}
           </span>
         </div>
-        <FinanceDisclaimer />
         <p className="mt-2 text-2xl font-bold tracking-[-0.03em] text-slate-950">
           {formatCents(gap.likely)}
         </p>

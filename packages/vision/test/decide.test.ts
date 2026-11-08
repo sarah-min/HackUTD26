@@ -10,7 +10,10 @@ import wrong from '../../../fixtures/verification/id-fields-wrong-address.json';
 
 const property: NormalizedAddress = { ...normalizeParts({ line1: '1234 Main St', city: 'Dallas', state: 'TX', zip: '75201' }), lat: 32.78, lng: -96.8, source: 'census' };
 const today = new Date('2026-11-07T12:00:00Z');
-const f = (x: unknown) => IdDocumentFieldsSchema.parse(x);
+// Cues and docConfidence are required for a verdict (v2 prompt). The hand-written fixtures predate them, so the
+// helper supplies explicit benign values; the legacy-shape behavior is covered in verifyHardening.test.ts.
+const BENIGN = { docConfidence: 0.9, riskCues: { screenCaptureSuspected: false, photoOfPhoto: false, edgesCroppedOrMissing: false, fontOrTemplateInconsistent: false, textOverlayOrEditArtifacts: false, facePhotoPresent: true } };
+const f = (x: unknown) => IdDocumentFieldsSchema.parse({ ...BENIGN, ...(x as object) });
 
 describe('decideVerification (CONTRACTS §3.3 order)', () => {
   it('verifies a specimen with the matching address', () => {

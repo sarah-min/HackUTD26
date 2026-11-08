@@ -35,12 +35,17 @@ import {
 
 // Import all reducer arg schemas
 import AdminAddServiceReducer from "./admin_add_service_reducer";
+import AdminResolveClaimReducer from "./admin_resolve_claim_reducer";
+import AdminResolveVerificationReducer from "./admin_resolve_verification_reducer";
+import AdminSetEmailConfigReducer from "./admin_set_email_config_reducer";
+import AdminSetSecurityConfigReducer from "./admin_set_security_config_reducer";
 import AskCoachReducer from "./ask_coach_reducer";
 import AttachMediaReducer from "./attach_media_reducer";
 import BeginUploadReducer from "./begin_upload_reducer";
 import ClaimJobReducer from "./claim_job_reducer";
 import CompleteJobReducer from "./complete_job_reducer";
 import CreateReportReducer from "./create_report_reducer";
+import DeleteAccountReducer from "./delete_account_reducer";
 import DeleteBlobReducer from "./delete_blob_reducer";
 import PutBlobReducer from "./put_blob_reducer";
 import RecordAgentStepReducer from "./record_agent_step_reducer";
@@ -50,7 +55,10 @@ import RecordCoachReplyReducer from "./record_coach_reply_reducer";
 import RecordFrameReducer from "./record_frame_reducer";
 import RecordRecoveryPlanReducer from "./record_recovery_plan_reducer";
 import RecordVerificationReducer from "./record_verification_reducer";
+import RemoveDeviceReducer from "./remove_device_reducer";
 import SaveAffectedIntakeReducer from "./save_affected_intake_reducer";
+import SetDeviceLabelReducer from "./set_device_label_reducer";
+import SignOutDeviceReducer from "./sign_out_device_reducer";
 import StartVerificationReducer from "./start_verification_reducer";
 import SubmitReportReducer from "./submit_report_reducer";
 import SubmitVerificationReducer from "./submit_verification_reducer";
@@ -60,14 +68,26 @@ import UploadChunkReducer from "./upload_chunk_reducer";
 import * as GeocodeAddressProcedure from "./geocode_address_procedure";
 import * as GeocodePointProcedure from "./geocode_point_procedure";
 import * as ReadBlobProcedure from "./read_blob_procedure";
+import * as RequestEmailCodeProcedure from "./request_email_code_procedure";
+import * as VerifyEmailCodeProcedure from "./verify_email_code_procedure";
 
 // Import all table schema definitions
+import AdminClaimConflictsRow from "./admin_claim_conflicts_table";
+import AdminEmailConfigRow from "./admin_email_config_table";
+import AdminSecurityConfigRow from "./admin_security_config_table";
 import AreaCellSummaryRow from "./area_cell_summary_table";
 import AreaNoticeRow from "./area_notice_table";
+import MyAccessLogRow from "./my_access_log_table";
+import MyAccountRow from "./my_account_table";
 import MyAffectedProfilesRow from "./my_affected_profiles_table";
 import MyAgentStepsRow from "./my_agent_steps_table";
 import MyAssessmentsRow from "./my_assessments_table";
+import MyAuthStatusRow from "./my_auth_status_table";
+import MyClaimConflictsRow from "./my_claim_conflicts_table";
 import MyCoachMessagesRow from "./my_coach_messages_table";
+import MyDemoCodeRow from "./my_demo_code_table";
+import MyDevicesRow from "./my_devices_table";
+import MyEmailChallengeRow from "./my_email_challenge_table";
 import MyFramesRow from "./my_frames_table";
 import MyMediaAssetsRow from "./my_media_assets_table";
 import MyPropertyPrivatesRow from "./my_property_privates_table";
@@ -75,6 +95,7 @@ import MyPropertyReportsRow from "./my_property_reports_table";
 import MyRecoveryPlansRow from "./my_recovery_plans_table";
 import MyReportPrivatesRow from "./my_report_privates_table";
 import MyReportsRow from "./my_reports_table";
+import MyStepupRow from "./my_stepup_table";
 import MyVerificationsRow from "./my_verifications_table";
 import PropertyRow from "./property_table";
 import SvcAffectedProfilesRow from "./svc_affected_profiles_table";
@@ -135,6 +156,41 @@ const tablesSchema = __schema({
       { name: 'property_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, PropertyRow),
+  adminClaimConflicts: __table({
+    name: 'admin_claim_conflicts',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, AdminClaimConflictsRow),
+  adminEmailConfig: __table({
+    name: 'admin_email_config',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, AdminEmailConfigRow),
+  adminSecurityConfig: __table({
+    name: 'admin_security_config',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, AdminSecurityConfigRow),
+  myAccessLog: __table({
+    name: 'my_access_log',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, MyAccessLogRow),
+  myAccount: __table({
+    name: 'my_account',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, MyAccountRow),
   myAffectedProfiles: __table({
     name: 'my_affected_profiles',
     indexes: [
@@ -156,6 +212,20 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, MyAssessmentsRow),
+  myAuthStatus: __table({
+    name: 'my_auth_status',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, MyAuthStatusRow),
+  myClaimConflicts: __table({
+    name: 'my_claim_conflicts',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, MyClaimConflictsRow),
   myCoachMessages: __table({
     name: 'my_coach_messages',
     indexes: [
@@ -163,6 +233,27 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, MyCoachMessagesRow),
+  myDemoCode: __table({
+    name: 'my_demo_code',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, MyDemoCodeRow),
+  myDevices: __table({
+    name: 'my_devices',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, MyDevicesRow),
+  myEmailChallenge: __table({
+    name: 'my_email_challenge',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, MyEmailChallengeRow),
   myFrames: __table({
     name: 'my_frames',
     indexes: [
@@ -212,6 +303,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, MyReportsRow),
+  myStepup: __table({
+    name: 'my_stepup',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, MyStepupRow),
   myVerifications: __table({
     name: 'my_verifications',
     indexes: [
@@ -322,12 +420,17 @@ const tablesSchema = __schema({
 /** The schema information for all reducers in this module. This is defined the same way as the reducers would have been defined in the server, except the body of the reducer is omitted in code generation. */
 const reducersSchema = __reducers(
   __reducerSchema("admin_add_service", AdminAddServiceReducer),
+  __reducerSchema("admin_resolve_claim", AdminResolveClaimReducer),
+  __reducerSchema("admin_resolve_verification", AdminResolveVerificationReducer),
+  __reducerSchema("admin_set_email_config", AdminSetEmailConfigReducer),
+  __reducerSchema("admin_set_security_config", AdminSetSecurityConfigReducer),
   __reducerSchema("ask_coach", AskCoachReducer),
   __reducerSchema("attach_media", AttachMediaReducer),
   __reducerSchema("begin_upload", BeginUploadReducer),
   __reducerSchema("claim_job", ClaimJobReducer),
   __reducerSchema("complete_job", CompleteJobReducer),
   __reducerSchema("create_report", CreateReportReducer),
+  __reducerSchema("delete_account", DeleteAccountReducer),
   __reducerSchema("delete_blob", DeleteBlobReducer),
   __reducerSchema("put_blob", PutBlobReducer),
   __reducerSchema("record_agent_step", RecordAgentStepReducer),
@@ -337,7 +440,10 @@ const reducersSchema = __reducers(
   __reducerSchema("record_frame", RecordFrameReducer),
   __reducerSchema("record_recovery_plan", RecordRecoveryPlanReducer),
   __reducerSchema("record_verification", RecordVerificationReducer),
+  __reducerSchema("remove_device", RemoveDeviceReducer),
   __reducerSchema("save_affected_intake", SaveAffectedIntakeReducer),
+  __reducerSchema("set_device_label", SetDeviceLabelReducer),
+  __reducerSchema("sign_out_device", SignOutDeviceReducer),
   __reducerSchema("start_verification", StartVerificationReducer),
   __reducerSchema("submit_report", SubmitReportReducer),
   __reducerSchema("submit_verification", SubmitVerificationReducer),
@@ -349,6 +455,8 @@ const proceduresSchema = __procedures(
   __procedureSchema("geocode_address", GeocodeAddressProcedure.params, GeocodeAddressProcedure.returnType),
   __procedureSchema("geocode_point", GeocodePointProcedure.params, GeocodePointProcedure.returnType),
   __procedureSchema("read_blob", ReadBlobProcedure.params, ReadBlobProcedure.returnType),
+  __procedureSchema("request_email_code", RequestEmailCodeProcedure.params, RequestEmailCodeProcedure.returnType),
+  __procedureSchema("verify_email_code", VerifyEmailCodeProcedure.params, VerifyEmailCodeProcedure.returnType),
 );
 
 type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "tables"> & {
@@ -357,14 +465,34 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "area_cell_summary": Omit<typeof tablesSchema.schemaType.tables["areaCellSummary"], "accessorName"> & { readonly accessorName: "area_cell_summary" };
     /** @deprecated Use `areaNotice` instead. This alias will be removed in the next major version. */
     readonly "area_notice": Omit<typeof tablesSchema.schemaType.tables["areaNotice"], "accessorName"> & { readonly accessorName: "area_notice" };
+    /** @deprecated Use `adminClaimConflicts` instead. This alias will be removed in the next major version. */
+    readonly "admin_claim_conflicts": Omit<typeof tablesSchema.schemaType.tables["adminClaimConflicts"], "accessorName"> & { readonly accessorName: "admin_claim_conflicts" };
+    /** @deprecated Use `adminEmailConfig` instead. This alias will be removed in the next major version. */
+    readonly "admin_email_config": Omit<typeof tablesSchema.schemaType.tables["adminEmailConfig"], "accessorName"> & { readonly accessorName: "admin_email_config" };
+    /** @deprecated Use `adminSecurityConfig` instead. This alias will be removed in the next major version. */
+    readonly "admin_security_config": Omit<typeof tablesSchema.schemaType.tables["adminSecurityConfig"], "accessorName"> & { readonly accessorName: "admin_security_config" };
+    /** @deprecated Use `myAccessLog` instead. This alias will be removed in the next major version. */
+    readonly "my_access_log": Omit<typeof tablesSchema.schemaType.tables["myAccessLog"], "accessorName"> & { readonly accessorName: "my_access_log" };
+    /** @deprecated Use `myAccount` instead. This alias will be removed in the next major version. */
+    readonly "my_account": Omit<typeof tablesSchema.schemaType.tables["myAccount"], "accessorName"> & { readonly accessorName: "my_account" };
     /** @deprecated Use `myAffectedProfiles` instead. This alias will be removed in the next major version. */
     readonly "my_affected_profiles": Omit<typeof tablesSchema.schemaType.tables["myAffectedProfiles"], "accessorName"> & { readonly accessorName: "my_affected_profiles" };
     /** @deprecated Use `myAgentSteps` instead. This alias will be removed in the next major version. */
     readonly "my_agent_steps": Omit<typeof tablesSchema.schemaType.tables["myAgentSteps"], "accessorName"> & { readonly accessorName: "my_agent_steps" };
     /** @deprecated Use `myAssessments` instead. This alias will be removed in the next major version. */
     readonly "my_assessments": Omit<typeof tablesSchema.schemaType.tables["myAssessments"], "accessorName"> & { readonly accessorName: "my_assessments" };
+    /** @deprecated Use `myAuthStatus` instead. This alias will be removed in the next major version. */
+    readonly "my_auth_status": Omit<typeof tablesSchema.schemaType.tables["myAuthStatus"], "accessorName"> & { readonly accessorName: "my_auth_status" };
+    /** @deprecated Use `myClaimConflicts` instead. This alias will be removed in the next major version. */
+    readonly "my_claim_conflicts": Omit<typeof tablesSchema.schemaType.tables["myClaimConflicts"], "accessorName"> & { readonly accessorName: "my_claim_conflicts" };
     /** @deprecated Use `myCoachMessages` instead. This alias will be removed in the next major version. */
     readonly "my_coach_messages": Omit<typeof tablesSchema.schemaType.tables["myCoachMessages"], "accessorName"> & { readonly accessorName: "my_coach_messages" };
+    /** @deprecated Use `myDemoCode` instead. This alias will be removed in the next major version. */
+    readonly "my_demo_code": Omit<typeof tablesSchema.schemaType.tables["myDemoCode"], "accessorName"> & { readonly accessorName: "my_demo_code" };
+    /** @deprecated Use `myDevices` instead. This alias will be removed in the next major version. */
+    readonly "my_devices": Omit<typeof tablesSchema.schemaType.tables["myDevices"], "accessorName"> & { readonly accessorName: "my_devices" };
+    /** @deprecated Use `myEmailChallenge` instead. This alias will be removed in the next major version. */
+    readonly "my_email_challenge": Omit<typeof tablesSchema.schemaType.tables["myEmailChallenge"], "accessorName"> & { readonly accessorName: "my_email_challenge" };
     /** @deprecated Use `myFrames` instead. This alias will be removed in the next major version. */
     readonly "my_frames": Omit<typeof tablesSchema.schemaType.tables["myFrames"], "accessorName"> & { readonly accessorName: "my_frames" };
     /** @deprecated Use `myMediaAssets` instead. This alias will be removed in the next major version. */
@@ -379,6 +507,8 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "my_report_privates": Omit<typeof tablesSchema.schemaType.tables["myReportPrivates"], "accessorName"> & { readonly accessorName: "my_report_privates" };
     /** @deprecated Use `myReports` instead. This alias will be removed in the next major version. */
     readonly "my_reports": Omit<typeof tablesSchema.schemaType.tables["myReports"], "accessorName"> & { readonly accessorName: "my_reports" };
+    /** @deprecated Use `myStepup` instead. This alias will be removed in the next major version. */
+    readonly "my_stepup": Omit<typeof tablesSchema.schemaType.tables["myStepup"], "accessorName"> & { readonly accessorName: "my_stepup" };
     /** @deprecated Use `myVerifications` instead. This alias will be removed in the next major version. */
     readonly "my_verifications": Omit<typeof tablesSchema.schemaType.tables["myVerifications"], "accessorName"> & { readonly accessorName: "my_verifications" };
     /** @deprecated Use `svcAffectedProfiles` instead. This alias will be removed in the next major version. */
@@ -429,10 +559,20 @@ const REMOTE_MODULE = {
 const tableAccessorAliases = {
   "area_cell_summary": "areaCellSummary",
   "area_notice": "areaNotice",
+  "admin_claim_conflicts": "adminClaimConflicts",
+  "admin_email_config": "adminEmailConfig",
+  "admin_security_config": "adminSecurityConfig",
+  "my_access_log": "myAccessLog",
+  "my_account": "myAccount",
   "my_affected_profiles": "myAffectedProfiles",
   "my_agent_steps": "myAgentSteps",
   "my_assessments": "myAssessments",
+  "my_auth_status": "myAuthStatus",
+  "my_claim_conflicts": "myClaimConflicts",
   "my_coach_messages": "myCoachMessages",
+  "my_demo_code": "myDemoCode",
+  "my_devices": "myDevices",
+  "my_email_challenge": "myEmailChallenge",
   "my_frames": "myFrames",
   "my_media_assets": "myMediaAssets",
   "my_property_privates": "myPropertyPrivates",
@@ -440,6 +580,7 @@ const tableAccessorAliases = {
   "my_recovery_plans": "myRecoveryPlans",
   "my_report_privates": "myReportPrivates",
   "my_reports": "myReports",
+  "my_stepup": "myStepup",
   "my_verifications": "myVerifications",
   "svc_affected_profiles": "svcAffectedProfiles",
   "svc_assessments": "svcAssessments",
@@ -479,14 +620,34 @@ export type DbView = __DbViewBase & {
   readonly "area_cell_summary": __DbViewBase["areaCellSummary"];
   /** @deprecated Use `areaNotice` instead. This alias will be removed in the next major version. */
   readonly "area_notice": __DbViewBase["areaNotice"];
+  /** @deprecated Use `adminClaimConflicts` instead. This alias will be removed in the next major version. */
+  readonly "admin_claim_conflicts": __DbViewBase["adminClaimConflicts"];
+  /** @deprecated Use `adminEmailConfig` instead. This alias will be removed in the next major version. */
+  readonly "admin_email_config": __DbViewBase["adminEmailConfig"];
+  /** @deprecated Use `adminSecurityConfig` instead. This alias will be removed in the next major version. */
+  readonly "admin_security_config": __DbViewBase["adminSecurityConfig"];
+  /** @deprecated Use `myAccessLog` instead. This alias will be removed in the next major version. */
+  readonly "my_access_log": __DbViewBase["myAccessLog"];
+  /** @deprecated Use `myAccount` instead. This alias will be removed in the next major version. */
+  readonly "my_account": __DbViewBase["myAccount"];
   /** @deprecated Use `myAffectedProfiles` instead. This alias will be removed in the next major version. */
   readonly "my_affected_profiles": __DbViewBase["myAffectedProfiles"];
   /** @deprecated Use `myAgentSteps` instead. This alias will be removed in the next major version. */
   readonly "my_agent_steps": __DbViewBase["myAgentSteps"];
   /** @deprecated Use `myAssessments` instead. This alias will be removed in the next major version. */
   readonly "my_assessments": __DbViewBase["myAssessments"];
+  /** @deprecated Use `myAuthStatus` instead. This alias will be removed in the next major version. */
+  readonly "my_auth_status": __DbViewBase["myAuthStatus"];
+  /** @deprecated Use `myClaimConflicts` instead. This alias will be removed in the next major version. */
+  readonly "my_claim_conflicts": __DbViewBase["myClaimConflicts"];
   /** @deprecated Use `myCoachMessages` instead. This alias will be removed in the next major version. */
   readonly "my_coach_messages": __DbViewBase["myCoachMessages"];
+  /** @deprecated Use `myDemoCode` instead. This alias will be removed in the next major version. */
+  readonly "my_demo_code": __DbViewBase["myDemoCode"];
+  /** @deprecated Use `myDevices` instead. This alias will be removed in the next major version. */
+  readonly "my_devices": __DbViewBase["myDevices"];
+  /** @deprecated Use `myEmailChallenge` instead. This alias will be removed in the next major version. */
+  readonly "my_email_challenge": __DbViewBase["myEmailChallenge"];
   /** @deprecated Use `myFrames` instead. This alias will be removed in the next major version. */
   readonly "my_frames": __DbViewBase["myFrames"];
   /** @deprecated Use `myMediaAssets` instead. This alias will be removed in the next major version. */
@@ -501,6 +662,8 @@ export type DbView = __DbViewBase & {
   readonly "my_report_privates": __DbViewBase["myReportPrivates"];
   /** @deprecated Use `myReports` instead. This alias will be removed in the next major version. */
   readonly "my_reports": __DbViewBase["myReports"];
+  /** @deprecated Use `myStepup` instead. This alias will be removed in the next major version. */
+  readonly "my_stepup": __DbViewBase["myStepup"];
   /** @deprecated Use `myVerifications` instead. This alias will be removed in the next major version. */
   readonly "my_verifications": __DbViewBase["myVerifications"];
   /** @deprecated Use `svcAffectedProfiles` instead. This alias will be removed in the next major version. */
@@ -539,14 +702,34 @@ export type Tables = __TablesBase & {
   readonly "area_cell_summary": __TablesBase["areaCellSummary"];
   /** @deprecated Use `areaNotice` instead. This alias will be removed in the next major version. */
   readonly "area_notice": __TablesBase["areaNotice"];
+  /** @deprecated Use `adminClaimConflicts` instead. This alias will be removed in the next major version. */
+  readonly "admin_claim_conflicts": __TablesBase["adminClaimConflicts"];
+  /** @deprecated Use `adminEmailConfig` instead. This alias will be removed in the next major version. */
+  readonly "admin_email_config": __TablesBase["adminEmailConfig"];
+  /** @deprecated Use `adminSecurityConfig` instead. This alias will be removed in the next major version. */
+  readonly "admin_security_config": __TablesBase["adminSecurityConfig"];
+  /** @deprecated Use `myAccessLog` instead. This alias will be removed in the next major version. */
+  readonly "my_access_log": __TablesBase["myAccessLog"];
+  /** @deprecated Use `myAccount` instead. This alias will be removed in the next major version. */
+  readonly "my_account": __TablesBase["myAccount"];
   /** @deprecated Use `myAffectedProfiles` instead. This alias will be removed in the next major version. */
   readonly "my_affected_profiles": __TablesBase["myAffectedProfiles"];
   /** @deprecated Use `myAgentSteps` instead. This alias will be removed in the next major version. */
   readonly "my_agent_steps": __TablesBase["myAgentSteps"];
   /** @deprecated Use `myAssessments` instead. This alias will be removed in the next major version. */
   readonly "my_assessments": __TablesBase["myAssessments"];
+  /** @deprecated Use `myAuthStatus` instead. This alias will be removed in the next major version. */
+  readonly "my_auth_status": __TablesBase["myAuthStatus"];
+  /** @deprecated Use `myClaimConflicts` instead. This alias will be removed in the next major version. */
+  readonly "my_claim_conflicts": __TablesBase["myClaimConflicts"];
   /** @deprecated Use `myCoachMessages` instead. This alias will be removed in the next major version. */
   readonly "my_coach_messages": __TablesBase["myCoachMessages"];
+  /** @deprecated Use `myDemoCode` instead. This alias will be removed in the next major version. */
+  readonly "my_demo_code": __TablesBase["myDemoCode"];
+  /** @deprecated Use `myDevices` instead. This alias will be removed in the next major version. */
+  readonly "my_devices": __TablesBase["myDevices"];
+  /** @deprecated Use `myEmailChallenge` instead. This alias will be removed in the next major version. */
+  readonly "my_email_challenge": __TablesBase["myEmailChallenge"];
   /** @deprecated Use `myFrames` instead. This alias will be removed in the next major version. */
   readonly "my_frames": __TablesBase["myFrames"];
   /** @deprecated Use `myMediaAssets` instead. This alias will be removed in the next major version. */
@@ -561,6 +744,8 @@ export type Tables = __TablesBase & {
   readonly "my_report_privates": __TablesBase["myReportPrivates"];
   /** @deprecated Use `myReports` instead. This alias will be removed in the next major version. */
   readonly "my_reports": __TablesBase["myReports"];
+  /** @deprecated Use `myStepup` instead. This alias will be removed in the next major version. */
+  readonly "my_stepup": __TablesBase["myStepup"];
   /** @deprecated Use `myVerifications` instead. This alias will be removed in the next major version. */
   readonly "my_verifications": __TablesBase["myVerifications"];
   /** @deprecated Use `svcAffectedProfiles` instead. This alias will be removed in the next major version. */
