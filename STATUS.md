@@ -9,6 +9,8 @@ This is the index only. **Each part logs progress in its own append-only file**,
 | 3. AI Pipeline (Nemotron) | [status/part3.md](status/part3.md) | unassigned |
 | 4. Recovery Navigator & Infra | [status/part4.md](status/part4.md) | unassigned |
 
+> **Backend is live (Part 2).** Before any database, upload, worker or affected-page work, read [status/part2.md → Handoff to other parts](status/part2.md) and [packages/stdb-bindings/README.md](packages/stdb-bindings/README.md).
+
 ## Entry format (newest at the top of your file)
 
 ```markdown
@@ -24,7 +26,7 @@ This is the index only. **Each part logs progress in its own append-only file**,
 ## Integration checkpoints (tick when true on the deployed URL)
 
 - [ ] Scaffold on main; everyone rebased (P1)
-- [ ] Module on Maincloud + bindings + provider hooks (P2)
+- [x] Module on Maincloud + bindings + provider hooks (P2): live as `aftermath-hackutd` (demo) and `aftermath-hackutd-dev` (build against this)
 - [ ] Real Nemotron VL call returns a valid FrameFinding (P3)
 - [ ] Presigned upload to Vultr Object Storage; VM serving HTTPS (P4)
 - [ ] `/api/geocode` returns normalized addresses (forward + reverse) (P2)

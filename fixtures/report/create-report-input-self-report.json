@@ -1,0 +1,21 @@
+{
+  "source": "fixture",
+  "schema": "CreateReportInput",
+  "description": "A resident films their own home after a tornado (self-report path, no GPS).",
+  "data": {
+    "hazard": "tornado",
+    "address": {
+      "line1": "1234 N GREENVILLE AVE APT 12",
+      "city": "RICHARDSON",
+      "state": "TX",
+      "zip": "75081",
+      "lat": null,
+      "lng": null,
+      "normalized": "1234 N GREENVILLE AVE APT 12 | RICHARDSON | TX | 75081",
+      "source": "manual"
+    },
+    "selfDanger": false,
+    "isSelfReport": true,
+    "reporterSecretHash": "60303ae22b998861bce3b28f33eec1be758a213c86c93c076dbe9f558c11c752"
+  }
+}

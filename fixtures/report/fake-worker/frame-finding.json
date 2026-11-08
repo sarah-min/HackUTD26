@@ -1,0 +1,38 @@
+{
+  "source": "fixture",
+  "schema": "FrameFindingSchema",
+  "description": "Sample output of scripts/dev-fake-worker.ts (frame-finding). DEV ONLY, not a real AI result.",
+  "data": {
+    "frameIndex": 0,
+    "tSec": 0,
+    "usable": true,
+    "components": [
+      {
+        "component": "roof",
+        "level": "destroyed",
+        "evidence": "[FIXTURE] simulated roof damage",
+        "confidence": 0.8
+      },
+      {
+        "component": "exterior_walls",
+        "level": "minor",
+        "evidence": "[FIXTURE] simulated",
+        "confidence": 0.7
+      }
+    ],
+    "lifeSafety": [
+      {
+        "flag": "standing_water_interior",
+        "evidence": "[FIXTURE] simulated hazard",
+        "confidence": 0.75
+      },
+      {
+        "flag": "road_blocked",
+        "evidence": "[FIXTURE] simulated hazard",
+        "confidence": 0.75
+      }
+    ],
+    "waterDepth": "knee",
+    "caption": "[FIXTURE] frame 1"
+  }
+}

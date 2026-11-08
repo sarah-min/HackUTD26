@@ -1,0 +1,24 @@
+{
+  "source": "fixture",
+  "schema": "CreateReportInput",
+  "description": "A neighbor reports flood damage at the demo property; someone may be in danger.",
+  "data": {
+    "hazard": "flood",
+    "address": {
+      "line1": "800 W CAMPBELL RD",
+      "city": "RICHARDSON",
+      "state": "TX",
+      "zip": "75080",
+      "lat": 32.9858,
+      "lng": -96.7501,
+      "normalized": "800 W CAMPBELL RD | RICHARDSON | TX | 75080",
+      "source": "census"
+    },
+    "deviceLat": 32.98583,
+    "deviceLng": -96.75004,
+    "selfDanger": true,
+    "notes": "Elderly man on porch, water still rising",
+    "isSelfReport": false,
+    "reporterSecretHash": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+  }
+}

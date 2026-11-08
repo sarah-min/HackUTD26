@@ -1,0 +1,20 @@
+{
+  "result": {
+    "input": {
+      "address": { "address": "1100 Congress Avenue, Austin, TX 78701" },
+      "benchmark": { "id": "4", "benchmarkName": "Public_AR_Current", "benchmarkDescription": "Public Address Ranges - Current Benchmark", "isDefault": true }
+    },
+    "addressMatches": [
+      {
+        "tigerLine": { "side": "L", "tigerLineId": "63930000" },
+        "coordinates": { "x": -97.74042, "y": 30.27468 },
+        "addressComponents": {
+          "zip": "78701", "streetName": "CONGRESS", "preType": "", "city": "AUSTIN", "preDirection": "",
+          "suffixDirection": "", "fromAddress": "1100", "state": "TX", "suffixType": "AVE", "toAddress": "1198",
+          "suffixQualifier": "", "preQualifier": ""
+        },
+        "matchedAddress": "1100 CONGRESS AVE, AUSTIN, TX, 78701"
+      }
+    ]
+  }
+}

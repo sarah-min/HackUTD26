@@ -1,0 +1,135 @@
+{
+  "source": "fixture",
+  "schema": "RecoveryPlanSchema",
+  "description": "Sample output of scripts/dev-fake-worker.ts (recovery-plan); forecast truncated to 3 of 91 points. DEV ONLY, not a real AI result.",
+  "data": {
+    "propertyId": "2",
+    "reportId": "2",
+    "profileId": "fixture-persona",
+    "cost": {
+      "lowCents": 1842750,
+      "likelyCents": 2632500,
+      "highCents": 3685500,
+      "lineItems": [
+        {
+          "component": "roof",
+          "level": "major",
+          "basis": "[FIXTURE] 1800 sqft \u00d7 $150/sqft \u00d7 15% roof share",
+          "likelyCents": 2025000
+        },
+        {
+          "component": "exterior_walls",
+          "level": "minor",
+          "basis": "[FIXTURE] 1800 sqft \u00d7 $150/sqft \u00d7 15% \u00d7 15%",
+          "likelyCents": 607500
+        }
+      ],
+      "inputs": {
+        "homeSqft": 1800,
+        "stories": 1,
+        "tenure": "own",
+        "assumed": false
+      },
+      "costModelVersion": "cost-v1",
+      "disclaimer": "Illustrative estimate, not a contractor quote or insurance determination."
+    },
+    "repairCostCents": {
+      "low": 1400000,
+      "likely": 2000000,
+      "high": 2800000
+    },
+    "expectedPayoutCents": {
+      "low": 900000,
+      "likely": 1300000,
+      "high": 1800000
+    },
+    "gapCents": {
+      "low": 500000,
+      "likely": 700000,
+      "high": 1000000
+    },
+    "payoutNotes": [
+      "[FIXTURE] Simulated payout estimate."
+    ],
+    "indicators": [
+      {
+        "id": "liquidity_runway_months",
+        "label": "Liquidity runway",
+        "value": 1.8,
+        "unit": "months",
+        "status": "watch",
+        "explanation": "[FIXTURE]"
+      },
+      {
+        "id": "emergency_fund_coverage",
+        "label": "Emergency fund coverage",
+        "value": 1.2,
+        "unit": "ratio",
+        "status": "watch",
+        "explanation": "[FIXTURE]"
+      },
+      {
+        "id": "debt_to_income",
+        "label": "Debt-to-income",
+        "value": 0.31,
+        "unit": "ratio",
+        "status": "good",
+        "explanation": "[FIXTURE]"
+      }
+    ],
+    "options": [
+      {
+        "id": "savings",
+        "label": "Savings",
+        "availableCents": 450000,
+        "costOfFundsCents": 0,
+        "daysToFunds": 0
+      },
+      {
+        "id": "credit_card",
+        "label": "Credit card",
+        "availableCents": 600000,
+        "costOfFundsCents": 31000,
+        "daysToFunds": 0
+      }
+    ],
+    "recommendedMix": [
+      {
+        "optionId": "savings",
+        "amountCents": 450000
+      },
+      {
+        "optionId": "credit_card",
+        "amountCents": 250000
+      }
+    ],
+    "forecast": [
+      {
+        "day": 0,
+        "at": 1794093877353,
+        "liquidCents": 840000,
+        "events": []
+      },
+      {
+        "day": 1,
+        "at": 1794180277353,
+        "liquidCents": 838000,
+        "events": []
+      },
+      {
+        "day": 2,
+        "at": 1794266677353,
+        "liquidCents": 836000,
+        "events": []
+      }
+    ],
+    "firstShortfallDay": 7,
+    "nextSteps": [
+      "[FIXTURE] Call your insurer to open a claim."
+    ],
+    "coachSummary": "[FIXTURE] Simulated coach summary.",
+    "disclaimer": "Educational estimate using a synthetic demo profile. Not financial advice.",
+    "source": "fixture",
+    "createdAt": 1794093877353
+  }
+}

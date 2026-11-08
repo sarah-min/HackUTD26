@@ -1,0 +1,15 @@
+{
+  "source": "fixture",
+  "schema": "NormalizedAddress",
+  "description": "Manually entered address with a unit and no geocode point (lat/lng null is only allowed for source=manual).",
+  "data": {
+    "line1": "1234 N GREENVILLE AVE APT 12",
+    "city": "RICHARDSON",
+    "state": "TX",
+    "zip": "75081",
+    "lat": null,
+    "lng": null,
+    "normalized": "1234 N GREENVILLE AVE APT 12 | RICHARDSON | TX | 75081",
+    "source": "manual"
+  }
+}

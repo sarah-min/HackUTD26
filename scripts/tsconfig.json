@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "spacetimedb": ["./node_modules/spacetimedb"],
+      "@hack/stdb-bindings": ["../packages/stdb-bindings/src/index.ts"],
+      "@hack/address": ["../packages/address/src/index.ts"]
+    }
+  },
+  "include": ["*.ts"]
+}
