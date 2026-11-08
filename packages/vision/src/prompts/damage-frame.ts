@@ -1,12 +1,18 @@
-import { ComponentSchema, DamageLevelSchema, HazardSchema, LifeSafetyFlagSchema, type Hazard } from '@hack/contracts/common';
-import { DamageExtentSchema, WaterDepthSchema } from '@hack/contracts/assessment';
+import { HazardSchema, LifeSafetyFlagSchema, type Hazard } from '@hack/contracts/common';
+import {
+  DamageCueSchema,
+  DamageExtentSchema,
+  SceneSchema,
+  WaterLevelSchema,
+  WaterReferenceObjectSchema,
+} from '@hack/contracts/assessment';
+import { CUE_RULES } from '../rules';
 
-// v3: separates the home from the street (public poles, road debris) and requires a flag for every visible danger.
-// v2: output shaped for the reporter and affected-person views (headline, extent, highlight box), bounded lists,
-// guided JSON decoding. v1 free-form output could loop until the token limit.
-export const DAMAGE_FRAME_PROMPT_VERSION = 'damage-frame-v3';
+// v4: the model reports visible evidence only (cues, water against a reference object); code rules set severity.
+// v3: separated the home from the street. v2: guided JSON, bounded lists. v1 free-form output could loop.
+export const DAMAGE_FRAME_PROMPT_VERSION = 'damage-frame-v4';
 
-export const MAX_COMPONENTS_PER_FRAME = 6;
+export const MAX_OBSERVATIONS_PER_FRAME = 8;
 export const MAX_FLAGS_PER_FRAME = 4;
 
 const box = {
@@ -22,30 +28,42 @@ const box = {
   additionalProperties: false,
 } as const;
 
-/** JSON Schema for the model's reply (vLLM guided decoding). frameIndex/tSec are added by code. */
+/** JSON Schema for the model's reply (vLLM guided decoding). */
 export const DAMAGE_FRAME_JSON_SCHEMA = {
   type: 'object',
   properties: {
     usable: { type: 'boolean' },
     unusableReason: { type: 'string', enum: ['dark', 'blurry', 'not_a_structure', 'other'] },
+    scene: { type: 'string', enum: SceneSchema.options },
     headline: { type: 'string', maxLength: 80 },
     caption: { type: 'string', maxLength: 240 },
-    components: {
+    observations: {
       type: 'array',
-      maxItems: MAX_COMPONENTS_PER_FRAME,
+      maxItems: MAX_OBSERVATIONS_PER_FRAME,
       items: {
         type: 'object',
         properties: {
-          component: { type: 'string', enum: ComponentSchema.options },
-          level: { type: 'string', enum: DamageLevelSchema.options },
-          extent: { type: 'string', enum: DamageExtentSchema.options },
+          cue: { type: 'string', enum: DamageCueSchema.options },
           evidence: { type: 'string', maxLength: 160 },
           confidence: { type: 'number', minimum: 0, maximum: 1 },
+          extent: { type: 'string', enum: DamageExtentSchema.options },
           box,
         },
-        required: ['component', 'level', 'extent', 'evidence', 'confidence'],
+        required: ['cue', 'evidence', 'confidence'],
         additionalProperties: false,
       },
+    },
+    water: {
+      type: 'object',
+      properties: {
+        present: { type: 'boolean' },
+        inside: { type: 'boolean' },
+        level: { type: 'string', enum: WaterLevelSchema.options },
+        referenceObject: { type: 'string', enum: WaterReferenceObjectSchema.options },
+        evidence: { type: 'string', maxLength: 160 },
+      },
+      required: ['present', 'inside', 'level', 'referenceObject'],
+      additionalProperties: false,
     },
     lifeSafety: {
       type: 'array',
@@ -63,32 +81,27 @@ export const DAMAGE_FRAME_JSON_SCHEMA = {
       },
     },
     hazardObserved: { type: 'string', enum: HazardSchema.options },
-    waterDepth: { type: 'string', enum: WaterDepthSchema.options },
   },
-  required: ['usable', 'headline', 'caption', 'components', 'lifeSafety', 'waterDepth'],
+  required: ['usable', 'scene', 'headline', 'caption', 'observations', 'water', 'lifeSafety'],
   additionalProperties: false,
 } as const;
 
-const list = (xs: readonly string[]) => xs.join(', ');
+const cueLines = DamageCueSchema.options.map((c) => `  ${c}: ${CUE_RULES[c].description}`).join('\n');
 
 export const DAMAGE_FRAME_SYSTEM_PROMPT = `/no_think
-You assess ONE still frame from a phone video or photo taken after a disaster. Reply with one JSON object and nothing else.
-Safety first: list every clearly visible danger in lifeSafety. Fallen or leaning utility poles, or wires hanging low or lying on the ground, are downed_power_line. Poles, trees or debris across a road are road_blocked. If your headline or caption mentions a danger, it must also be in lifeSafety.
-Damage second: components describe only the home or property being filmed. Street poles, wires and road debris are not components; they belong in lifeSafety or the caption. Use yard_debris only for debris on the property's own lot. If the frame is mostly a street, components may be empty. Name a component only when that part of a building is visible; do not infer roof damage from loose debris.
-Fields:
-- usable: true if the frame is clear enough to assess. If false, give unusableReason (dark, blurry, not_a_structure, other) and an empty components list.
-- headline: the most important finding in 3 to 8 words, dangers before damage, e.g. "Downed power lines across the road". Use "No visible damage" when nothing is damaged or dangerous.
+You report visible evidence in ONE still frame from a phone video or photo taken after a disaster (any kind: flood, storm, tornado, fire, earthquake, hail, landslide, snow). You do not rate severity; the software does that from your evidence. Reply with one JSON object and nothing else.
+- usable: true if the frame is clear enough to judge. If false, give unusableReason and no observations.
+- scene: home_exterior, home_interior, street_or_area (a road or several buildings), aerial, vehicle, or other.
+- headline: the most important thing visible, 3 to 8 words, dangers first. "No visible damage" if nothing is wrong.
 - caption: one plain sentence describing what is visible.
-- components: up to ${MAX_COMPONENTS_PER_FRAME}, each part once. component is one of: ${list(ComponentSchema.options)}.
-  level uses the FEMA scale: none (undamaged), affected (cosmetic, livable), minor (repairable, e.g. some shingles missing, water below the outlets), major (structural damage or water above the outlets), destroyed (total loss or structurally unsafe).
-  extent: localized (one small area), partial (a noticeable section), widespread (most of what is visible).
-  evidence: what you see, under 160 characters. confidence: 0 to 1.
-  box: the region as fractions of the image (x, y from the top-left; w, h sizes), only when you can point to it.
-- lifeSafety: up to ${MAX_FLAGS_PER_FRAME} visible dangers, each once: ${list(LifeSafetyFlagSchema.options)}. Same evidence, confidence and box rules.
-- hazardObserved: the disaster type, only if the frame itself shows it: ${list(HazardSchema.options)}.
-- waterDepth: ${list(WaterDepthSchema.options)}.
-Describe only what this frame shows. Leave out costs and anything that is not visible.`;
+- observations: up to ${MAX_OBSERVATIONS_PER_FRAME}, each cue once, only for what you can actually see. Choose from:
+${cueLines}
+  Each has evidence (what you see, under 160 characters), confidence 0 to 1, optional extent (localized, partial, widespread) and optional box (the region as fractions of the image).
+  Street poles, wires and road debris are not observations; report them in lifeSafety.
+- water: present (any floodwater or standing water), inside (in a building). level only by comparing the waterline to a visible object of known height, named in referenceObject (electrical_outlet, door_or_handle, countertop_or_furniture, stair_steps, window_sill, vehicle, person, other_known_height). If no such object is visible, level is not_visible and referenceObject is none.
+- lifeSafety: up to ${MAX_FLAGS_PER_FRAME} clearly visible dangers, each once: ${LifeSafetyFlagSchema.options.join(', ')}. Fallen or leaning utility poles or low wires are downed_power_line; anything across a road is road_blocked.
+- hazardObserved: the disaster type, only if this frame shows it: ${HazardSchema.options.join(', ')}.`;
 
 export function damageFrameUserText(hazard: Hazard | undefined): string {
-  return hazard ? `Reported hazard: ${hazard}. Assess this frame.` : 'Assess this frame.';
+  return hazard ? `Reported hazard: ${hazard}. Report the visible evidence in this frame.` : 'Report the visible evidence in this frame.';
 }

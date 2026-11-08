@@ -1,5 +1,12 @@
-import { FrameFindingSchema, type FrameFinding } from '@hack/contracts/assessment';
-import { DAMAGE_LEVEL_RANK, type Hazard } from '@hack/contracts/common';
+import { z } from 'zod';
+import {
+  FrameFindingSchema,
+  FrameObservationSchema,
+  FrameWaterSchema,
+  SceneSchema,
+  type FrameFinding,
+} from '@hack/contracts/assessment';
+import { HazardSchema, LifeSafetyFlagSchema, type Hazard } from '@hack/contracts/common';
 import { NimHttpError, type ChatMessage, type NimClient } from '@hack/agent';
 import { findingCacheKey, sha256Hex, type FindingCache } from './cache';
 import { toDataUrl, type ImageMime } from './image';
@@ -8,10 +15,26 @@ import {
   DAMAGE_FRAME_JSON_SCHEMA,
   DAMAGE_FRAME_PROMPT_VERSION,
   DAMAGE_FRAME_SYSTEM_PROMPT,
-  MAX_COMPONENTS_PER_FRAME,
   MAX_FLAGS_PER_FRAME,
+  MAX_OBSERVATIONS_PER_FRAME,
   damageFrameUserText,
 } from './prompts/damage-frame';
+import { applyDamageRules, type ModelFrame } from './rules';
+
+/** What the model returns (v4). Code turns it into a FrameFinding with applyDamageRules. */
+export const ModelFrameSchema: z.ZodType<ModelFrame> = z.object({
+  usable: z.boolean(),
+  unusableReason: z.enum(['dark', 'blurry', 'not_a_structure', 'other']).optional(),
+  scene: SceneSchema.catch('other'),
+  headline: z.string().max(80).optional(),
+  caption: z.string().max(240),
+  observations: z.array(FrameObservationSchema).max(MAX_OBSERVATIONS_PER_FRAME),
+  water: FrameWaterSchema.catch({ present: false, inside: false, level: 'not_visible', referenceObject: 'none' }),
+  lifeSafety: z
+    .array(z.object({ flag: LifeSafetyFlagSchema, evidence: z.string().max(200), confidence: z.number().min(0).max(1), box: FrameFindingSchema.shape.lifeSafety.element.shape.box }))
+    .max(MAX_FLAGS_PER_FRAME),
+  hazardObserved: HazardSchema.optional(),
+}) as z.ZodType<ModelFrame>;
 
 export interface AnalyzeFrameArgs {
   nim: NimClient;
@@ -58,57 +81,50 @@ export function normalizeBox(v: unknown): { x: number; y: number; w: number; h: 
   return { x: r(x), y: r(y), w: r(w), h: r(h) };
 }
 
-function prepare(frameIndex: number, tSec: number) {
-  return (raw: unknown): unknown => {
-    const r = rec(raw);
-    if (!r) return raw;
-    const item = (v: unknown) => {
-      const o = rec(v);
-      if (!o) return v;
-      const out: Record<string, unknown> = { ...o, evidence: clampString(o.evidence ?? '', 200), confidence: clampUnit(o.confidence) };
-      const box = normalizeBox(o.box);
-      if (box) out.box = box;
-      else delete out.box;
-      if (out.extent === null || (out.extent !== undefined && !['localized', 'partial', 'widespread'].includes(out.extent as string)))
-        delete out.extent;
-      return out;
-    };
-    // Each component / flag once: keep the worst (then most confident) entry. Repeats are a sign of a looping reply.
-    const dedupe = (v: unknown, key: string, rank: (o: Record<string, unknown>) => number, max: number) => {
-      if (!Array.isArray(v)) return v;
-      const best = new Map<unknown, Record<string, unknown>>();
-      const passthrough: unknown[] = [];
-      for (const x of v.map(item)) {
-        const o = rec(x);
-        if (!o || typeof o[key] !== 'string') {
-          passthrough.push(x); // let validation report it
-          continue;
-        }
-        const prev = best.get(o[key]);
-        const score = (e: Record<string, unknown>) => rank(e) * 10 + (typeof e.confidence === 'number' ? e.confidence : 0);
-        if (!prev || score(o) > score(prev)) best.set(o[key], o);
-      }
-      return [...best.values(), ...passthrough].slice(0, max);
-    };
-    const out: Record<string, unknown> = {
-      ...r,
-      frameIndex,
-      tSec,
-      components: dedupe(r.components ?? [], 'component', (o) => DAMAGE_LEVEL_RANK[o.level as keyof typeof DAMAGE_LEVEL_RANK] ?? 0, MAX_COMPONENTS_PER_FRAME),
-      lifeSafety: dedupe(r.lifeSafety ?? [], 'flag', () => 0, MAX_FLAGS_PER_FRAME),
-      caption: clampString(r.caption ?? '', 240),
-    };
-    if (typeof r.headline === 'string' && r.headline.trim()) out.headline = clampString(r.headline, 80);
-    else delete out.headline;
-    if (out.usable === true) delete out.unusableReason;
-    if (out.usable === false) {
-      out.components = [];
-      // keep life-safety flags: a blurry frame can still show a fire
-    }
-    if (out.hazardObserved === null) delete out.hazardObserved;
-    if (out.waterDepth === null) delete out.waterDepth;
+function prepare(raw: unknown): unknown {
+  const r = rec(raw);
+  if (!r) return raw;
+  const item = (v: unknown) => {
+    const o = rec(v);
+    if (!o) return v;
+    const out: Record<string, unknown> = { ...o, evidence: clampString(o.evidence ?? '', 200), confidence: clampUnit(o.confidence) };
+    const box = normalizeBox(o.box);
+    if (box) out.box = box;
+    else delete out.box;
+    if (out.extent === null || (out.extent !== undefined && !['localized', 'partial', 'widespread'].includes(out.extent as string)))
+      delete out.extent;
     return out;
   };
+  // Each cue / flag once, keeping the most confident entry. Repeats are a sign of a looping reply.
+  const dedupe = (v: unknown, key: string, max: number) => {
+    if (!Array.isArray(v)) return v;
+    const best = new Map<unknown, Record<string, unknown>>();
+    const passthrough: unknown[] = [];
+    for (const x of v.map(item)) {
+      const o = rec(x);
+      if (!o || typeof o[key] !== 'string') {
+        passthrough.push(x); // let validation report it
+        continue;
+      }
+      const prev = best.get(o[key]);
+      const conf = (e: Record<string, unknown>) => (typeof e.confidence === 'number' ? e.confidence : 0);
+      if (!prev || conf(o) > conf(prev)) best.set(o[key], o);
+    }
+    return [...best.values(), ...passthrough].slice(0, max);
+  };
+  const out: Record<string, unknown> = {
+    ...r,
+    observations: dedupe(r.observations, 'cue', MAX_OBSERVATIONS_PER_FRAME), // missing stays missing: validation asks again
+    lifeSafety: dedupe(r.lifeSafety ?? [], 'flag', MAX_FLAGS_PER_FRAME),
+    caption: clampString(r.caption ?? '', 240),
+  };
+  if (typeof r.headline === 'string' && r.headline.trim()) out.headline = clampString(r.headline, 80);
+  else delete out.headline;
+  const water = rec(r.water);
+  if (water) out.water = { ...water, ...(typeof water.evidence === 'string' ? { evidence: clampString(water.evidence, 200) } : {}) };
+  if (out.usable === true) delete out.unusableReason;
+  if (out.hazardObserved === null) delete out.hazardObserved;
+  return out;
 }
 
 /**
@@ -134,7 +150,7 @@ export function addMentionedDangers(f: FrameFinding): FrameFinding {
     added.push({ flag, evidence: clampString(`Mentioned by the model: "${m[0]}"`, 200) as string, confidence: 0.6 });
   }
   if (!added.length) return f;
-  return { ...f, lifeSafety: [...f.lifeSafety, ...added].slice(0, MAX_FLAGS_PER_FRAME + DANGER_WORDS.length) };
+  return { ...f, lifeSafety: [...f.lifeSafety, ...added] };
 }
 
 export function unusableFinding(frameIndex: number, tSec: number, reason: FrameFinding['unusableReason'], caption: string): FrameFinding {
@@ -144,7 +160,7 @@ export function unusableFinding(frameIndex: number, tSec: number, reason: FrameF
   });
 }
 
-/** One VL call per frame; guided JSON; Zod-validated; one retry with the validation error; then unusable/parse_error. */
+/** One VL call per frame: guided JSON evidence, Zod-validated, severity from code rules; one retry; then unusable/parse_error. */
 export async function analyzeFrame(args: AnalyzeFrameArgs): Promise<AnalyzeFrameResult> {
   const { nim, image, frameIndex, tSec, hazard, cache, signal } = args;
   const modelId = nim.models.vision;
@@ -195,9 +211,9 @@ export async function analyzeFrame(args: AnalyzeFrameArgs): Promise<AnalyzeFrame
     const parsed =
       res.finishReason === 'length'
         ? ({ ok: false, error: 'the reply was cut off at the length limit' } as const)
-        : parseModelJson(text, FrameFindingSchema, prepare(frameIndex, tSec));
+        : parseModelJson(text, ModelFrameSchema, prepare);
     if (parsed.ok) {
-      const finding = addMentionedDangers(parsed.value);
+      const finding = addMentionedDangers(FrameFindingSchema.parse(applyDamageRules(parsed.value, frameIndex, tSec)));
       if (cache) {
         const { frameIndex: _f, tSec: _t, ...rest } = finding;
         await cache.set(key, rest);

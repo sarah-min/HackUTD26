@@ -21,6 +21,56 @@ export type FrameBox = z.infer<typeof FrameBoxSchema>;
 export const DamageExtentSchema = z.enum(['localized', 'partial', 'widespread']);
 export type DamageExtent = z.infer<typeof DamageExtentSchema>;
 
+/**
+ * Additive (damage-frame-v4): visible evidence the vision model reports. It never rates severity; code maps each cue to a
+ * component and FEMA level (packages/vision/src/rules.ts). Hazard-agnostic: the same cues cover flood, wind, tornado,
+ * wildfire, earthquake, hail, landslide and winter storms.
+ */
+export const DamageCueSchema = z.enum([
+  // whole structure
+  'structure_collapsed', 'structure_burned_out', 'structure_off_foundation', 'structure_leaning', 'foundation_damaged',
+  // roof
+  'roof_structure_missing', 'roof_sagging_or_collapsed', 'roof_covering_missing', 'roof_surface_minor', 'object_on_structure',
+  // walls and openings
+  'wall_section_missing', 'wall_structural_cracks', 'cladding_damaged', 'char_or_soot', 'exterior_cosmetic', 'windows_doors_broken',
+  // inside
+  'ceiling_collapsed', 'interior_finishes_damaged', 'mud_or_sediment_inside', 'contents_damaged', 'contents_piled_outside',
+  // property
+  'utility_service_damaged', 'vehicle_damaged', 'vehicle_destroyed', 'debris_on_lot', 'no_visible_damage',
+]);
+export type DamageCue = z.infer<typeof DamageCueSchema>;
+
+export const SceneSchema = z.enum(['home_exterior', 'home_interior', 'street_or_area', 'aerial', 'vehicle', 'other']);
+export type Scene = z.infer<typeof SceneSchema>;
+
+/** Water height, judged only against a visible object of known height. */
+export const WaterLevelSchema = z.enum([
+  'not_visible', 'below_floor_level', 'ankle', 'below_outlets', 'above_outlets', 'waist_or_higher', 'near_ceiling', 'over_roof',
+]);
+export type WaterLevel = z.infer<typeof WaterLevelSchema>;
+export const WaterReferenceObjectSchema = z.enum([
+  'none', 'electrical_outlet', 'door_or_handle', 'countertop_or_furniture', 'stair_steps', 'window_sill', 'vehicle', 'person', 'other_known_height',
+]);
+export type WaterReferenceObject = z.infer<typeof WaterReferenceObjectSchema>;
+
+export const FrameObservationSchema = z.object({
+  cue: DamageCueSchema,
+  evidence: z.string().max(200),
+  confidence: z.number().min(0).max(1),
+  extent: DamageExtentSchema.optional(),
+  box: FrameBoxSchema.optional(),
+});
+export type FrameObservation = z.infer<typeof FrameObservationSchema>;
+
+export const FrameWaterSchema = z.object({
+  present: z.boolean(), // any floodwater or standing water in the frame
+  inside: z.boolean(), // inside a building
+  level: WaterLevelSchema,
+  referenceObject: WaterReferenceObjectSchema,
+  evidence: z.string().max(200).optional(),
+});
+export type FrameWater = z.infer<typeof FrameWaterSchema>;
+
 export const FrameFindingSchema = z.object({
   frameIndex: z.number().int().min(0),
   tSec: z.number().min(0), // 0 for photos
@@ -49,6 +99,11 @@ export const FrameFindingSchema = z.object({
   caption: z.string().max(240),
   /** Additive: the frame's main finding in a few words, e.g. "Missing shingles and exposed decking". Affected view only. */
   headline: z.string().max(80).optional(),
+  /** Additive (v4): the raw evidence the components and flags above were computed from, kept for audit. */
+  scene: SceneSchema.optional(),
+  observations: z.array(FrameObservationSchema).optional(),
+  water: FrameWaterSchema.optional(),
+  rulesVersion: z.string().optional(),
 });
 export type FrameFinding = z.infer<typeof FrameFindingSchema>;
 

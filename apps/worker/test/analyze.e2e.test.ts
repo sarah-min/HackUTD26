@@ -72,7 +72,7 @@ describe('analyze handler end to end', () => {
   }, 60_000);
 
   it('live path with a scripted model: agent tools run and no invented $ survives', async () => {
-    const finding = JSON.stringify({ usable: true, components: [{ component: 'roof', level: 'major', evidence: 'hole', confidence: 0.9 }], lifeSafety: [], waterDepth: 'none', caption: 'Roof hole.' });
+    const finding = JSON.stringify({ usable: true, scene: 'home_exterior', headline: 'Roof open to the sky', caption: 'Roof hole.', observations: [{ cue: 'roof_structure_missing', evidence: 'hole', confidence: 0.9 }], water: { present: false, inside: false, level: 'not_visible', referenceObject: 'none' }, lifeSafety: [] });
     let agentTurn = 0;
     const script = [
       { tool_calls: [{ name: 'get_frame_findings', arguments: {} }, { name: 'estimate_repair_cost', arguments: {} }] },

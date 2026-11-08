@@ -4,6 +4,7 @@ export * from './limit';
 export * from './cache';
 export * from './frames';
 export * from './findings';
+export * from './rules';
 export * from './idDocument';
 export * from './verify/decide';
 export * from './verify/parseAddressText';
