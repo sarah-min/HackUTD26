@@ -1,0 +1,34 @@
+{
+  "source": "fixture",
+  "schema": "AreaCell[]",
+  "description": "Area-map cells around the demo property. Cell 14660:-36069 has 2 reports, so its hazardFlags stay empty (privacy rule); 14661:-36069 has 4 reports, so flags are shown.",
+  "data": [
+    {
+      "cellId": "14660:-36069",
+      "reportCount72h": 2,
+      "worstLevel": "major",
+      "hazardReportCount72h": 1,
+      "severeHazardCount72h": 0,
+      "hazardFlags": [],
+      "lastReportAt": 1762560000000
+    },
+    {
+      "cellId": "14661:-36069",
+      "reportCount72h": 4,
+      "worstLevel": "destroyed",
+      "hazardReportCount72h": 3,
+      "severeHazardCount72h": 1,
+      "hazardFlags": ["downed_power_line", "gas_leak_suspected", "standing_water_interior"],
+      "lastReportAt": 1762563600000
+    },
+    {
+      "cellId": "14659:-36070",
+      "reportCount72h": 1,
+      "worstLevel": "minor",
+      "hazardReportCount72h": 0,
+      "severeHazardCount72h": 0,
+      "hazardFlags": [],
+      "lastReportAt": 1762556400000
+    }
+  ]
+}

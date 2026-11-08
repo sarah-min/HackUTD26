@@ -380,7 +380,7 @@ Below are logical definitions. Part 2 translates them into the current TS module
 
 | Table | Vis. | Columns (pk first) | Readable by |
 |---|---|---|---|
-| `property` | public | `id u64 pk autoInc`, `cell_id string` (index), `created_at` | everyone (no PII) |
+| `property` | public | `id u64 pk autoInc`, `cell_id string` (index), `created_at`, `county_fips string?` (5-digit county FIPS, set by the service; coarse, not PII) | everyone (no PII) |
 | `property_private` | private | `property_id pk`, `normalized string` (unique index), `line1`, `city`, `state`, `zip`, `lat f64?`, `lng f64?`, `county_fips string?` | Verified for this property; service |
 | `report` | public | `id u64 pk autoInc`, `reporter Identity` (index), `property_id` (index), `cell_id` (index), `created_at`, `updated_at`, `status`, `hazard`, `self_danger bool`, `life_safety_csv string`, `overall_level` (default `none`), `usable_frames u8`, `total_frames u8`, `status_reason string?`, `claimed bool`, `source` | everyone (no address, no coordinates, no finances) |
 | `report_private` | private | `report_id pk`, `reporter_secret_hash`, `is_self_report bool`, `address_line1`, `lat f64?`, `lng f64?` (device GPS or geocode), `notes string?` | Reporter of the report; Verified for its property; service |
@@ -392,13 +392,39 @@ Below are logical definitions. Part 2 translates them into the current TS module
 | `affected_profile` | private | `id pk autoInc`, `identity` (index), `property_id`, `intake_json` (AffectedIntake), `updated_at` (unique on identity+property) | Self; service |
 | `recovery_plan` | private | `id pk autoInc`, `identity` (index), `property_id`, `report_id`, `json` (RecoveryPlan), `created_at` (unique on identity+property+report) | Self; service |
 | `coach_message` | private | `id pk autoInc`, `identity` (index), `property_id`, `report_id`, `role`, `text`, `at` | Self; service |
+| `area_notice` | public | `id u64 pk autoInc`, `county_fips string` (index), `kind 'nws_alert'\|'fema_declaration'`, `title`, `severity?`, `headline?`, `declaration_string?` (e.g. `DR-4999-TX`), `ih_program_declared bool?`, `source_url?`, `effective_at`, `expires_at?`, `updated_at` | everyone (no PII). Lets **unverified** visitors see NWS alerts and FEMA declarations for their county |
 | `area_cell_summary` | public | `cell_id pk`, `report_count_72h u32`, `worst_level`, `hazard_report_count_72h u32`, `severe_hazard_count_72h u32`, `hazard_flags_csv` (empty unless ≥3 reports), `last_report_at` | everyone (aggregated) |
 | `job` | private | `id pk autoInc`, `kind 'analyze'|'verify_identity'|'plan'|'coach'`, `report_id u64?`, `property_id u64?`, `verification_id u64?`, `subject Identity?` (for plan/coach), `payload_json`, `state 'queued'|'leased'|'done'|'failed'`, `attempts u8`, `lease_owner Identity?`, `lease_expires_at?`, `last_error?`, `created_at` | Service |
 | `service_identity` | private | `identity pk`, `role 'admin'|'worker'` | Service |
 | `lease_tick` | scheduled | interval 30 s → `requeue_expired_jobs` | — |
 | `area_tick` | scheduled | interval 5 min → `refresh_area_cells` | — |
 
-**Visibility VERIFY (hour 1):** document here which mechanism enforces the "Readable by" column (views / RLS / filters keyed on `ctx.sender`), or note that the HTTP fallback `/api/private/[...]` (§8) is in use for the private tables.
+**`record_area_notices` `notices_json` shape** (epoch ms, camelCase):
+
+```json
+[
+  { "kind": "nws_alert", "title": "Flash Flood Warning", "severity": "Severe", "headline": "Flash flooding ongoing until 6 PM",
+    "sourceUrl": "https://api.weather.gov/alerts/…", "effectiveAt": 1762538400000, "expiresAt": 1762560000000 },
+  { "kind": "fema_declaration", "title": "Severe Storms and Flooding", "declarationString": "DR-4999-TX",
+    "ihProgramDeclared": true, "sourceUrl": "https://www.fema.gov/disaster/4999", "effectiveAt": 1762300000000 }
+]
+```
+
+An empty array clears the county's notices. Send the full current list each time (replace semantics).
+
+**Visibility (VERIFIED against `spacetimedb@2.13.0`, implemented in `spacetimedb/src/views.ts`):** private tables stay private, and clients subscribe to **sender-scoped views** (`spacetimedb.view(...)`, evaluated per subscriber with `ctx.sender`) that enforce the "Readable by" column. There's no HTTP fallback: `/api/private/[...]` isn't needed.
+
+| View | Returns (row type of) | Rows |
+|---|---|---|
+| `my_reports` | `report` | reports the sender submitted (convenience; `report` is public anyway) |
+| `my_report_privates` | `report_private` | sender's own reports + reports on properties the sender is verified for |
+| `my_verifications` | `verification` | sender's own verification rows (the client reads the matched `property_id` here) |
+| `my_property_privates` | `property_private` | properties the sender is verified for |
+| `my_media_assets`, `my_frames`, `my_assessments` | `media_asset`, `frame`, `assessment` | reports on properties the sender is verified for |
+| `my_agent_steps` | `agent_step` | verified: all steps; reporter of an unverified report: only `visibility='reporter'` steps |
+| `my_affected_profiles`, `my_recovery_plans`, `my_coach_messages` | same-named tables | rows with `identity == sender` |
+
+Limitations: view rows reuse the table row types, so `report_private.reporter_secret_hash` and `verification.secret_hash` are visible to whoever can read those rows. They're SHA-256 hashes of client secrets, which is harmless. Private tables are NOT in the client bindings, so the worker can't read them as a client. Instead it subscribes to the **worker-only views** `svc_jobs`, `svc_report_privates`, `svc_property_privates`, `svc_media_assets`, `svc_frames`, `svc_assessments`, `svc_verifications`, `svc_affected_profiles`, `svc_recovery_plans` and `svc_coach_messages` (`spacetimedb/src/views_service.ts`). Each returns rows only to an identity in `service_identity`, and only rows tied to a job whose state is `queued` or `leased`; everyone else gets `[]`. Nobody needs the owner token. **Web-server role:** `service_identity.role` also accepts `'web'` for the Next.js server (`STDB_WEB_TOKEN`, server-only). `isService` (worker reducers + `svc_*`) is `admin`|`worker` only. The `web` role reads three narrow views in `spacetimedb/src/views_web.ts`: `web_report_upload_auth` (`report_id, reporter_secret_hash, status` for uploadable reports), `web_verification_auth` (`verification_id, secret_hash, state, property_id` for pending/verified) and `web_media_index` (`object_key, report_id, property_id` for media and frame keys, never `idv/`). These are the "service read" that §8's presign/media auth uses. Additive module columns not in v1: `report_private.submit_count u8` and `media_asset.round u8`, so a re-shoot after `needs_more_footage` gets a fresh "max 8 images or 1 video" budget. The analyze job's `payload_json` is `{"round": n}`, and the worker should process only media with that round. `create_report` takes one arg, `input_json` (the CreateReportInput JSON). Ids/identities passed to service reducers as strings are 64-char hex. `start_verification` throws `rate_limited` (no row is inserted) when the limit is hit.
 
 ### 5.2 Reducers
 
@@ -422,7 +448,8 @@ Below are logical definitions. Part 2 translates them into the current TS module
 | `record_coach_reply` | service | `identity, property_id, report_id, text` | |
 | `complete_job` | service | `job_id, ok, error?` | `ok` → done. Else attempts++ → requeue if < 2, else `failed` (analyze → report `failed` + `status_reason`; verify_identity → verification `failed` / `unreadable`) |
 | `requeue_expired_jobs` | scheduled | — | |
-| `refresh_area_cells` | scheduled | — | Recomputes `area_cell_summary` from `report` rows with `status='assessed'` created in the last 72 h; deletes empty cells |
+| `refresh_area_cells` | scheduled | — | Recomputes `area_cell_summary` from `report` rows with `status='assessed'` created in the last 72 h; deletes empty cells. Also deletes `nws_alert` rows in `area_notice` whose `expires_at` has passed |
+| `record_area_notices` | service | `property_id, county_fips, notices_json` | Sets `property.county_fips` (and `property_private.county_fips`) if empty, then **replaces** every `area_notice` row for that county with the list. `county_fips` must be 5 digits. Max 20 notices; strings capped (title 200, headline 400, severity 40, declaration 40, url 500). Called by the worker during `analyze`, after `reverse_geocode`, `lookup_disaster_declarations` and `get_weather_alerts` |
 
 ## 6. Repair cost model (Part 3: `packages/damage`, `costModelVersion = "cost-v1"`)
 

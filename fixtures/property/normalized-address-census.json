@@ -1,0 +1,15 @@
+{
+  "source": "fixture",
+  "schema": "NormalizedAddress",
+  "description": "Census-geocoded public address (UT Dallas campus) used as the demo property. Hand-written, not a captured response.",
+  "data": {
+    "line1": "800 W CAMPBELL RD",
+    "city": "RICHARDSON",
+    "state": "TX",
+    "zip": "75080",
+    "lat": 32.9858,
+    "lng": -96.7501,
+    "normalized": "800 W CAMPBELL RD | RICHARDSON | TX | 75080",
+    "source": "census"
+  }
+}

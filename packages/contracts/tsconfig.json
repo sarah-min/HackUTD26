@@ -1,0 +1,19 @@
+{
+  // index.ts re-exports every domain file (CONTRACTS.md §0), including P3/P4 files that don't exist yet.
+  // Until assessment.ts, agent.ts, verification.ts and finance.ts land, typecheck only Part 2's files.
+  // Once they exist, change "include" to ["src", "test"].
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "types": []
+  },
+  "include": ["src/common.ts", "src/report.ts", "src/property.ts", "test"]
+}
