@@ -9,6 +9,7 @@ import type { NormalizedAddress } from '@hack/contracts/property';
 import { formatAddress, saveSelectedAddress } from '@/components/affected/helpers';
 import { AppShell } from '@/components/chrome/AppShell';
 import { P } from '@/lib/stdb';
+import { SigninLink } from '../_account/SigninLink';
 import { useProcedure } from 'spacetimedb/react';
 
 type Phase = { k: 'idle' } | { k: 'loading' } | { k: 'results'; list: NormalizedAddress[] } | { k: 'error'; msg: string };
@@ -127,6 +128,8 @@ function StartInner() {
           </button>
         </div>
       </form>
+
+      <SigninLink />
 
       {phase.k === 'loading' && <p className="text-[13px] text-slate-600">Looking up the address…</p>}
       {phase.k === 'error' && (

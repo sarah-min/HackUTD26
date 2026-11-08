@@ -8,6 +8,8 @@ import { idFromString, idToString, useReport, useVerifiedFor } from '@/lib/stdb'
 import { AgentTrace, Banner911, DamageReport, HazardList, RecoverySummaryCard } from '@/components/affected/external';
 import { DAMAGE_LEVEL_TEXT, STATUS_TEXT, parseFlagsCsv, parseLevel } from '@/components/affected/helpers';
 import { AppShell } from '@/components/chrome/AppShell';
+import { AccountLink } from '../../_account/AccountLink';
+import { StepupGate } from '../../_account/StepupGate';
 
 export default function AffectedReportPage() {
   const params = useParams<{ id: string }>();
@@ -32,7 +34,10 @@ export default function AffectedReportPage() {
   if (!report) {
     return (
       <AppShell>
-        <p className="text-[13px] text-slate-700">We couldn&apos;t find that report.</p>
+        {/* With step-up required and not done, the owner's report rows are hidden, so show the prompt. */}
+        <StepupGate>
+          <p className="text-[13px] text-slate-700">We couldn&apos;t find that report.</p>
+        </StepupGate>
       </AppShell>
     );
   }
@@ -65,12 +70,15 @@ export default function AffectedReportPage() {
 
   return (
     <AppShell>
-      <Link
-        href={`/affected/property/${propertyId}`}
-        className="text-[12px] font-bold text-blue-700 underline"
-      >
-        ← Your home
-      </Link>
+      <div className="flex items-center justify-between gap-3">
+        <Link
+          href={`/affected/property/${propertyId}`}
+          className="text-[12px] font-bold text-blue-700 underline"
+        >
+          ← Your home
+        </Link>
+        <AccountLink />
+      </div>
       <header>
         <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-blue-700">
           Damage report
@@ -106,11 +114,13 @@ export default function AffectedReportPage() {
         </p>
       ) : null}
 
-      <DamageReport reportId={id} />
-      {report.status === 'assessed' ? (
-        <RecoverySummaryCard propertyId={propertyId} reportId={id} />
-      ) : null}
-      <AgentTrace reportId={id} mode="full" />
+      <StepupGate>
+        <DamageReport reportId={id} />
+        {report.status === 'assessed' ? (
+          <RecoverySummaryCard propertyId={propertyId} reportId={id} />
+        ) : null}
+        <AgentTrace reportId={id} mode="full" />
+      </StepupGate>
 
       <p className="text-[11px] text-slate-500">
         AI estimate, not an insurance determination or inspection.

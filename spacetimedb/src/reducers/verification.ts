@@ -4,8 +4,13 @@ import { spacetimedb } from '../schema';
 import { requireService } from '../auth';
 import { parseAddress, upsertProperty } from '../matching';
 import { enqueueJob } from '../jobs';
+import { grantOrHold } from '../verification_decide';
+import { getSecurityConfig, DAY_MICROS } from '../security';
 import { deleteBlob, requireOwnBlob } from '../blobs';
 import { DOC_KINDS, FAIL_REASONS, HOUR_MICROS, IDV_MAX_ATTEMPTS_PER_HOUR, fail, oneOf } from '../constants';
+
+// Same style as the per-identity limit; the web client matches on 'rate_limited'.
+const TOO_MANY = 'rate_limited: too many verification attempts, try again later';
 
 export const start_verification = spacetimedb.reducer(
   { address_json: t.string(), doc_kind: t.string(), secret_hash: t.string() },
@@ -31,7 +36,23 @@ export const start_verification = spacetimedb.reducer(
     // Reducers can't return data; the client sees this error message.
     if (recent >= IDV_MAX_ATTEMPTS_PER_HOUR) fail('rate_limited');
 
+    // Global and per-property caps: the module can't see IPs and anonymous identities are free to mint, so per-identity
+    // limits are evadable. Counted from the verification_start ledger (rows purged after 24 h by the maintenance tick;
+    // rejected calls roll back and are not counted).
+    const cfg = getSecurityConfig(ctx.db);
+    let globalRecent = 0;
+    for (const r of ctx.db.verification_start.iter()) {
+      if (now - r.at.microsSinceUnixEpoch < HOUR_MICROS) globalRecent++;
+    }
+    if (globalRecent >= cfg.maxStartsPerHourGlobal) fail(TOO_MANY);
+
     const propertyId = upsertProperty(ctx, address);
+    let propertyRecent = 0;
+    for (const r of ctx.db.verification_start.property_id.filter(propertyId)) {
+      if (now - r.at.microsSinceUnixEpoch < DAY_MICROS) propertyRecent++;
+    }
+    if (propertyRecent >= cfg.maxStartsPerPropertyPerDay) fail(TOO_MANY); // rolls back the property upsert too
+    ctx.db.verification_start.insert({ id: 0n, property_id: propertyId, at: ctx.timestamp });
     ctx.db.verification.insert({
       id: 0n,
       identity: ctx.sender,
@@ -81,18 +102,19 @@ export const record_verification = spacetimedb.reducer(
     if (name_on_doc !== undefined && name_on_doc.length > 120) fail('name_on_doc too long');
     // The ID image is never kept once decided (the worker also deletes it; this is the guarantee).
     if (v.object_key) deleteBlob(ctx.db, v.object_key);
+    if (ok) {
+      // Grants access, unless another identity already owns the property (then: held as 'duplicate_claim', see security.ts).
+      grantOrHold(ctx.db, v, ctx.timestamp, name_on_doc);
+      return;
+    }
+    // 'needs_review' is a HOLD: state stays 'failed' until an admin calls admin_resolve_verification.
     ctx.db.verification.id.update({
       ...v,
-      state: ok ? 'verified' : 'failed',
+      state: 'failed',
       fail_reason: reason,
-      name_on_doc: ok ? name_on_doc : undefined,
+      name_on_doc: undefined,
       object_key: undefined,
       decided_at: ctx.timestamp,
     });
-    if (ok) {
-      for (const r of [...ctx.db.report.property_id.filter(v.property_id)]) {
-        if (!r.claimed) ctx.db.report.id.update({ ...r, claimed: true, updated_at: ctx.timestamp });
-      }
-    }
   }
 );

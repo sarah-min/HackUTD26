@@ -231,7 +231,12 @@ Rule: `kind = 'pipeline'` steps (Uploaded, Extracting frames, Analyzing 3/8, Est
 
 ```ts
 export const DocKindSchema = z.enum(['drivers_license','state_id','utility_bill','insurance_declarations']);
-export const VerificationFailReasonSchema = z.enum(['address_mismatch','unreadable','not_an_id','expired','rate_limited']);
+export const VerificationFailReasonSchema = z.enum(['address_mismatch','unreadable','not_an_id','expired','rate_limited','needs_review']);
+// Additive 2026-11-08: 'needs_review' = the worker HOLDS the verification (ID tamper cues / suspicious text / low document confidence):
+// ok=false, state 'failed', resolved by an admin (admin_resolve_verification, §5.4). The module itself also writes two reasons the
+// worker can NOT send: 'duplicate_claim' (property already has a different verified owner, held for admin_resolve_claim) and
+// 'review_rejected' (an admin rejected a held verification). The UI should map 'needs_review' and 'duplicate_claim' to a friendly
+// "held for review" message, and 'review_rejected' to "couldn't be verified".
 
 export const IdDocumentFieldsSchema = z.object({   // Nemotron VL output for the ID-document prompt
   docKind: DocKindSchema,
@@ -437,9 +442,9 @@ Limitations: view rows reuse the table row types, so `report_private.reporter_se
 | `create_report` | anyone | `CreateReportInput` JSON | Light validation. Matches/creates the property (§2.3). Inserts `report` (status `draft`, `claimed` = property already has a verified identity, `source='live'`) and `report_private` |
 | `attach_media` | reporter | `report_id, kind, object_key, content_type, size_bytes, sha256` | Status must be `draft` or `needs_more_footage`. Max 8 images or 1 video |
 | `submit_report` | reporter | `report_id` | Needs ≥ 1 media. Allowed from `draft`, `needs_more_footage` or `failed`. Status → `queued`. Inserts `job(analyze)` |
-| `start_verification` | anyone | `address_json` (NormalizedAddress), `doc_kind`, `secret_hash` | Fails with `rate_limited` if the sender has ≥ `IDV_MAX_ATTEMPTS_PER_HOUR` verifications in the last hour. Matches/creates the property (§2.3) and inserts `verification(pending)` with its `property_id`. The client learns the property id from its own `verification` row (reducers return no data) |
+| `start_verification` | anyone | `address_json` (NormalizedAddress), `doc_kind`, `secret_hash` | Fails with `rate_limited` if the sender has ≥ `IDV_MAX_ATTEMPTS_PER_HOUR` verifications in the last hour. Also fails with `rate_limited: too many verification attempts, try again later` when the GLOBAL cap (starts per rolling hour, all identities) or the PER-PROPERTY cap (starts per rolling day) is reached (§5.4); rejected calls leave no rows behind. Matches/creates the property (§2.3) and inserts `verification(pending)` with its `property_id`. The client learns the property id from its own `verification` row (reducers return no data) |
 | `submit_verification` | self | `verification_id, object_key` | State must be `pending`. The key must start with `idv/<verification_id>/`. Stores the key. Inserts `job(verify_identity)` |
-| `record_verification` | service | `verification_id, ok, fail_reason?, name_on_doc?` | Sets `verified` / `failed`, `decided_at`; clears `object_key`. On ok: `claimed = true` on every report of the property |
+| `record_verification` | service | `verification_id, ok, fail_reason?, name_on_doc?` | Sets `verified` / `failed`, `decided_at`; clears `object_key`. On ok: `claimed = true` on every report of the property. On ok it first applies the duplicate-claim rule (§5.4): if the property already has a verified owner that is a different identity and not on the same account, and `security_config.hold_duplicate_claims` is on, the row becomes `failed` / `duplicate_claim` instead and no access is granted. `fail_reason` accepts `needs_review` (a hold, §3.3) |
 | `save_affected_intake` | verified | `property_id, intake_json, report_id?` | Upserts `affected_profile`. Picks `report_id` (default: most severe `assessed` report on the property). Inserts `job(plan)` with `subject = sender`. Error if there's no assessed report |
 | `ask_coach` | verified | `property_id, report_id, text` | Needs an existing `recovery_plan`. Inserts `coach_message(user)` + `job(coach)`. Max 1 pending coach job per identity |
 | `claim_job` | service | `job_id, lease_ms` | Only if `state='queued'` or the lease has expired. Sets lease. analyze → report `processing`; verify_identity → verification `processing` |
@@ -452,6 +457,89 @@ Limitations: view rows reuse the table row types, so `report_private.reporter_se
 | `requeue_expired_jobs` | scheduled | — | |
 | `refresh_area_cells` | scheduled | — | Recomputes `area_cell_summary` from `report` rows with `status='assessed'` created in the last 72 h; deletes empty cells. Also deletes `nws_alert` rows in `area_notice` whose `expires_at` has passed |
 | `record_area_notices` | service | `property_id, county_fips, notices_json` | Sets `property.county_fips` (and `property_private.county_fips`) if empty, then **replaces** every `area_notice` row for that county with the list. `county_fips` must be 5 digits. Max 20 notices; strings capped (title 200, headline 400, severity 40, declaration 40, url 500). Called by the worker during `analyze`, after `reverse_geocode`, `lookup_disaster_declarations` and `get_weather_alerts` |
+
+### 5.3 Email accounts for affected persons (additive, Part 2; added 2026-11-08, converted from phone to email the same day)
+
+Passwordless accounts for **affected persons only** (reporters stay accountless). The email address is the only credential: a 6-digit code sent through Brevo's HTTP API re-links a new device and steps up before the full report. Nothing below changes an existing table, reducer or view signature; existing views gained account awareness (see "Access rules"). Label wherever it appears: **"Demo identity check, not production-grade verification."** (An earlier SMS design was dropped, see `docs/BACKEND_RUNBOOK.md` section 13.)
+
+**Email handling.** `spacetimedb/src/email.ts` `normalizeEmail`: trim, lowercase, max 254 chars, exactly one `@`, local part 1-64 chars of RFC atext (ASCII only: no spaces, control chars, quotes, commas or angle brackets; no leading, trailing or doubled dots), domain with at least one dot, valid labels (no empty label, no leading or trailing `-`, max 63) and a TLD of 2+ letters. **Plus-addressing and dots are NOT stripped**: `a+x@gmail.com` and `a@gmail.com` are different accounts. `email_hash = sha256(hash_pepper + normalized)`. Only the hash and a masked display (`s***@gmail.com`: first char + `***` + `@domain`; a one-char local part shows `***@domain`) are stored on an account. The full address lives in `email_challenge.email_plain` only until the send attempt finishes (then `''`; the tick sweeps anything older than 15 min). Because the address is not kept, **signin and step-up require the user to type the email again**: signin looks the hash up, step-up must match the account's `email_hash` (`email_mismatch` otherwise).
+
+**Tables (all private).** Never exposed by any view: `email_plain`, `code_hash`, `salt`, `email_hash`, `hash_pepper`, `brevo_api_key`, `sender_email`, `demo_code.code` (except to its requester in demo mode).
+
+| Table | Columns (pk first) | Notes |
+|---|---|---|
+| `account` | `id u64 pk autoInc`, `email_hash` (unique; `sha256(pepper + normalized)`), `email_masked`, `created_at`, `last_login_at` | Only a hash and the masked display are kept. Hard-deleted by `delete_account` (no `deleted` flag) |
+| `account_device` | `identity pk`, `account_id` (index), `label`, `linked_at`, `last_seen_at` (last sign-in / step-up), `stepup_until?` | One identity is in at most one account. `stepup_until` is set on enroll / signin / stepup (now + 15 min) and cleared by `account_tick` |
+| `account_property` | `id pk autoInc`, `account_id` (index), `property_id`, `verification_id`, `added_at` | **Not in the original design.** Properties the account owns, bound when a linked device is verified (and when a verified device signs in or enrolls). Survives `sign_out_device` / `remove_device`; removed by `delete_account`. Without it, signing out of the device that holds the `verification` row would orphan the property |
+| `email_challenge` | `id pk autoInc`, `identity` (index), `purpose 'enroll'\|'signin'\|'stepup'`, `email_plain`, `email_hash` (index), `email_masked`, `salt`, `code_hash` (`sha256(salt:code)`), `attempts u8`, `expires_at`, `created_at`, `consumed`, `delivery_state 'pending'\|'sent'\|'failed'\|'demo'`, `delivery_error?`, `account_id?`, `decoy`, `locked_at?` | `email_plain` is held only while a Brevo send is in flight and cleared right after. Rows are kept 24 h as the rate-limit ledger, then deleted. `decoy`, `account_id`, `locked_at`, `email_masked` are additive |
+| `demo_code` | `challenge_id pk`, `identity` (index), `code`, `created_at` | Plaintext code, demo mode only; deleted on consume, expiry, supersession, delete_account, or when the mode leaves `demo` |
+| `email_config` | `id u8 pk` (always 0), `mode 'demo'\|'brevo'`, `brevo_api_key`, `sender_email`, `hash_pepper`, `require_stepup` (default false), `daily_send_cap` (default 200) | **Absent until an admin sets it: accounts are inert (`email_not_configured`, `my_auth_status.mode = 'off'`)**. `brevo_api_key` and `sender_email` are never in any view |
+| `account_tick` | scheduled, interval 60 s | -> `account_maintenance` |
+
+**Reducers / procedures.** The two procedures **return** their outcome instead of throwing (a thrown error would roll back the wrong-attempt counter).
+
+| Name | Kind | Caller | Args | Result / effect |
+|---|---|---|---|---|
+| `request_email_code` | procedure | any identity | `email, purpose` | `{ ok, error, challenge_id, retry_after_s }`. `enroll`: caller must hold a verified verification and no account; the email must not already have an account (`email_already_registered`; acceptable because only verified owners can enroll). `signin`: caller not signed in; **identical response whether or not the email has an account** (an unknown email gets a decoy challenge: same result, same `my_email_challenge` row, same demo code in demo mode, nothing sent, never verifies). `stepup`: caller's device is linked; the user **types the email again** and it must match the account's hash (`email_mismatch`). Limits: 30 s cooldown (per email and per identity), 3 / hour / email, 5 / hour / identity, global rolling-24 h cap `daily_send_cap`; 15 min lock per email after 5 wrong codes. Code: 6 digits, expires in 10 min. A new request supersedes the identity's earlier open challenge |
+| `verify_email_code` | procedure | the requesting identity | `challenge_id, code` | `{ ok, error, attempts_left, purpose }`. Constant-time hash compare; attempts++ (persisted); 5 wrong -> `locked`. Success: `enroll` creates the account, links the caller, binds its verified properties; `signin` links the caller (and binds any properties it verified earlier); `stepup` sets `stepup_until`. All three set `stepup_until = now + 15 min`. Purges the demo code and the address |
+| `sign_out_device` | reducer | linked device | - | Unlinks the caller. Its own verifications stay |
+| `remove_device` | reducer | linked device | `identity_hex` | Removes another device (or itself) of the **same** account |
+| `set_device_label` | reducer | linked device | `label` (1-40 chars) | Default label is `Device <6 hex>` |
+| `delete_account` | reducer | linked device | - | Deletes the account, all its devices, bindings and challenges. Verifications, reports and affected-person data stay |
+| `admin_set_email_config` | reducer | admin | `mode, brevo_api_key?, sender_email?, require_stepup?, daily_send_cap?` | Omitted optionals keep their value. First call generates `hash_pepper` (never rotated). `brevo` needs the key and a `sender_email` (validated and normalized with `normalizeEmail`). Leaving demo mode deletes all demo codes. Ensures the 60 s tick exists |
+| `account_maintenance` | scheduled (60 s) | host | - | Same auth guard as the other scheduled reducers. Clears expired `stepup_until` (this update re-evaluates the gated views), closes expired challenges, purges stale email addresses and orphan demo codes, deletes challenges older than 24 h |
+
+`request_email_code` errors: `email_not_configured`, `invalid_purpose`, `invalid_email`, `locked`, `not_verified_owner`, `already_signed_in`, `email_already_registered`, `not_signed_in`, `email_mismatch`, `cooldown`, `rate_limited_email`, `rate_limited_identity`, `daily_cap`. `verify_email_code` errors: `not_found`, `invalid_code`, `locked`, `expired`, `already_signed_in`, `email_already_registered`, `not_verified_owner`, `not_signed_in`, `email_mismatch`.
+
+**Views (sender-scoped, public: true).** One row each unless noted.
+
+| View | Row | Rows |
+|---|---|---|
+| `my_account` | `{id, email_masked, created_at}` | 0 or 1 (this device is linked) |
+| `my_devices` | `{identity_hex pk, label, linked_at, last_seen_at, is_current}` | the devices of my account |
+| `my_stepup` | `{device_identity pk, linked, active, stepup_until?, require_stepup}` | always 1. `active` = a step-up is in effect (the tick clears it within ~60 s of expiry) |
+| `my_email_challenge` | `{id pk, purpose, expires_at, attempts_left, delivery_state, delivery_error?}` | my newest open challenge, 0 or 1. Never the code or the address. Views have no clock: compare `expires_at` to your own clock; the row disappears within ~60 s of expiry |
+| `my_demo_code` | `{challenge_id pk, purpose, code}` | **only when `mode = 'demo'`** and only my own open challenge. UI label: "Demo mode: code shown on screen. Not a real email." |
+| `my_auth_status` | `{id pk, mode 'off'\|'demo'\|'brevo', configured}` | always 1. Public-safe |
+| `admin_email_config` | booleans only (`has_key, has_sender_email, has_pepper`), `mode`, `require_stepup`, `daily_send_cap` | admin only, else `[]`. Verify config without printing the key |
+
+**Access rules (what changed in existing views and `read_blob`).** *Owner* = a `verified` verification held by the caller's identity, OR by any device linked to the caller's account, OR a property in `account_property` for the caller's account (`spacetimedb/src/auth.ts` `verifiedPropertyIds`; every owner-access view, `save_affected_intake`, `ask_coach` and `read_blob` goes through it). With `email_config.require_stepup = true` (default **false**) the **full-report** surfaces additionally need a current step-up: `my_property_reports`, the verified part of `my_report_privates`, `my_media_assets`, `my_frames`, `my_assessments`, the owner part of `my_agent_steps`, `my_affected_profiles`, `my_recovery_plans`, `my_coach_messages`, and `read_blob` (returns `stepup_required` for an owner without step-up). A verified owner with **no account** gets nothing from those while it is on (push them to enroll). Not gated: `my_reports` and the reporter's own rows, `my_verifications` (also lists the verified rows of the account's other devices and bound properties), `my_property_privates`, and the write reducers (they are ownership-checked only). `my_affected_profiles` / `my_recovery_plans` / `my_coach_messages` return rows of every device on the account. A signed-out or removed device keeps whatever its own verification grants (everything while step-up is off, nothing while it is on and it has no account). `web_*` views (web role, secret-hash auth) are not account-aware.
+
+**Brevo delivery** is isolated in `spacetimedb/src/email_brevo.ts` (`sendEmailViaBrevo(http, cfg, to, code, idemKey?)`): `POST https://api.brevo.com/v3/smtp/email` with headers `api-key`, `content-type: application/json`, `accept: application/json` and body `{sender:{name:"Project Aftermath",email}, to:[{email}], subject:"Your Aftermath verification code", textContent, htmlContent}`; success is HTTP 201 `{messageId}`. The email carries the code, "expires in 10 minutes", "If you did not request this, ignore this email" and "Demo identity check, not production-grade verification"; no links, no tracking. Failure is non-fatal: `delivery_state = 'failed'` plus a short `delivery_error` built only from the HTTP status and Brevo's `code` string (`brevo:401:unauthorized`, `brevo:429:too_many_requests`, `brevo:network`; never the key, a body or the address). **This exact API shape is best knowledge and is verified only by the live test** (`docs/BACKEND_RUNBOOK.md` section 13, `scripts/live-email.ts`).
+
+### 5.4 Security hardening (additive, Part 2; added 2026-11-08)
+
+All tables are private. Clients read them only through the views below.
+
+| Table | Columns | Purpose |
+|---|---|---|
+| `claim_conflict` | `id pk autoInc`, `property_id` (index), `existing_verification_id`, `new_verification_id` (index), `created_at`, `status` (`open`/`approved`/`rejected`), `resolved_at?` | A second identity passed the ID check on a property that already has a verified owner. Never exposed with identities or names |
+| `security_config` | `id u8 pk` (single row, id 0), `hold_duplicate_claims bool`, `max_verification_starts_per_hour_global u32`, `max_verification_starts_per_property_per_day u32` | Absent = defaults: hold ON, 120 starts/hour globally, 6 starts/property/day |
+| `access_log` | `id pk autoInc`, `identity` (index), `property_id` (index), `kind` (`blob`/`verify`/`claim`), `object_key?`, `at` | Audit of owner reads and grants. Purged after 30 days. Never holds ID bytes, names or `idv/` keys |
+| `verification_start` | `id pk autoInc`, `property_id` (index), `at` | Ledger of accepted `start_verification` calls for the caps. Purged after 24 h. Calls rejected by a cap roll back and are not counted |
+
+**Duplicate-claim rule** (in `record_verification` ok=true, and in `admin_resolve_verification` approve). The new verification is HELD when the property already has a `verified` owner AND the claimant does not already own it AND `hold_duplicate_claims` is on. "Already owns" = the same identity, another device linked to the same account, or a property bound to the claimant's account (`account_property`), i.e. `isVerifiedFor`. A property with no verified owner is never held. A held verification keeps `property_id`, becomes `state = 'failed'`, `fail_reason = 'duplicate_claim'` and a `claim_conflict(open)` row is inserted. No state values were added.
+
+**Caps** (`start_verification`): in order, per identity (3/hour, plain `rate_limited`), global per rolling hour, per property per rolling day (property known after the geocode/match). The last two fail with `rate_limited: too many verification attempts, try again later` (the web client matches on `rate_limited`). A failed verification still counts toward the caps (it was a start). Trade-off: someone can burn a property's daily budget with junk attempts; an admin can raise it with `admin_set_security_config`.
+
+**Views**
+
+| View | Row | Readable by |
+|---|---|---|
+| `my_claim_conflicts` | `{ id, property_id, created_at, status }` | The verified owner(s) of the property and every device on their account. Nothing about the claimant. Web hook `useClaimConflicts` |
+| `my_access_log` | `{ id, property_id, kind, at, mine }`, newest first, max 50 | Verified owner(s) and their account. `mine` = done by one of the caller's own devices. Never another identity or an object key. Web hook `useAccessLog` |
+| `admin_security_config` | `{ id, hold_duplicate_claims, max_verification_starts_per_hour_global, max_verification_starts_per_property_per_day, is_default }` | admin only (effective values, booleans and numbers) |
+| `admin_claim_conflicts` | `claim_conflict` columns | admin only (ids only) |
+
+**Reducers (admin only, `unauthorized: admin only` otherwise)**
+
+| Reducer | Args | Behavior |
+|---|---|---|
+| `admin_resolve_claim` | `conflict_id u64, approve bool` | Conflict must be `open` and its verification still held as `duplicate_claim`. approve: the verification becomes `verified` (access granted, linked account bound, reports marked claimed, `access_log` kind `verify`) and the conflict `approved`. reject: stays `failed` with `fail_reason = 'review_rejected'`, `name_on_doc` dropped, conflict `rejected`. An explicit approval is the only way past the duplicate rule |
+| `admin_resolve_verification` | `verification_id u64, approve bool` | For verifications held with `fail_reason = 'needs_review'`. approve: normal grant path INCLUDING the duplicate rule (it can end as `duplicate_claim` + a conflict row, then use `admin_resolve_claim`). reject: `failed` / `review_rejected`. Fails with `use admin_resolve_claim` for duplicate holds and `not held for review` otherwise |
+| `admin_set_security_config` | `hold_duplicate_claims? bool, max_verification_starts_per_hour_global? u32, max_verification_starts_per_property_per_day? u32` | Omitted args keep their current value (or the default). Caps must be 1-100000 |
+
+**Audit entries**: `verify` is written when a verification becomes `verified` (worker path or admin approval), `claim` when account enroll/sign-in binds a property to the account, `blob` when an OWNER (never the worker) reads media/frames through `read_blob` (one entry per object, written on chunk 0). Maintenance (`account_maintenance`, every 60 s) purges `verification_start` after 24 h and `access_log` after 30 days.
 
 ## 6. Repair cost model (Part 3: `packages/damage`, `costModelVersion = "cost-v1"`)
 

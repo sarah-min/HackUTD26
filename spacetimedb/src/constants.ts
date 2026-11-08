@@ -23,7 +23,14 @@ export const LIFE_SAFETY_FLAGS = [
 ] as const;
 export const SEVERE_FLAGS = ['person_trapped', 'injury_visible', 'active_fire', 'gas_leak_suspected'] as const;
 export const DOC_KINDS = ['drivers_license', 'state_id', 'utility_bill', 'insurance_declarations'] as const;
-export const FAIL_REASONS = ['address_mismatch', 'unreadable', 'not_an_id', 'expired', 'rate_limited'] as const;
+// Reasons the worker may pass to record_verification. 'needs_review' = ID tamper cues flagged: the verification is HELD
+// (state 'failed') until an admin calls admin_resolve_verification.
+export const FAIL_REASONS = ['address_mismatch', 'unreadable', 'not_an_id', 'expired', 'rate_limited', 'needs_review'] as const;
+// Reasons the module itself writes (never accepted from the worker). 'duplicate_claim' = another identity already owns the
+// property (held for admin review); 'review_rejected' = an admin rejected a held verification.
+export const REASON_DUPLICATE_CLAIM = 'duplicate_claim';
+export const REASON_NEEDS_REVIEW = 'needs_review';
+export const REASON_REVIEW_REJECTED = 'review_rejected';
 export const AGENT_STEP_KINDS = ['pipeline', 'vision', 'model', 'tool_call', 'tool_result', 'error'] as const;
 export const STEP_VISIBILITY = ['reporter', 'affected'] as const;
 export const JOB_KINDS = ['analyze', 'verify_identity', 'plan', 'coach'] as const;

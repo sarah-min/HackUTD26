@@ -9,6 +9,8 @@ import { type Infer as __Infer } from "spacetimedb";
 import * as GeocodeAddressProcedure from "../geocode_address_procedure";
 import * as GeocodePointProcedure from "../geocode_point_procedure";
 import * as ReadBlobProcedure from "../read_blob_procedure";
+import * as RequestEmailCodeProcedure from "../request_email_code_procedure";
+import * as VerifyEmailCodeProcedure from "../verify_email_code_procedure";
 
 export type GeocodeAddressArgs = __Infer<typeof GeocodeAddressProcedure.params>;
 export type GeocodeAddressResult = __Infer<typeof GeocodeAddressProcedure.returnType>;
@@ -16,4 +18,8 @@ export type GeocodePointArgs = __Infer<typeof GeocodePointProcedure.params>;
 export type GeocodePointResult = __Infer<typeof GeocodePointProcedure.returnType>;
 export type ReadBlobArgs = __Infer<typeof ReadBlobProcedure.params>;
 export type ReadBlobResult = __Infer<typeof ReadBlobProcedure.returnType>;
+export type RequestEmailCodeArgs = __Infer<typeof RequestEmailCodeProcedure.params>;
+export type RequestEmailCodeResult = __Infer<typeof RequestEmailCodeProcedure.returnType>;
+export type VerifyEmailCodeArgs = __Infer<typeof VerifyEmailCodeProcedure.params>;
+export type VerifyEmailCodeResult = __Infer<typeof VerifyEmailCodeProcedure.returnType>;
 

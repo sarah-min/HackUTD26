@@ -3,12 +3,13 @@
 //   media/<reportId>/...   the report's reporter, while the report accepts footage
 //   idv/<verificationId>/... the person who started that verification, while it is pending
 //   frames/<reportId>/...  the worker (service role)
-// Reads (read_blob): the worker reads anything; a verified affected person reads media/ and frames/ of their
-// property; idv/ is never readable by a client.
+// Reads (read_blob): the worker reads anything; a verified affected person (or a device on the same account, with a current step-up
+// when email_config.require_stepup is on) reads media/ and frames/ of their property; idv/ is never readable by a client.
 import { t } from 'spacetimedb/server';
 import { spacetimedb } from '../schema';
-import { isReporter, isService, isVerifiedFor, requireService } from '../auth';
+import { hasReportAccess, isReporter, isService, isVerifiedFor, requireService } from '../auth';
 import { fail, oneOf, type Db } from '../constants';
+import { logAccess } from '../security';
 import {
   BLOB_CHUNK_BYTES, FRAME_MAX_BYTES, MAX_IDV_BLOBS_PER_VERIFICATION, MAX_MEDIA_BLOBS_PER_REPORT, MAX_MEDIA_BYTES_PER_REPORT, blobsWithPrefix, IDV_IMAGE_MAX_BYTES, IMAGE_CONTENT_TYPES, MEDIA_CONTENT_TYPES,
   MEDIA_IMAGE_MAX_BYTES, MEDIA_VIDEO_MAX_BYTES, deleteBlob, parseKey,
@@ -147,10 +148,14 @@ export const read_blob = spacetimedb.procedure(
         return err('invalid object_key');
       }
       const service = isService(tx.db, ctx.sender);
+      let ownedProperty: bigint | undefined;
       if (!service) {
         if (k.kind === 'idv') return err('forbidden');
         const r = tx.db.report.id.find(k.reportId);
         if (!r || !isVerifiedFor(tx.db, ctx.sender, r.property_id)) return err('forbidden');
+        // Owner, but the full report needs a current email step-up (only when email_config.require_stepup is on).
+        if (!hasReportAccess(tx.db, ctx.sender, tx.timestamp.microsSinceUnixEpoch)) return err('stepup_required');
+        ownedProperty = r.property_id;
       }
       const b = tx.db.blob.object_key.find(object_key);
       if (!b || !b.complete) return err('not_found');
@@ -158,6 +163,8 @@ export const read_blob = spacetimedb.procedure(
       let bytes: Uint8Array | undefined;
       for (const c of tx.db.blob_chunk.object_key.filter(object_key)) if (c.seq === seq) bytes = c.bytes;
       if (!bytes) return err('not_found');
+      // Audit log: an OWNER (never the worker) read media/frames. One entry per object (first chunk), never idv/.
+      if (ownedProperty !== undefined && seq === 0) logAccess(tx.db, ctx.sender, ownedProperty, 'blob', tx.timestamp, object_key);
       return {
         ok: true, error: '',
         part: { content_type: b.content_type, size_bytes: b.size_bytes, chunk_count: b.chunk_count, seq, bytes },
