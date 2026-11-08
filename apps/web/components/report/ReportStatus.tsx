@@ -19,6 +19,12 @@ import { RetrySubmit } from './RetrySubmit';
 
 const SLOW_MS = 10_000;
 
+/** "hurricane_wind" -> "Hurricane wind". */
+function hazardLabel(hazard: string): string {
+  const s = hazard.replace(/_/g, ' ').trim();
+  return s ? s[0]!.toUpperCase() + s.slice(1) : 'Not specified';
+}
+
 function parseFlags(csv: string): LifeSafetyFlag[] {
   if (!csv.trim()) return [];
   return csv
@@ -48,9 +54,10 @@ export function ReportStatus({ reportIdParam }: { reportIdParam: string }) {
   if (reportId === null) {
     return (
       <AppShell>
-        <p className="text-red-700">That report id is not valid.</p>
-        <Link className="inline-block text-[13px] font-bold text-blue-700 underline" href="/reporter">
-          My submissions
+        <p className="text-[13px] font-semibold text-red-700">We couldn’t find that report.</p>
+        <p className="mt-1 text-[12px] text-slate-600">The link may be incomplete. Check it and try again.</p>
+        <Link className="mt-3 inline-block text-[13px] font-bold text-blue-700 underline" href="/reporter">
+          Go to My submissions
         </Link>
       </AppShell>
     );
@@ -59,14 +66,17 @@ export function ReportStatus({ reportIdParam }: { reportIdParam: string }) {
   if (connError) {
     return (
       <AppShell>
-        <p className="text-[13px] font-semibold text-red-700">Could not reach Aftermath live data.</p>
-        <p className="mt-1 text-[12px] text-slate-600">{connError.message}</p>
+        <p className="text-[13px] font-semibold text-red-700">We can’t connect right now.</p>
+        <p className="mt-1 text-[12px] text-slate-600">
+          Check your internet connection and try again. Your report is saved.
+        </p>
+        <p className="mt-1 text-[11px] text-slate-400">Details: {connError.message}</p>
         <button
           className="mt-3 rounded-xl bg-slate-900 px-4 py-2.5 text-[13px] font-bold text-white"
           onClick={() => window.location.reload()}
           type="button"
         >
-          Retry connection
+          Try again
         </button>
       </AppShell>
     );
@@ -76,11 +86,11 @@ export function ReportStatus({ reportIdParam }: { reportIdParam: string }) {
     return (
       <AppShell>
         <p className="text-sm text-slate-600">
-          {slow ? 'Still connecting to live data…' : 'Connecting…'}
+          {slow ? 'This is taking longer than usual…' : 'Loading your report…'}
         </p>
         {slow ? (
           <div className="mt-3 space-y-2 text-[12px] text-slate-500">
-            <p>Check that you are online and that the header shows Live.</p>
+            <p>Make sure you’re online. The header shows “Live” once you’re connected.</p>
             <button
               className="rounded-xl bg-slate-900 px-4 py-2.5 text-[13px] font-bold text-white"
               onClick={() => window.location.reload()}
@@ -89,7 +99,7 @@ export function ReportStatus({ reportIdParam }: { reportIdParam: string }) {
               Reload page
             </button>
             <Link className="block text-[13px] font-bold text-blue-700 underline" href="/reporter">
-              Open My submissions
+              Go to My submissions
             </Link>
           </div>
         ) : null}
@@ -100,12 +110,12 @@ export function ReportStatus({ reportIdParam }: { reportIdParam: string }) {
   if (!report) {
     return (
       <AppShell>
-        <p className="text-slate-700">No report found for this identity (or still syncing).</p>
+        <p className="text-[13px] font-semibold text-slate-800">We can’t find this report yet.</p>
         <p className="mt-1 text-[12px] text-slate-500">
-          If you just submitted, wait a moment or check My submissions for the draft.
+          If you just sent it, give it a few seconds. Reports only appear on the device that sent them.
         </p>
         <Link className="mt-3 inline-block text-[13px] font-bold text-blue-700 underline" href="/reporter">
-          My submissions
+          Go to My submissions
         </Link>
       </AppShell>
     );
@@ -122,13 +132,15 @@ export function ReportStatus({ reportIdParam }: { reportIdParam: string }) {
   const levelLabel = noHomeDamage
     ? 'No visible damage to the home'
     : report.overallLevel === 'none'
-      ? 'Not assessed yet'
+      ? assessed
+        ? 'Not assessed'
+        : 'Waiting for the review'
       : (DAMAGE_LEVEL_LABEL[report.overallLevel as keyof typeof DAMAGE_LEVEL_LABEL] ?? report.overallLevel);
 
   return (
     <AppShell>
       {report.selfDanger ? (
-        <Banner911 reason="This report flagged on-scene danger." />
+        <Banner911 reason="Whoever sent this report said there was danger on the scene." />
       ) : (
         <Banner911 />
       )}
@@ -136,16 +148,11 @@ export function ReportStatus({ reportIdParam }: { reportIdParam: string }) {
       <section className="rounded-2xl border border-slate-200 bg-white p-5">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-blue-700">
-            Report {idToString(report.id)}
+            Report #{idToString(report.id)}
           </p>
           {report.claimed ? (
             <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
-              Claimed
-            </span>
-          ) : null}
-          {report.source !== 'live' ? (
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-900">
-              {report.source}
+              Claimed by resident
             </span>
           ) : null}
         </div>
@@ -153,16 +160,23 @@ export function ReportStatus({ reportIdParam }: { reportIdParam: string }) {
           {REPORT_STATUS_LABEL[status] ?? status}
         </h1>
         <p className="mt-1 text-[12px] text-slate-500">
-          Hazard: {report.hazard.replace(/_/g, ' ')}
+          Reported for: {hazardLabel(report.hazard)}
         </p>
         {report.statusReason != null && String(report.statusReason) !== '' ? (
           <p className="mt-2 text-[12px] text-amber-800">{String(report.statusReason)}</p>
         ) : null}
         {waitingOnWorker || status === 'draft' ? (
           <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-950">
-            Analysis runs on the worker (Brev Nemotron or local{' '}
-            <code className="font-semibold">pnpm --dir scripts fake-worker</code>). If nothing
-            moves for a minute, the worker is probably not running.
+            {status === 'draft'
+              ? 'Add at least one photo or video below and we’ll start reviewing it.'
+              : 'This usually takes about a minute. You can keep this page open; it updates on its own.'}
+            {process.env.NODE_ENV === 'development' ? (
+              <span className="mt-1 block text-amber-800/80">
+                Dev: analysis needs the worker (Brev Nemotron or{' '}
+                <code className="font-semibold">pnpm --dir scripts fake-worker</code>). If nothing moves
+                for a minute, it probably isn’t running.
+              </span>
+            ) : null}
           </p>
         ) : null}
       </section>
@@ -172,7 +186,7 @@ export function ReportStatus({ reportIdParam }: { reportIdParam: string }) {
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5">
         <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
-          Overall assessment
+          Damage to the home
         </p>
         <p
           className={`mt-2 inline-flex rounded-full px-3 py-1.5 text-[12px] font-bold ${damageLevelClasses(report.overallLevel)}`}
@@ -182,33 +196,35 @@ export function ReportStatus({ reportIdParam }: { reportIdParam: string }) {
         {noHomeDamage ? (
           <p className="mt-2 text-[12px] leading-relaxed text-slate-600">
             {flags.length > 0
-              ? 'These photos show hazards near the property, but no damage to the home itself. To assess the home, add photos or a video of the house.'
-              : 'Nothing in these photos shows damage to the home.'}
+              ? 'We spotted hazards near the property, but no damage to the house itself. To check the house, add photos or a video of it.'
+              : 'We didn’t see any damage to the home in these photos.'}
           </p>
         ) : null}
         <div className="mt-3">
-          <p className="mb-2 text-[12px] font-bold text-slate-800">Life-safety flags</p>
+          <p className="mb-2 text-[12px] font-bold text-slate-800">Safety hazards</p>
           {flags.length > 0 ? (
             <HazardList flags={flags} />
           ) : (
-            <p className="text-[12px] text-slate-400">{assessed ? 'None found' : 'None yet'}</p>
+            <p className="text-[12px] text-slate-400">
+              {assessed ? 'No hazards spotted in these photos.' : 'Any hazards we spot will show up here.'}
+            </p>
           )}
         </div>
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5">
         <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
-          Pipeline
+          Progress
         </p>
         <AgentTrace reportId={idToString(report.id)} mode="pipeline" />
       </section>
 
       <aside className="rounded-2xl border border-slate-200 bg-slate-100/80 p-4 text-[11px] leading-relaxed text-slate-600">
-        The resident can claim this report via{' '}
+        Live at this address? Go to{' '}
         <Link className="font-bold text-slate-800 underline" href="/affected/start">
           I&apos;ve been affected
-        </Link>
-        .
+        </Link>{' '}
+        to claim this report and see the full assessment.
       </aside>
 
       {self ? (
@@ -216,7 +232,7 @@ export function ReportStatus({ reportIdParam }: { reportIdParam: string }) {
           className="block rounded-xl bg-blue-700 px-4 py-3 text-center text-[13px] font-bold text-white"
           href={`/affected/start?address=${encodeURIComponent(addressPrefill)}&self=1`}
         >
-          Continue to verify this is your property
+          This is my home: verify it
         </Link>
       ) : null}
 
@@ -224,7 +240,7 @@ export function ReportStatus({ reportIdParam }: { reportIdParam: string }) {
         className="block text-center text-[12px] font-bold text-blue-700 underline"
         href="/report/new"
       >
-        Start another report
+        Report damage at another address
       </Link>
     </AppShell>
   );

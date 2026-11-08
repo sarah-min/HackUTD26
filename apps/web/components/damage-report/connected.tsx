@@ -8,6 +8,8 @@ import { blobResolver } from './useMediaUrl';
 /** Props Part 2's report page passes (apps/web/components/affected/placeholders/types.ts). */
 export interface DamageReportProps {
   reportId: string;
+  /** False when the page already lists the hazards above the report. */
+  showHazards?: boolean;
   className?: string;
 }
 
@@ -16,7 +18,7 @@ export interface DamageReportProps {
  * `my_frames` (empty for anyone not verified for the property) and loads frame thumbnails from SpacetimeDB storage
  * (read_blob checks that this browser identity is verified for the property).
  */
-export function DamageReport({ reportId, className }: DamageReportProps) {
+export function DamageReport({ reportId, showHazards, className }: DamageReportProps) {
   const id = idFromString(reportId);
   useReport(id);
   const { assessment, frames, ready } = useVerifiedReportData(id);
@@ -26,5 +28,5 @@ export function DamageReport({ reportId, className }: DamageReportProps) {
   if (!ready && !assessment) {
     return <p className={`text-sm text-zinc-500 dark:text-zinc-400 ${className ?? ''}`}>Loading report…</p>;
   }
-  return <DamageReportView reportId={reportId} assessment={assessment?.json ?? null} frames={frames} resolveMediaUrl={resolveMediaUrl} className={className} />;
+  return <DamageReportView reportId={reportId} assessment={assessment?.json ?? null} frames={frames} resolveMediaUrl={resolveMediaUrl} showHazards={showHazards} className={className} />;
 }

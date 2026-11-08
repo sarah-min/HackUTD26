@@ -18,6 +18,28 @@ export interface AgentTraceViewProps {
 
 type StepState = 'done' | 'active' | 'pending' | 'failed';
 
+/** Plain-language step names for the reporter timeline (the contract labels stay for logs and the full trace). */
+const FRIENDLY_STEP: Record<PipelineStepName, string> = {
+  uploaded: 'Photos received',
+  extract_frames: 'Preparing your photos',
+  analyze_frames: 'Looking for damage',
+  estimate_cost: 'Estimating repair costs',
+  check_declarations: 'Checking for disaster declarations',
+  finalize: 'Report ready',
+};
+
+/** Worker summaries repeat the step name or use pipeline jargon; keep only useful progress, in plain words. */
+function friendlyDetail(summary: string | undefined, contractLabel: string): string | undefined {
+  if (!summary) return undefined;
+  const s = summary.trim();
+  if (s === contractLabel || ['Footage received', 'Done', 'More footage needed'].includes(s)) return undefined;
+  const checking = s.match(/^Analyzing (\d+)\/(\d+)$/);
+  if (checking) return `${checking[1]} of ${checking[2]} images checked`;
+  const prepared = s.match(/^Extracted (\d+) frames?$/);
+  if (prepared) return `${prepared[1]} image${prepared[1] === '1' ? '' : 's'} ready to check`;
+  return s;
+}
+
 const KIND_LABEL: Record<AgentStep['kind'], string> = {
   pipeline: 'Status',
   vision: 'Vision',
@@ -48,11 +70,12 @@ function pipelineView(steps: AgentStep[], status?: string) {
     else if (i === reached) state = status === 'failed' ? 'failed' : 'active';
     else if (i === 0 && (status === 'queued' || status === 'processing')) state = 'active';
     const step = latest.get(name);
-    let label: string = PIPELINE_STEP_LABELS[name as PipelineStepName];
-    if (name === 'finalize' && status === 'needs_more_footage') label = 'More footage needed';
+    const contractLabel: string = PIPELINE_STEP_LABELS[name as PipelineStepName];
+    let label: string = FRIENDLY_STEP[name as PipelineStepName] ?? contractLabel;
+    if (name === 'finalize' && status === 'needs_more_footage') label = 'More photos needed';
     // The last step turns green once the run finished with an assessment (not for 'More footage needed').
     const complete = name === 'finalize' && state === 'done' && status !== 'needs_more_footage' && status !== 'failed';
-    return { name, label, state, complete, detail: step && step.summary !== label ? step.summary : undefined };
+    return { name, label, state, complete, detail: friendlyDetail(step?.summary, contractLabel) };
   });
 }
 
@@ -93,7 +116,7 @@ export function AgentTraceView({ reportId, steps, mode = 'full', status, classNa
                         : 'text-zinc-900 dark:text-zinc-100'
                 } ${s.state === 'active' ? 'font-medium' : ''}`}
               >
-                {s.state === 'failed' ? `${s.label} — failed` : s.label}
+                {s.state === 'failed' ? `${s.label}: didn’t finish` : s.label}
               </p>
               {s.detail && s.state !== 'pending' && <p className="text-xs text-zinc-500 dark:text-zinc-400">{s.detail}</p>}
             </div>
