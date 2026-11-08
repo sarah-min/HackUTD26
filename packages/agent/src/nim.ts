@@ -1,6 +1,6 @@
-// Nemotron client for our own model server on a Vultr GPU instance (vLLM, OpenAI-compatible /v1).
+// Nemotron client for our own model server on the NVIDIA Brev GPU instance (vLLM, OpenAI-compatible /v1).
 // Two endpoints, one per role: the vision model (Nemotron Nano 12B v2 VL) and the agent model
-// (Nemotron 3 Nano 30B-A3B, native tool calling). See apps/worker/model-server/README.md.
+// (Nemotron 3 Nano 30B-A3B, native tool calling). See apps/worker/brev/README.md.
 // Uses fetch directly (no SDK) so the request shape is explicit and stable.
 // Images go in `image_url` content parts as data URIs (vLLM's OpenAI-compatible format).
 // Run scripts/smoke-nim.ts against the server to confirm models, tool calling and image input.
@@ -120,11 +120,11 @@ export class NimClient {
 
   /**
    * Env (worker / scripts):
-   *   NEMOTRON_VL_BASE_URL     vision server on the Vultr GPU box, e.g. http://10.1.96.5:8001/v1
-   *   NEMOTRON_AGENT_BASE_URL  agent server on the Vultr GPU box, e.g. http://10.1.96.5:8002/v1
+   *   NEMOTRON_VL_BASE_URL     vision server on the Brev GPU box, e.g. http://nemotron-vl:8001/v1
+   *   NEMOTRON_AGENT_BASE_URL  agent server on the Brev GPU box, e.g. http://nemotron-agent:8002/v1
    *   NEMOTRON_BASE_URL        one URL for both roles (only if a single gateway serves both models)
    *   NEMOTRON_API_KEY         the key the servers were started with (vLLM --api-key); per role: NEMOTRON_VL_API_KEY / NEMOTRON_AGENT_API_KEY
-   *   NEMOTRON_VL_MODEL, NEMOTRON_AGENT_MODEL   served model names (defaults match model-server/compose.gpu.yaml)
+   *   NEMOTRON_VL_MODEL, NEMOTRON_AGENT_MODEL   served model names (defaults match apps/worker/brev/compose.gpu.yaml)
    *   NEMOTRON_AGENT_THINKING  "on" to let the agent model reason before answering (slower); default off
    * There is deliberately no hosted-API fallback: a missing URL is an error, not a silent switch to another provider.
    */
@@ -137,8 +137,8 @@ export class NimClient {
       const missing = [!vlUrl && 'NEMOTRON_VL_BASE_URL', !agentUrl && 'NEMOTRON_AGENT_BASE_URL'].filter(Boolean);
       if (missing.length)
         throw new Error(
-          `${missing.join(' and ')} required: the OpenAI-compatible URL of the Nemotron server on the Vultr GPU instance ` +
-            `(e.g. http://<vpc-ip>:8001/v1), or NEMOTRON_BASE_URL for both. Set USE_FIXTURES=true to run without it.`,
+          `${missing.join(' and ')} required: the OpenAI-compatible URL of the Nemotron server on the Brev GPU instance ` +
+            `(e.g. http://nemotron-vl:8001/v1), or NEMOTRON_BASE_URL for both. Set USE_FIXTURES=true to run without it.`,
         );
       for (const u of [vlUrl, agentUrl])
         if (!/^https?:\/\/[^/]+/.test(u)) throw new Error(`Invalid Nemotron server URL: ${u}`);

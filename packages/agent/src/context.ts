@@ -1,5 +1,4 @@
 import type { AgentStep } from '@hack/contracts/agent';
-import type { StoragePort } from '@hack/storage';
 import type { Logger } from './log';
 import type { NimClient } from './nim';
 import type {
@@ -22,6 +21,19 @@ export type JobKind = JobRow['kind'];
  * while their job is queued or leased) plus the public `report` / `property` tables; writes are service reducers.
  * The concrete adapter is apps/worker/src/stdb/sdk.ts (SpacetimeDB SDK + generated bindings).
  */
+/**
+ * Object storage as the worker uses it. Files live in SpacetimeDB (blob tables): the worker reads media and ID
+ * images, writes frame thumbnails and deletes ID images (apps/worker/src/stdb/storage.ts).
+ */
+export interface ObjectStore {
+  getObject(key: string): Promise<Buffer>;
+  putObject(key: string, body: Buffer, contentType: string): Promise<void>;
+  deleteObject(key: string): Promise<void>;
+  ping(): Promise<boolean>;
+}
+/** @deprecated Old name from the S3 design; use ObjectStore. */
+export type StoragePort = ObjectStore;
+
 export interface ServiceConnection {
   readonly identityHex: string;
   // reads
@@ -68,7 +80,7 @@ export interface JobInfo {
 export interface JobContext {
   job: JobInfo;
   stdb: ServiceConnection;
-  storage: StoragePort;
+  storage: ObjectStore;
   nim: NimClient;
   log: Logger; // never log IdDocumentFields or finance JSON
   /** analyze only: auto seq + record_agent_step. */

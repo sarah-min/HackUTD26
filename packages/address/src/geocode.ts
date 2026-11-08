@@ -1,46 +1,51 @@
-// Pure request/response mapping for /api/geocode (CONTRACTS.md §8). No I/O here, so it's unit-tested
-// against recorded sample responses in __fixtures__/.
-import { normalizeParts } from '@hack/address';
-import type { NormalizedAddress } from '@hack/contracts/property';
+// Pure request/response mapping for address lookup (CONTRACTS.md §8). No I/O here; the SpacetimeDB module's
+// geocode procedures (spacetimedb/src/reducers/geocode.ts) do the HTTP calls. Unit-tested against recorded
+// responses in packages/address/test/__fixtures__/. Moved from apps/web/app/api/geocode/parse.ts.
+// No URL/URLSearchParams: the module runtime may not provide them.
+import { normalizeParts } from './index';
+
+/** Same shape as NormalizedAddress in @hack/contracts/property (kept local so the module bundle stays dependency-free). */
+export interface NormalizedAddress {
+  line1: string;
+  city: string;
+  state: string;
+  zip: string;
+  lat: number | null;
+  lng: number | null;
+  normalized: string;
+  source: 'census' | 'nominatim' | 'manual';
+}
+
+const qs = (params: Record<string, string>) =>
+  Object.entries(params).map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
 
 export const CENSUS_BASE = 'https://geocoding.geo.census.gov/geocoder/locations/onelineaddress';
 export const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org/reverse';
 
 export function censusUrl(q: string, benchmark: string): string {
-  const u = new URL(CENSUS_BASE);
-  u.searchParams.set('address', q);
-  u.searchParams.set('benchmark', benchmark);
-  u.searchParams.set('format', 'json');
-  return u.toString();
+  return `${CENSUS_BASE}?${qs({ address: q, benchmark, format: 'json' })}`;
 }
 
 export function nominatimReverseUrl(lat: number, lng: number): string {
-  const u = new URL(NOMINATIM_BASE);
-  u.searchParams.set('format', 'jsonv2');
-  u.searchParams.set('lat', lat.toFixed(6));
-  u.searchParams.set('lon', lng.toFixed(6));
-  u.searchParams.set('addressdetails', '1');
-  u.searchParams.set('zoom', '18'); // building-level
-  return u.toString();
+  // zoom 18 = building-level
+  return `${NOMINATIM_BASE}?${qs({ format: 'jsonv2', lat: lat.toFixed(6), lon: lng.toFixed(6), addressdetails: '1', zoom: '18' })}`;
 }
 
-/** `?q=` must be a plausible one-line US address; `?lat&lng` must be valid coordinates. */
+/** A forward query must be a plausible one-line US address; a reverse query must be valid coordinates. */
 export type GeocodeQuery = { kind: 'forward'; q: string } | { kind: 'reverse'; lat: number; lng: number };
 
-export function parseQuery(params: URLSearchParams): GeocodeQuery | { error: string } {
-  const q = params.get('q');
-  if (q !== null) {
-    const trimmed = q.trim().replace(/\s+/g, ' ');
+export function parseGeocodeQuery(input: { q?: string | null; lat?: number | null; lng?: number | null }): GeocodeQuery | { error: string } {
+  if (typeof input.q === 'string') {
+    const trimmed = input.q.trim().replace(/\s+/g, ' ');
     if (trimmed.length < 5 || trimmed.length > 200) return { error: 'q must be 5–200 characters' };
     return { kind: 'forward', q: trimmed };
   }
-  const lat = Number(params.get('lat'));
-  const lng = Number(params.get('lng'));
-  if (params.has('lat') && params.has('lng') && Number.isFinite(lat) && Number.isFinite(lng)) {
+  const { lat, lng } = input;
+  if (typeof lat === 'number' && typeof lng === 'number' && Number.isFinite(lat) && Number.isFinite(lng)) {
     if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return { error: 'lat/lng out of range' };
     return { kind: 'reverse', lat, lng };
   }
-  return { error: 'pass ?q=<address> or ?lat=&lng=' };
+  return { error: 'pass an address or coordinates' };
 }
 
 function build(

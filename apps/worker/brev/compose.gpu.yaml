@@ -1,10 +1,13 @@
-# Nemotron model server for the Vultr GPU instance (Part 3). Two vLLM servers on one GPU, OpenAI-compatible:
-#   :8001  vision  nvidia/NVIDIA-Nemotron-Nano-12B-v2-VL-FP8   (~14 GB weights)
-#   :8002  agent   nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8   (~35 GB weights, native tool calling)
-# Sized for one 80 GB GPU (Vultr Cloud GPU, 1x H100 80GB). Run on the GPU box:
-#   cp model-server.env.example .env   # set NEMOTRON_API_KEY and BIND_ADDR
-#   docker compose -f compose.gpu.yaml up -d && docker compose -f compose.gpu.yaml logs -f
-# The worker VM points NEMOTRON_VL_BASE_URL / NEMOTRON_AGENT_BASE_URL at http://<BIND_ADDR>:8001/v1 and :8002/v1.
+# NVIDIA Brev GPU instance (Part 3): both Nemotron models AND the worker on one box.
+#   :8001  vision  nvidia/NVIDIA-Nemotron-Nano-12B-v2-VL-FP8
+#   :8002  agent   nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8 (native tool calling)
+#   worker         claims jobs from SpacetimeDB, calls the two models over the compose network
+# Nothing is published on the host: the models are reachable only by the worker, and the worker only makes outbound
+# connections (SpacetimeDB Maincloud, FEMA/NWS/Census). SpacetimeDB is the whole backend: data, jobs, auth and files.
+# Sized for one 80 GB GPU (Brev: 1x H100 80GB). On the instance, from the repo root:
+#   cp apps/worker/brev/brev.env.example apps/worker/brev/.env   # set NEMOTRON_API_KEY and STDB_SERVICE_TOKEN
+#   docker compose -f apps/worker/brev/compose.gpu.yaml --env-file apps/worker/brev/.env up -d --build
+#   docker compose -f apps/worker/brev/compose.gpu.yaml logs -f
 
 x-vllm: &vllm
   image: ${VLLM_IMAGE:-vllm/vllm-openai:v0.28.0}
@@ -27,8 +30,6 @@ x-vllm: &vllm
 services:
   nemotron-vl:
     <<: *vllm
-    ports:
-      - "${BIND_ADDR:-127.0.0.1}:8001:8001"
     entrypoint: ["/bin/bash", "-lc"]
     command:
       - >-
@@ -53,8 +54,6 @@ services:
     depends_on:
       nemotron-vl:
         condition: service_healthy
-    ports:
-      - "${BIND_ADDR:-127.0.0.1}:8002:8002"
     entrypoint: ["/bin/bash", "-lc"]
     command:
       - >-
@@ -78,5 +77,29 @@ services:
       retries: 80
       start_period: 180s
 
+  worker:
+    build:
+      context: ../../..
+      dockerfile: apps/worker/brev/Dockerfile.worker
+    restart: unless-stopped
+    depends_on:
+      nemotron-vl:
+        condition: service_healthy
+      nemotron-agent:
+        condition: service_healthy
+    environment:
+      STDB_URI: ${STDB_URI:-https://maincloud.spacetimedb.com}
+      STDB_MODULE: ${STDB_MODULE:-aftermath-hackutd-dev}
+      STDB_SERVICE_TOKEN: ${STDB_SERVICE_TOKEN:?set STDB_SERVICE_TOKEN in .env (the registered worker token)}
+      NEMOTRON_VL_BASE_URL: http://nemotron-vl:8001/v1
+      NEMOTRON_AGENT_BASE_URL: http://nemotron-agent:8002/v1
+      NEMOTRON_API_KEY: ${NEMOTRON_API_KEY}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-1}
+      VL_CONCURRENCY: ${VL_CONCURRENCY:-2}
+      USE_FIXTURES: "false"
+    volumes:
+      - vl-cache:/root/.cache/aftermath-vl
+
 volumes:
   hf-cache:
+  vl-cache:

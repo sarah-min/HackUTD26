@@ -1,9 +1,9 @@
 'use client';
 
 import { useMemo } from 'react';
-import { idFromString, useReport, useVerifiedReportData } from '@/lib/stdb';
-import { useVerificationCredentials } from '@/components/affected/useVerificationCredentials';
+import { idFromString, useReadFile, useReport, useVerifiedReportData } from '@/lib/stdb';
 import { DamageReportView } from './DamageReport';
+import { blobResolver } from './useMediaUrl';
 
 /** Props Part 2's report page passes (apps/web/components/affected/placeholders/types.ts). */
 export interface DamageReportProps {
@@ -13,18 +13,18 @@ export interface DamageReportProps {
 
 /**
  * Live damage report for a verified affected person. Reads the assessment and frames from `my_assessments` /
- * `my_frames` (empty for anyone not verified for the property) and loads frame thumbnails through /api/media with
- * this browser's verification credentials.
+ * `my_frames` (empty for anyone not verified for the property) and loads frame thumbnails from SpacetimeDB storage
+ * (read_blob checks that this browser identity is verified for the property).
  */
 export function DamageReport({ reportId, className }: DamageReportProps) {
   const id = idFromString(reportId);
-  const { report } = useReport(id);
+  useReport(id);
   const { assessment, frames, ready } = useVerifiedReportData(id);
-  const creds = useVerificationCredentials(report?.propertyId ?? null);
-  const mediaAuth = useMemo(() => (creds ? { verificationId: creds.id, verificationSecret: creds.secret } : undefined), [creds]);
+  const read = useReadFile();
+  const resolveMediaUrl = useMemo(() => blobResolver(read), [read]);
   if (id === null) return null;
   if (!ready && !assessment) {
     return <p className={`text-sm text-zinc-500 dark:text-zinc-400 ${className ?? ''}`}>Loading report…</p>;
   }
-  return <DamageReportView reportId={reportId} assessment={assessment?.json ?? null} frames={frames} mediaAuth={mediaAuth} className={className} />;
+  return <DamageReportView reportId={reportId} assessment={assessment?.json ?? null} frames={frames} resolveMediaUrl={resolveMediaUrl} className={className} />;
 }

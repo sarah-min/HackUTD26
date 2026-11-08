@@ -4,18 +4,15 @@ import { useEffect, useState } from 'react';
 
 export type MediaUrlResolver = (objectKey: string) => Promise<string | null>;
 
-/**
- * Default resolver: GET /api/media/<key> with the verification headers (CONTRACTS §8). The route answers with a
- * 302 to a presigned GET; the image bytes become an object URL. Pass `resolveMediaUrl` to override.
- */
-export function mediaResolver(auth: { verificationId: string; verificationSecret: string }): MediaUrlResolver {
+/** Resolver over a file reader (SpacetimeDB storage, see useReadFile): the bytes become an object URL. */
+export function blobResolver(read: (objectKey: string) => Promise<Blob>): MediaUrlResolver {
   return async (objectKey) => {
     if (objectKey.startsWith('idv/')) return null;
-    const res = await fetch(`/api/media/${objectKey.split('/').map(encodeURIComponent).join('/')}`, {
-      headers: { 'x-verification-id': auth.verificationId, 'x-verification-secret': auth.verificationSecret },
-    });
-    if (!res.ok) return null;
-    return URL.createObjectURL(await res.blob());
+    try {
+      return URL.createObjectURL(await read(objectKey));
+    } catch {
+      return null;
+    }
   };
 }
 

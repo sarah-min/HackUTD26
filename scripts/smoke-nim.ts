@@ -1,7 +1,7 @@
-// Part 3 smoke test for the Nemotron model server on the Vultr GPU instance (T3.1/T3.3).
+// Part 3 smoke test for the Nemotron model server on the Brev GPU instance (T3.1/T3.3).
 // Verifies both servers serve the configured models, image input, FrameFinding parsing and tool calling.
 //   node --env-file=.env.local --import tsx scripts/smoke-nim.ts --image ./fema-roof.jpg [--capture]
-// Needs NEMOTRON_VL_BASE_URL, NEMOTRON_AGENT_BASE_URL and NEMOTRON_API_KEY (see apps/worker/model-server/README.md).
+// Needs NEMOTRON_VL_BASE_URL, NEMOTRON_AGENT_BASE_URL and NEMOTRON_API_KEY (see apps/worker/brev/README.md).
 // --image accepts a local JPEG/PNG/WebP path or an https URL of a public-domain image (e.g. FEMA media library).
 // Prints one JSON report; paste the VERIFY results into status/part3.md and SOURCES.md.
 import { mkdir, readFile, writeFile } from 'node:fs/promises';

@@ -1,6 +1,5 @@
 import type { AgentStep } from '@hack/contracts/agent';
-import type { JobKind, JobRow, Logger, NimClient, ServiceConnection } from '@hack/agent';
-import type { StoragePort } from '@hack/storage';
+import type { JobKind, JobRow, Logger, NimClient, ObjectStore, ServiceConnection } from '@hack/agent';
 import type { JobContext, JobHandler } from './handlers/types';
 
 // ARCHITECTURE §6.6 / stdb-bindings README §6: watch svc_jobs → claim_job(lease) → proceed only when the row shows
@@ -23,7 +22,7 @@ export function stepSeqBase(job: Pick<JobRow, 'attempts'>, payload: unknown): nu
 
 export interface RunnerOptions {
   stdb: ServiceConnection;
-  storage: StoragePort;
+  storage: ObjectStore;
   nim: NimClient;
   log: Logger;
   handlers: Partial<Record<JobKind, JobHandler>>;

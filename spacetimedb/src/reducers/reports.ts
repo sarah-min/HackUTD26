@@ -4,6 +4,7 @@ import { spacetimedb } from '../schema';
 import { isReporter, propertyHasVerified } from '../auth';
 import { parseAddress, upsertProperty } from '../matching';
 import { enqueueJob } from '../jobs';
+import { requireOwnBlob } from '../blobs';
 import { HAZARDS, MAX_IMAGES_PER_ROUND, MAX_VIDEOS_PER_ROUND, fail, oneOf } from '../constants';
 
 const HEX64 = /^[0-9a-f]{64}$/;
@@ -84,6 +85,9 @@ export const attach_media = spacetimedb.reducer(
     const kind = oneOf(['video', 'image'] as const, a.kind, 'kind');
     if (!a.object_key.startsWith(`media/${a.report_id}/`)) fail('object_key must start with media/<reportId>/');
     if (!/^[0-9a-f]{64}$/.test(a.sha256.toLowerCase())) fail('sha256 must be 64 hex chars');
+    // Storage lives in this database: the file must be fully uploaded by this reporter first.
+    const stored = requireOwnBlob(ctx.db, a.object_key, ctx.sender);
+    if (stored.content_type !== a.content_type || stored.size_bytes !== a.size_bytes) fail('media does not match the upload');
     const priv = ctx.db.report_private.report_id.find(a.report_id)!;
     const round = priv.submit_count;
     let images = 0;

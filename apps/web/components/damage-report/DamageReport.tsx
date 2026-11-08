@@ -5,7 +5,7 @@ import { DamageAssessmentSchema, FrameFindingSchema, type DamageAssessment, type
 import { type DamageLevel } from '@hack/contracts/common';
 import { HazardList } from '@/components/safety';
 import { formatCents } from '@/lib/format';
-import { mediaResolver, useMediaUrl, type MediaUrlResolver } from './useMediaUrl';
+import { useMediaUrl, type MediaUrlResolver } from './useMediaUrl';
 
 export interface FrameRowLike {
   frameIndex: number | bigint;
@@ -22,7 +22,6 @@ export interface DamageReportViewProps {
   /** frame rows for this report. */
   frames?: readonly FrameRowLike[];
   /** Verified affected person's credentials for /api/media, or a custom resolver. */
-  mediaAuth?: { verificationId: string; verificationSecret: string };
   resolveMediaUrl?: MediaUrlResolver;
   className?: string;
 }
@@ -115,7 +114,7 @@ function printText(title: string, text: string) {
   w.print();
 }
 
-export function DamageReportView({ reportId, assessment, frames = [], mediaAuth, resolveMediaUrl, className = '' }: DamageReportViewProps) {
+export function DamageReportView({ reportId, assessment, frames = [], resolveMediaUrl, className = '' }: DamageReportViewProps) {
   const [copied, setCopied] = useState(false);
   const parsed = useMemo(() => {
     if (!assessment) return null;
@@ -143,7 +142,7 @@ export function DamageReportView({ reportId, assessment, frames = [], mediaAuth,
         }),
     [frames],
   );
-  const resolve = useMemo(() => resolveMediaUrl ?? (mediaAuth ? mediaResolver(mediaAuth) : undefined), [resolveMediaUrl, mediaAuth]);
+  const resolve = resolveMediaUrl;
 
   if (parsed === null) {
     return (

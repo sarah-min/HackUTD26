@@ -1,13 +1,10 @@
 import type { AgentStep } from '@hack/contracts/agent';
-import type { JobRow, ServiceConnection } from '@hack/agent';
-import type { StoragePort } from '@hack/storage';
+import type { JobRow, ObjectStore, ServiceConnection } from '@hack/agent';
 
 export function fakeStorage(objects: Record<string, Buffer> = {}, opts: { failGet?: boolean } = {}) {
   const deleted: string[] = [];
   const puts: string[] = [];
-  const storage: StoragePort = {
-    presignPut: async () => ({ url: 'x', expiresAt: 0 }),
-    presignGet: async () => 'x',
+  const storage: ObjectStore = {
     getObject: async (k) => {
       if (opts.failGet) throw new Error('network down');
       const v = objects[k];

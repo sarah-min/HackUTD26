@@ -3,7 +3,7 @@ import { PROD_MODULE, loadEnv } from './env';
 import { handlers } from './handlers';
 import { Runner } from './runner';
 import { SdkServiceConnection } from './stdb/sdk';
-import { createStorageFromEnv } from './storage';
+import { SpacetimeStore } from './stdb/storage';
 
 const log = createLogger('worker');
 
@@ -11,11 +11,11 @@ async function main(): Promise<void> {
   const env = loadEnv();
   if (env.STDB_MODULE === PROD_MODULE) log.warn('connected to the PRODUCTION database (demo); use aftermath-hackutd-dev while building');
   const stdb = await SdkServiceConnection.connect({ uri: env.STDB_URI, module: env.STDB_MODULE, token: env.STDB_SERVICE_TOKEN });
-  const storage = createStorageFromEnv();
+  const storage = new SpacetimeStore(stdb);
   const nim = NimClient.fromEnv();
-  if (!(await storage.ping().catch(() => false))) log.warn('object storage ping failed; jobs will fail until it is reachable');
+  if (!(await storage.ping().catch(() => false))) log.warn('SpacetimeDB connection not active; storage reads will fail until it reconnects');
   if (!nim.useFixtures) {
-    // The model server runs on a separate Vultr GPU instance and may still be loading weights; warn instead of exiting.
+    // The model server runs next to the worker on the Brev GPU instance and may still be loading weights; warn instead of exiting.
     const check = await nim.checkModels();
     for (const [role, r] of Object.entries(check)) {
       if (r.ok) log.info('model server ready', { role, url: r.url, model: nim.models[role as 'vision' | 'agent'] });

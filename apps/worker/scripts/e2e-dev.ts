@@ -1,26 +1,28 @@
-// Live end-to-end check of the Part 3 worker against the DEV database (no GPU, no bucket needed).
+// Live end-to-end check of the Part 3 worker against the DEV database or a local `spacetime start` (no GPU needed).
 //   pnpm --filter @hack/worker e2e:dev        (reads ../../.env.local: STDB_SERVICE_TOKEN, optional STDB_URI / STDB_MODULE)
 //
-// Runs the REAL worker loop (Runner + analyze/verify_identity handlers + SdkServiceConnection) with USE_FIXTURES=true
-// model output and an in-memory object store. An anonymous reporter files a report with one photo; the worker
-// analyzes it; an anonymous affected person verifies with a placeholder ID image; every row the app reads is checked.
-// Writes test rows (notes "P3 E2E TEST (fixture)", assessment source "fixture"). Refuses any database not ending in
-// "-dev". The token is never printed. Exits non-zero if a check fails.
+// Runs the REAL worker loop (Runner + analyze/verify_identity handlers + SdkServiceConnection + SpacetimeStore) with
+// USE_FIXTURES=true model output. Files are stored in SpacetimeDB itself: an anonymous reporter uploads one photo
+// (begin_upload + upload_chunk) and files a report; the worker analyzes it; an anonymous affected person uploads a
+// placeholder ID image and verifies; every row and file the app reads is checked. Writes test rows (notes
+// "P3 E2E TEST (fixture)", assessment source "fixture"). Refuses any database not ending in "-dev" unless STDB_URI
+// is localhost. The token is never printed. Exits non-zero if a check fails.
 import { spawnSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import { normalizeParts } from '@hack/address';
 import { createLogger, NimClient } from '@hack/agent';
 import { DamageAssessmentSchema } from '@hack/contracts/assessment';
-import type { StoragePort } from '@hack/storage';
 import { DbConnection } from '@hack/stdb-bindings';
 import { FFMPEG_PATH } from '@hack/vision';
 import { DEV_MODULE, loadEnv } from '../src/env';
 import { handlers } from '../src/handlers';
 import { Runner } from '../src/runner';
 import { SdkServiceConnection } from '../src/stdb/sdk';
+import { SpacetimeStore } from '../src/stdb/storage';
 
 const env = loadEnv({ ...process.env, STDB_MODULE: process.env.STDB_MODULE || DEV_MODULE, USE_FIXTURES: 'true' });
-if (!env.STDB_MODULE.endsWith('-dev')) {
+const local = /^(https?|wss?):\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(env.STDB_URI);
+if (!env.STDB_MODULE.endsWith('-dev') && !local) {
   console.error(`Refusing to run: STDB_MODULE "${env.STDB_MODULE}" is not a -dev database.`);
   process.exit(2);
 }
@@ -45,19 +47,13 @@ async function waitFor<T>(label: string, fn: () => T | undefined | null | false,
 const sha256 = (b: string | Buffer) => createHash('sha256').update(b).digest('hex');
 const hex = (id: { toHexString(): string }) => id.toHexString().toLowerCase().replace(/^0x/, '');
 
-/** In-memory object store with the StoragePort contract (Part 4 owns the real one). */
-class MemoryStorage implements StoragePort {
-  readonly objects = new Map<string, Buffer>();
-  async presignPut(key: string) { return { url: `memory://${key}`, expiresAt: Date.now() + 600_000 }; }
-  async presignGet(key: string) { return `memory://${key}`; }
-  async getObject(key: string) {
-    const b = this.objects.get(key);
-    if (!b) throw new Error(`no object ${key}`);
-    return b;
-  }
-  async putObject(key: string, body: Buffer, _contentType: string) { this.objects.set(key, body); }
-  async deleteObject(key: string) { this.objects.delete(key); }
-  async ping() { return true; }
+const CHUNK = 512 * 1024;
+/** Uploads bytes into SpacetimeDB storage over this client's own connection (same as the web app). */
+async function upload(conn: DbConnection, objectKey: string, bytes: Buffer, contentType: string): Promise<void> {
+  const chunkCount = Math.ceil(bytes.length / CHUNK);
+  await conn.reducers.beginUpload({ objectKey, contentType, sizeBytes: BigInt(bytes.length), sha256: sha256(bytes), chunkCount });
+  for (let seq = 0; seq < chunkCount; seq++)
+    await conn.reducers.uploadChunk({ objectKey, seq, bytes: new Uint8Array(bytes.subarray(seq * CHUNK, (seq + 1) * CHUNK)) });
 }
 
 /** A plain JPEG made with the bundled ffmpeg (the fixture model ignores pixels). */
@@ -91,9 +87,9 @@ const address = { ...parts, lat: 32.7811, lng: -96.799, source: 'manual' as cons
 async function main(): Promise<void> {
   console.log(`P3 worker e2e → ${env.STDB_URI} / ${env.STDB_MODULE}`);
   const log = createLogger('e2e-worker');
-  const storage = new MemoryStorage();
   const stdb = await SdkServiceConnection.connect({ uri: env.STDB_URI, module: env.STDB_MODULE, token: env.STDB_SERVICE_TOKEN });
   check('worker connects with STDB_SERVICE_TOKEN', !!stdb.identityHex, `identity ${stdb.identityHex.slice(0, 12)}…`);
+  const storage = new SpacetimeStore(stdb);
   const nim = new NimClient({ baseUrl: 'http://fixtures.invalid/v1', apiKey: '', visionModel: 'fixture', agentModel: 'fixture', useFixtures: true });
   const runner = new Runner({ stdb, storage, nim, log, handlers, concurrency: 2, pollMs: 300 });
 
@@ -109,10 +105,12 @@ async function main(): Promise<void> {
   const report = await waitFor('report row', () => [...R.db.report.iter()].find(mine), 15_000);
   if (!check('reporter creates a report', !!report)) return;
   const reportId = report!.id;
-  const photo = testJpeg('gray');
+  // > 512 KiB so the upload spans several chunks.
+  const photo = Buffer.concat([testJpeg('gray'), randomBytes(700 * 1024)]);
   const photoSha = sha256(photo);
   const photoKey = `media/${reportId}/${photoSha}.jpg`;
-  await storage.putObject(photoKey, photo, 'image/jpeg');
+  await upload(R, photoKey, photo, 'image/jpeg');
+  check('reporter uploads the photo into SpacetimeDB (multi-chunk)', (await storage.getObject(photoKey)).equals(photo), `${photo.length} bytes`);
   await R.reducers.attachMedia({ reportId, kind: 'image', objectKey: photoKey, contentType: 'image/jpeg', sizeBytes: BigInt(photo.length), sha256: photoSha });
   await R.reducers.submitReport({ reportId });
   console.log(`      report ${reportId}, property ${report!.propertyId}`);
@@ -124,11 +122,15 @@ async function main(): Promise<void> {
     if (!check('worker analyzes the report (status → assessed)', !!assessed, `status=${last?.status}`)) return;
     const reporterSteps = [...R.db.myAgentSteps.iter()].filter((s) => s.reportId === reportId);
     check('reporter sees only reporter-visible pipeline steps', reporterSteps.length > 0 && reporterSteps.every((s) => s.visibility === 'reporter'), `${reporterSteps.length} steps`);
-    check('frame thumbnail written to storage', storage.objects.has(`frames/${reportId}/0.jpg`));
+    check('frame thumbnail stored in SpacetimeDB', (await storage.getObject(`frames/${reportId}/0.jpg`)).length > 0);
     const notices = [...R.db.areaNotice.iter()];
     check('area notices table readable by an unverified visitor', true, `${notices.length} notices in view`);
 
     // Affected person verifies with a placeholder ID image (fixture extraction).
+    const stranger = await anon('stranger', ['SELECT * FROM report']);
+    const asStranger = await stranger.conn.procedures.readBlob({ objectKey: photoKey, seq: 0 });
+    check('an unverified stranger cannot read the footage', !asStranger.ok && asStranger.error === 'forbidden');
+    stranger.conn.disconnect();
     const affected = await anon('affected', [
       'SELECT * FROM my_verifications', 'SELECT * FROM my_assessments', 'SELECT * FROM my_frames', 'SELECT * FROM my_agent_steps',
     ]);
@@ -138,13 +140,17 @@ async function main(): Promise<void> {
     if (!check('affected person starts verification', !!ver)) return;
     check('verification matched the report property', ver!.propertyId === report!.propertyId, `ver.property=${ver!.propertyId}`);
     const idKey = `idv/${ver!.id}/doc.jpg`;
-    await storage.putObject(idKey, testJpeg('white'), 'image/jpeg');
+    await upload(A, idKey, testJpeg('white'), 'image/jpeg');
     await A.reducers.submitVerification({ verificationId: ver!.id, objectKey: idKey });
 
     const done = await waitFor('verification decided', () => [...A.db.myVerifications.iter()].find((v) => v.id === ver!.id && (v.state === 'verified' || v.state === 'failed')), 60_000);
     const vNow = [...A.db.myVerifications.iter()].find((v) => v.id === ver!.id);
     check('worker decides the verification (state → verified)', done?.state === 'verified', `state=${vNow?.state}`);
-    check('ID image deleted from storage after extraction', !storage.objects.has(idKey));
+    check('ID image deleted from storage after extraction', await storage.getObject(idKey).then(() => false, () => true));
+    const asOwner = await A.procedures.readBlob({ objectKey: photoKey, seq: 0 });
+    check('verified person can read the footage from SpacetimeDB', asOwner.ok && asOwner.part?.chunkCount === Math.ceil(photo.length / CHUNK));
+    const idAsOwner = await A.procedures.readBlob({ objectKey: idKey, seq: 0 });
+    check('nobody can read an ID image back', !idAsOwner.ok);
 
     const row = await waitFor('my_assessments row', () => [...A.db.myAssessments.iter()].find((a) => a.reportId === reportId), 15_000);
     if (check('verified person sees the assessment', !!row)) {
