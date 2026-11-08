@@ -10,6 +10,8 @@ export * from './reducers/affected';
 export * from './reducers/worker';
 export * from './reducers/scheduled';
 export * from './reducers/notices';
+export * from './reducers/blobs';
+export * from './reducers/geocode';
 export * from './views';
 export * from './views_service';
 export * from './views_web';

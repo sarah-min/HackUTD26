@@ -4,6 +4,7 @@ import { spacetimedb } from '../schema';
 import { requireService } from '../auth';
 import { parseAddress, upsertProperty } from '../matching';
 import { enqueueJob } from '../jobs';
+import { deleteBlob, requireOwnBlob } from '../blobs';
 import { DOC_KINDS, FAIL_REASONS, HOUR_MICROS, IDV_MAX_ATTEMPTS_PER_HOUR, fail, oneOf } from '../constants';
 
 export const start_verification = spacetimedb.reducer(
@@ -57,6 +58,7 @@ export const submit_verification = spacetimedb.reducer(
     if (v.state !== 'pending') fail(`cannot submit in state ${v.state}`);
     if (v.object_key !== undefined) fail('already submitted');
     if (!object_key.startsWith(`idv/${verification_id}/`)) fail('object_key must start with idv/<verificationId>/');
+    requireOwnBlob(ctx.db, object_key, ctx.sender); // the ID image is stored in this database
     ctx.db.verification.id.update({ ...v, object_key });
     enqueueJob(ctx, { kind: 'verify_identity', verification_id, property_id: v.property_id });
   }
@@ -77,6 +79,8 @@ export const record_verification = spacetimedb.reducer(
     if (!ok && fail_reason === undefined) fail('fail_reason required when ok=false');
     const reason = ok ? undefined : oneOf(FAIL_REASONS, fail_reason!, 'fail_reason');
     if (name_on_doc !== undefined && name_on_doc.length > 120) fail('name_on_doc too long');
+    // The ID image is never kept once decided (the worker also deletes it; this is the guarantee).
+    if (v.object_key) deleteBlob(ctx.db, v.object_key);
     ctx.db.verification.id.update({
       ...v,
       state: ok ? 'verified' : 'failed',

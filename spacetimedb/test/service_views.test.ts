@@ -63,6 +63,7 @@ describe('service views (worker access to private data)', () => {
     });
     const ver = [...s.h.db.verification.identity.filter(s.idOf(alice))][0];
     expect(v(s, s.worker, 'svc_verifications')).toHaveLength(0); // no job yet
+    s.upload(alice, `idv/${ver.id}/doc.jpg`, 'image/jpeg');
     s.call(alice, mod.submit_verification as any, { verification_id: ver.id, object_key: `idv/${ver.id}/doc.jpg` });
     const rows = v(s, s.worker, 'svc_verifications');
     expect(rows.map(r => r.id)).toEqual([ver.id]);

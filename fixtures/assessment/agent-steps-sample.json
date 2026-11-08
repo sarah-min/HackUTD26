@@ -1,0 +1,191 @@
+{
+  "source": "fixture",
+  "description": "Synthetic agent_step rows for UI previews.",
+  "steps": [
+    {
+      "reportId": "7",
+      "seq": 0,
+      "kind": "pipeline",
+      "name": "uploaded",
+      "summary": "Footage received",
+      "visibility": "reporter",
+      "at": 1794100000000
+    },
+    {
+      "reportId": "7",
+      "seq": 1,
+      "kind": "pipeline",
+      "name": "extract_frames",
+      "summary": "Extracting frames",
+      "visibility": "reporter",
+      "at": 1794100001300
+    },
+    {
+      "reportId": "7",
+      "seq": 2,
+      "kind": "pipeline",
+      "name": "extract_frames",
+      "summary": "Extracted 4 frames",
+      "visibility": "reporter",
+      "at": 1794100002600
+    },
+    {
+      "reportId": "7",
+      "seq": 3,
+      "kind": "pipeline",
+      "name": "analyze_frames",
+      "summary": "Analyzing 0/4",
+      "visibility": "reporter",
+      "at": 1794100003900
+    },
+    {
+      "reportId": "7",
+      "seq": 4,
+      "kind": "vision",
+      "name": "nvidia/NVIDIA-Nemotron-Nano-12B-v2-VL-FP8",
+      "summary": "Frame 1 at 0.5 s: roof major, yard_debris minor",
+      "visibility": "affected",
+      "durationMs": 548,
+      "at": 1794100005200
+    },
+    {
+      "reportId": "7",
+      "seq": 5,
+      "kind": "pipeline",
+      "name": "analyze_frames",
+      "summary": "Analyzing 4/4",
+      "visibility": "reporter",
+      "at": 1794100006500
+    },
+    {
+      "reportId": "7",
+      "seq": 6,
+      "kind": "model",
+      "name": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8",
+      "summary": "Plan: get_report_context, get_frame_findings",
+      "visibility": "affected",
+      "at": 1794100007800
+    },
+    {
+      "reportId": "7",
+      "seq": 7,
+      "kind": "tool_call",
+      "name": "get_frame_findings",
+      "summary": "Calling get_frame_findings",
+      "visibility": "affected",
+      "at": 1794100009100
+    },
+    {
+      "reportId": "7",
+      "seq": 8,
+      "kind": "tool_result",
+      "name": "get_frame_findings",
+      "summary": "3/4 usable frames; overall major (roof major, windows_doors minor, interior minor)",
+      "visibility": "affected",
+      "durationMs": 696,
+      "at": 1794100010400
+    },
+    {
+      "reportId": "7",
+      "seq": 9,
+      "kind": "model",
+      "name": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8",
+      "summary": "Plan: reverse_geocode, lookup_disaster_declarations",
+      "visibility": "affected",
+      "at": 1794100011700
+    },
+    {
+      "reportId": "7",
+      "seq": 10,
+      "kind": "tool_call",
+      "name": "reverse_geocode",
+      "summary": "Calling reverse_geocode",
+      "visibility": "affected",
+      "at": 1794100013000
+    },
+    {
+      "reportId": "7",
+      "seq": 11,
+      "kind": "tool_result",
+      "name": "reverse_geocode",
+      "summary": "Dallas County, TX (FIPS 48113)",
+      "visibility": "affected",
+      "durationMs": 807,
+      "at": 1794100014300
+    },
+    {
+      "reportId": "7",
+      "seq": 12,
+      "kind": "pipeline",
+      "name": "check_declarations",
+      "summary": "Checking disaster declarations",
+      "visibility": "reporter",
+      "at": 1794100015600
+    },
+    {
+      "reportId": "7",
+      "seq": 13,
+      "kind": "tool_call",
+      "name": "lookup_disaster_declarations",
+      "summary": "Calling lookup_disaster_declarations",
+      "visibility": "affected",
+      "at": 1794100016900
+    },
+    {
+      "reportId": "7",
+      "seq": 14,
+      "kind": "tool_result",
+      "name": "lookup_disaster_declarations",
+      "summary": "1 declaration(s): DR-0000-TX",
+      "visibility": "affected",
+      "durationMs": 918,
+      "at": 1794100018200
+    },
+    {
+      "reportId": "7",
+      "seq": 15,
+      "kind": "pipeline",
+      "name": "estimate_cost",
+      "summary": "Estimating repairs",
+      "visibility": "reporter",
+      "at": 1794100019500
+    },
+    {
+      "reportId": "7",
+      "seq": 16,
+      "kind": "tool_call",
+      "name": "estimate_repair_cost",
+      "summary": "Calling estimate_repair_cost",
+      "visibility": "affected",
+      "at": 1794100020800
+    },
+    {
+      "reportId": "7",
+      "seq": 17,
+      "kind": "tool_result",
+      "name": "estimate_repair_cost",
+      "summary": "Estimated 6 line item(s), assumed home size: yes",
+      "visibility": "affected",
+      "durationMs": 1029,
+      "at": 1794100022100
+    },
+    {
+      "reportId": "7",
+      "seq": 18,
+      "kind": "model",
+      "name": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8",
+      "summary": "Plan: finish",
+      "visibility": "affected",
+      "at": 1794100023400
+    },
+    {
+      "reportId": "7",
+      "seq": 19,
+      "kind": "pipeline",
+      "name": "finalize",
+      "summary": "Done",
+      "visibility": "reporter",
+      "at": 1794100024700
+    }
+  ]
+}

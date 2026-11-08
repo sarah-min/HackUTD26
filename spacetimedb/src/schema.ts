@@ -13,6 +13,8 @@ import {
 } from './tables/core';
 import { verification, affected_profile, recovery_plan, coach_message } from './tables/affected';
 import { job, service_identity, lease_tick, area_tick } from './tables/system';
+import { blob, blob_chunk } from './tables/blobs';
+import { geocode_cache, geocode_throttle } from './tables/geocode';
 
 export const spacetimedb = schema({
   property,
@@ -33,6 +35,10 @@ export const spacetimedb = schema({
   service_identity,
   lease_tick,
   area_tick,
+  blob,
+  blob_chunk,
+  geocode_cache,
+  geocode_throttle,
 });
 
 export type Spacetime = typeof spacetimedb;

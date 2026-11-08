@@ -7,7 +7,7 @@
  * Accessor names are camelCased by the generator (CONTRACTS.md §5 uses snake_case).
  * VERIFY after spacetime generate: every accessor below exists with this exact name.
  */
-import { DbConnection, tables, reducers } from '@hack/stdb-bindings';
+import { DbConnection, tables, reducers, procedures } from '@hack/stdb-bindings';
 
 export { DbConnection };
 
@@ -48,6 +48,20 @@ export const R = {
   submitVerification: reducers.submitVerification,
   saveAffectedIntake: reducers.saveAffectedIntake,
   askCoach: reducers.askCoach,
+  // File storage lives in this database (no S3): begin_upload, then upload_chunk for each 512 KiB piece.
+  beginUpload: reducers.beginUpload,
+  uploadChunk: reducers.uploadChunk,
+} as const;
+
+/**
+ * Procedures callable from the browser (they return a value).
+ * readBlob: one chunk of a stored file (footage/thumbnails for verified residents; never ID images).
+ * geocodeAddress / geocodePoint: address lookup (US Census forward, Nominatim reverse), returning NormalizedAddress[] JSON.
+ */
+export const P = {
+  readBlob: procedures.readBlob,
+  geocodeAddress: procedures.geocodeAddress,
+  geocodePoint: procedures.geocodePoint,
 } as const;
 
 // Row types. VERIFY after spacetime generate: the generator's exported type names.

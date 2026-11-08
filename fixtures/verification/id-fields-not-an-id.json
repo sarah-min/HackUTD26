@@ -1,0 +1,9 @@
+{
+  "docKind": "utility_bill",
+  "fullName": "",
+  "addressText": "",
+  "isLikelyId": false,
+  "confidence": 0.2,
+  "modelId": "fixture",
+  "promptVersion": "id-document-v1"
+}

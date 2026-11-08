@@ -1,0 +1,91 @@
+{
+  "source": "fixture",
+  "description": "Synthetic FrameFindings for a wind-damaged one-story house. Not real model output.",
+  "findings": [
+    {
+      "frameIndex": 0,
+      "tSec": 0.5,
+      "usable": true,
+      "components": [
+        {
+          "component": "roof",
+          "level": "major",
+          "evidence": "Large section of shingles and decking missing over about a third of the roof",
+          "confidence": 0.86
+        },
+        {
+          "component": "yard_debris",
+          "level": "minor",
+          "evidence": "Branches and roofing debris across the front yard",
+          "confidence": 0.8
+        }
+      ],
+      "lifeSafety": [
+        {
+          "flag": "downed_power_line",
+          "evidence": "A service line hangs low across the driveway",
+          "confidence": 0.72
+        }
+      ],
+      "hazardObserved": "hurricane_wind",
+      "waterDepth": "none",
+      "caption": "Front of a one-story house with a large hole in the roof and debris in the yard."
+    },
+    {
+      "frameIndex": 1,
+      "tSec": 4.5,
+      "usable": true,
+      "components": [
+        {
+          "component": "interior",
+          "level": "minor",
+          "evidence": "Water-stained ceiling drywall sagging in the living room",
+          "confidence": 0.74
+        },
+        {
+          "component": "contents",
+          "level": "minor",
+          "evidence": "Wet sofa and rug under the ceiling leak",
+          "confidence": 0.66
+        }
+      ],
+      "lifeSafety": [],
+      "hazardObserved": "hurricane_wind",
+      "waterDepth": "ankle",
+      "caption": "Living room with a sagging, water-stained ceiling and wet furniture."
+    },
+    {
+      "frameIndex": 2,
+      "tSec": 8.5,
+      "usable": false,
+      "unusableReason": "blurry",
+      "components": [],
+      "lifeSafety": [],
+      "waterDepth": "unknown",
+      "caption": "Motion-blurred frame."
+    },
+    {
+      "frameIndex": 3,
+      "tSec": 12.5,
+      "usable": true,
+      "components": [
+        {
+          "component": "windows_doors",
+          "level": "minor",
+          "evidence": "Two front windows shattered",
+          "confidence": 0.9
+        },
+        {
+          "component": "vehicle",
+          "level": "affected",
+          "evidence": "Car in the driveway with dents from fallen branches",
+          "confidence": 0.61
+        }
+      ],
+      "lifeSafety": [],
+      "hazardObserved": "hurricane_wind",
+      "waterDepth": "none",
+      "caption": "Shattered front windows and a dented car in the driveway."
+    }
+  ]
+}

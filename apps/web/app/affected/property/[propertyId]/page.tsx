@@ -33,14 +33,12 @@ import {
   toAreaCell,
 } from '@/components/affected/helpers';
 import { useMediaUrl } from '@/components/affected/media';
-import { useVerificationCredentials } from '@/components/affected/useVerificationCredentials';
 
-function ReportThumb({ reportId, propertyId }: { reportId: bigint; propertyId: bigint }) {
+function ReportThumb({ reportId }: { reportId: bigint; propertyId?: bigint }) {
   const { frames } = useVerifiedReportData(reportId);
-  const creds = useVerificationCredentials(propertyId);
-  const url = useMediaUrl(frames[0]?.thumbKey ?? null, creds);
+  const url = useMediaUrl(frames[0]?.thumbKey ?? null);
   return url ? (
-    // eslint-disable-next-line @next/next/no-img-element -- object URL from an authorized fetch
+    // eslint-disable-next-line @next/next/no-img-element -- object URL from SpacetimeDB storage
     <img src={url} alt="" className="h-16 w-16 flex-none rounded object-cover" />
   ) : (
     <div className="h-16 w-16 flex-none rounded bg-gray-200" aria-hidden />

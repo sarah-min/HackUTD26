@@ -2,9 +2,9 @@
 // /affected/verify — demo-grade ID check (T2.9).
 // 1. generate verificationSecret → start_verification(address, docKind, sha256(secret))
 // 2. wait for our own `verification` row (matched by secret hash) → its id + property id
-// 3. POST /api/uploads/presign {kind:'idv'} → PUT the photo → submit_verification(id, objectKey)
+// 3. upload the photo into SpacetimeDB storage (begin_upload + upload_chunk) → submit_verification(id, objectKey)
 // 4. watch the row: verified → property page; failed → reason + "Try another document".
-// The ID image is deleted by the worker right after extraction (CONTRACTS §3.3); nothing is kept here.
+// The ID image is deleted right after extraction (worker + record_verification; CONTRACTS §3.3); it can never be read back.
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -13,10 +13,12 @@ import {
   R,
   generateSecret,
   idToString,
+  idvKeyFor,
   saveVerificationSecret,
   sha256Hex,
   useReducer,
   useStdb,
+  useUploadFile,
   useVerificationBySecretHash,
 } from '@/lib/stdb';
 import { DOC_KINDS, FAIL_REASON_TEXT, formatAddress, loadSelectedAddress, type DocKind } from '@/components/affected/helpers';
@@ -48,6 +50,7 @@ export default function AffectedVerifyPage() {
   const { isActive } = useStdb();
   const startVerification = useReducer(R.startVerification);
   const submitVerification = useReducer(R.submitVerification);
+  const uploadFile = useUploadFile();
 
   const [address, setAddress] = useState<NormalizedAddress | null | undefined>(undefined);
   const [docKind, setDocKind] = useState<DocKind>('drivers_license');
@@ -76,21 +79,12 @@ export default function AffectedVerifyPage() {
     setPhase('uploading');
     (async () => {
       try {
-        const presign = await fetch('/api/uploads/presign', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            kind: 'idv',
-            verificationId: idToString(row.id),
-            verificationSecret: secretRef.current,
-            contentType: file.type,
-            sizeBytes: file.size,
-          }),
-        });
-        if (!presign.ok) throw new Error('Could not start the upload.');
-        const { putUrl, objectKey } = (await presign.json()) as { putUrl: string; objectKey: string };
-        const put = await fetch(putUrl, { method: 'PUT', headers: { 'content-type': file.type }, body: file });
-        if (!put.ok) throw new Error('The upload failed.');
+        const objectKey = idvKeyFor(idToString(row.id), file.type);
+        try {
+          await uploadFile(objectKey, file);
+        } catch {
+          throw new Error('The upload failed.');
+        }
         await submitVerification({ verificationId: row.id, objectKey });
         writePending(secretHash);
         setPhase('submitted');
@@ -100,7 +94,7 @@ export default function AffectedVerifyPage() {
         uploadStarted.current = false;
       }
     })();
-  }, [phase, row, file, secretHash, submitVerification]);
+  }, [phase, row, file, secretHash, submitVerification, uploadFile]);
 
   // Step 4: react to the decision.
   useEffect(() => {

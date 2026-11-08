@@ -5,6 +5,7 @@ import { refreshAllCells } from '../cells';
 import { failAttempt, leaseExpired } from '../jobs';
 import { fail } from '../constants';
 import { purgeExpiredNotices } from '../notices';
+import { BLOB_STALE_MICROS, deleteBlob } from '../blobs';
 
 function requireScheduler(isInternal: boolean): void {
   // Scheduled reducers run as the module itself; block direct client calls.
@@ -18,6 +19,12 @@ export const requeue_expired_jobs = spacetimedb.reducer(
     requireScheduler(ctx.senderAuth.isInternal);
     for (const j of [...ctx.db.job.state.filter('leased')]) {
       if (leaseExpired(j, ctx.timestamp)) failAttempt(ctx, j, 'lease expired');
+    }
+    // Storage lifecycle: unfinished uploads, and ID images not tied to a pending verification, after 1 hour.
+    const now = ctx.timestamp.microsSinceUnixEpoch;
+    for (const b of [...ctx.db.blob.iter()]) {
+      if (now - b.created_at.microsSinceUnixEpoch < BLOB_STALE_MICROS) continue;
+      if (!b.complete || b.object_key.startsWith('idv/')) deleteBlob(ctx.db, b.object_key);
     }
   }
 );

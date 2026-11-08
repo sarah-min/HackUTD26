@@ -9,9 +9,12 @@ import { type Infer as __Infer } from "spacetimedb";
 import AdminAddServiceReducer from "../admin_add_service_reducer";
 import AskCoachReducer from "../ask_coach_reducer";
 import AttachMediaReducer from "../attach_media_reducer";
+import BeginUploadReducer from "../begin_upload_reducer";
 import ClaimJobReducer from "../claim_job_reducer";
 import CompleteJobReducer from "../complete_job_reducer";
 import CreateReportReducer from "../create_report_reducer";
+import DeleteBlobReducer from "../delete_blob_reducer";
+import PutBlobReducer from "../put_blob_reducer";
 import RecordAgentStepReducer from "../record_agent_step_reducer";
 import RecordAreaNoticesReducer from "../record_area_notices_reducer";
 import RecordAssessmentReducer from "../record_assessment_reducer";
@@ -23,13 +26,17 @@ import SaveAffectedIntakeReducer from "../save_affected_intake_reducer";
 import StartVerificationReducer from "../start_verification_reducer";
 import SubmitReportReducer from "../submit_report_reducer";
 import SubmitVerificationReducer from "../submit_verification_reducer";
+import UploadChunkReducer from "../upload_chunk_reducer";
 
 export type AdminAddServiceParams = __Infer<typeof AdminAddServiceReducer>;
 export type AskCoachParams = __Infer<typeof AskCoachReducer>;
 export type AttachMediaParams = __Infer<typeof AttachMediaReducer>;
+export type BeginUploadParams = __Infer<typeof BeginUploadReducer>;
 export type ClaimJobParams = __Infer<typeof ClaimJobReducer>;
 export type CompleteJobParams = __Infer<typeof CompleteJobReducer>;
 export type CreateReportParams = __Infer<typeof CreateReportReducer>;
+export type DeleteBlobParams = __Infer<typeof DeleteBlobReducer>;
+export type PutBlobParams = __Infer<typeof PutBlobReducer>;
 export type RecordAgentStepParams = __Infer<typeof RecordAgentStepReducer>;
 export type RecordAreaNoticesParams = __Infer<typeof RecordAreaNoticesReducer>;
 export type RecordAssessmentParams = __Infer<typeof RecordAssessmentReducer>;
@@ -41,4 +48,5 @@ export type SaveAffectedIntakeParams = __Infer<typeof SaveAffectedIntakeReducer>
 export type StartVerificationParams = __Infer<typeof StartVerificationReducer>;
 export type SubmitReportParams = __Infer<typeof SubmitReportReducer>;
 export type SubmitVerificationParams = __Infer<typeof SubmitVerificationReducer>;
+export type UploadChunkParams = __Infer<typeof UploadChunkReducer>;
 

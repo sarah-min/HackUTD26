@@ -1,0 +1,10 @@
+{
+  "docKind": "drivers_license",
+  "fullName": "SAMPLE SPECIMEN",
+  "addressText": "1234 MAIN STREET, DALLAS, TX 75201",
+  "expiration": "2030-01-31",
+  "isLikelyId": true,
+  "confidence": 0.93,
+  "modelId": "fixture",
+  "promptVersion": "id-document-v1"
+}
