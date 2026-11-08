@@ -534,17 +534,18 @@ All arithmetic is integer cents with Math.round at each multiplication. Never ac
 >   (`useReadFile()` / `useFileObjectUrl()`). Worker: anything. Verified resident: `media/` and `frames/` of their property.
 >   `idv/` is never readable by a client; `record_verification` deletes it, and unfinished uploads and leftover ID images
 >   are purged after 1 hour.
+> - Caps (2026-11-08): a report accepts at most 9 media files and 60 MB total per round (a re-shoot gets a fresh budget); a verification accepts at most 3 `idv/` files. Completed `media/` files never attached to a report are purged after 1 hour.
 > - Address lookup: procedures `geocode_address({q})` (Census) and `geocode_point({lat, lng})` (Nominatim, 1 request /
 >   1.1 s across all users; `error: 'busy'` means retry) → `{ok, error, addressesJson}` (NormalizedAddress[] JSON).
 
 
 | Method + path | Owner | Auth | Request | Response |
 |---|---|---|---|---|
-| `GET /api/geocode?q=<address>` | P2 | none (rate limited per IP) | — | `NormalizedAddress[]` via the US Census Geocoder (`source='census'`) |
-| `GET /api/geocode?lat=&lng=` | P2 | none (rate limited, ≤ 1 upstream req/s) | — | `NormalizedAddress[]` via Nominatim reverse (`source='nominatim'`) |
-| `POST /api/uploads/presign` (kind `media`) | P4 | `reporterSecret` in the body; the route checks `sha256 == report_private.reporter_secret_hash` via a service read | `{ kind:'media', reportId, reporterSecret, contentType: 'video/mp4'|'video/quicktime'|'image/jpeg'|'image/png'|'image/webp', sizeBytes, sha256 }` | `{ putUrl, objectKey, expiresAt }`. Rejects > 200 MB video / 15 MB image |
-| `POST /api/uploads/presign` (kind `idv`) | P4 | `verificationSecret`; checked against `verification.secret_hash`; state must be `pending` | `{ kind:'idv', verificationId, verificationSecret, contentType: 'image/jpeg'|'image/png'|'image/webp', sizeBytes }` | `{ putUrl, objectKey: 'idv/<verificationId>/<uuid>.<ext>', expiresAt }`. Max 15 MB; images only |
-| `GET /api/media/[...key]` | P4 | header `x-verification-id` + `x-verification-secret`; the verification must be `verified`, and the key must belong to a report on that verification's property | — | 302 to a presigned GET (10 min). **Always 403 for `idv/` keys.** Reporters have no media access |
+| ~~`GET /api/geocode?q=<address>`~~ **(replaced by the `geocode_address` procedure)** | P2 | none (rate limited per IP) | — | `NormalizedAddress[]` via the US Census Geocoder (`source='census'`) |
+| ~~`GET /api/geocode?lat=&lng=`~~ **(replaced by `geocode_point`)** | P2 | none (rate limited, ≤ 1 upstream req/s) | — | `NormalizedAddress[]` via Nominatim reverse (`source='nominatim'`) |
+| ~~`POST /api/uploads/presign` (kind `media`)~~ **(replaced by `begin_upload` + `upload_chunk`)** | P4 | `reporterSecret` in the body; the route checks `sha256 == report_private.reporter_secret_hash` via a service read | `{ kind:'media', reportId, reporterSecret, contentType: 'video/mp4'|'video/quicktime'|'image/jpeg'|'image/png'|'image/webp', sizeBytes, sha256 }` | `{ putUrl, objectKey, expiresAt }`. Rejects > 200 MB video / 15 MB image |
+| ~~`POST /api/uploads/presign` (kind `idv`)~~ **(replaced by `begin_upload` + `upload_chunk`)** | P4 | `verificationSecret`; checked against `verification.secret_hash`; state must be `pending` | `{ kind:'idv', verificationId, verificationSecret, contentType: 'image/jpeg'|'image/png'|'image/webp', sizeBytes }` | `{ putUrl, objectKey: 'idv/<verificationId>/<uuid>.<ext>', expiresAt }`. Max 15 MB; images only |
+| ~~`GET /api/media/[...key]`~~ **(replaced by the `read_blob` procedure)** | P4 | header `x-verification-id` + `x-verification-secret`; the verification must be `verified`, and the key must belong to a report on that verification's property | — | 302 to a presigned GET (10 min). **Always 403 for `idv/` keys.** Reporters have no media access |
 | `GET /api/health` | P4 | none | — | `{ ok, web: true, stdb: bool, storage: bool, version }` |
 | `GET /api/private/[...]` | P2 | reporter or verification secret | — | **Only if the §5 visibility fallback is chosen.** Returns exactly the rows the "Readable by" column allows |
 
