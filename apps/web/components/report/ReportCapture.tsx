@@ -2,11 +2,11 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import type { Hazard } from '@hack/contracts/common';
 import type { NormalizedAddress } from '@hack/contracts/property';
 import { CreateReportInputSchema } from '@hack/contracts/report';
-import { AppHeader } from '@/components/chrome/AppHeader';
+import { AppShell } from '@/components/chrome/AppShell';
 import { Banner911 } from '@/components/safety';
 import {
   P,
@@ -21,14 +21,14 @@ import {
 } from '@/lib/stdb';
 import { useProcedure } from 'spacetimedb/react';
 import { HAZARD_OPTIONS } from './hazardOptions';
+import { useReporterEvidence, validateEvidence } from './useReporterEvidence';
 
-type Phase = 'form' | 'creating' | 'error';
+type Phase = 'form' | 'creating' | 'uploading' | 'error';
 type GeocodeQuery = { q: string } | { lat: number; lng: number };
 type GeocodeResult = { ok: boolean; error: string; addressesJson: string };
 
-const CREATE_TIMEOUT_MS = 15_000;
+const CREATE_TIMEOUT_MS = 20_000;
 
-/** Address lookup in the SpacetimeDB module (geocode_address / geocode_point). */
 async function geocode(
   query: GeocodeQuery,
   forward: (a: { q: string }) => Promise<GeocodeResult>,
@@ -53,7 +53,7 @@ function formatAddress(a: NormalizedAddress): string {
   return `${a.line1}, ${a.city}, ${a.state} ${a.zip}`;
 }
 
-/** Live createReport capture. Media attach/submit can use SpacetimeDB blobs next. */
+/** Live createReport + SpacetimeDB evidence upload + submitReport (P3). */
 export function ReportCapture() {
   const router = useRouter();
   const params = useSearchParams();
@@ -62,6 +62,7 @@ export function ReportCapture() {
   const forward = useProcedure(P.geocodeAddress);
   const reverse = useProcedure(P.geocodePoint);
   const { rows: myReports, ready: reportsReady } = useMyReports();
+  const { uploadAttachSubmit } = useReporterEvidence();
 
   const [hazard, setHazard] = useState<Hazard>('flood');
   const [selfDanger, setSelfDanger] = useState(false);
@@ -72,17 +73,22 @@ export function ReportCapture() {
   const [suggestions, setSuggestions] = useState<NormalizedAddress[]>([]);
   const [deviceLat, setDeviceLat] = useState<number | undefined>();
   const [deviceLng, setDeviceLng] = useState<number | undefined>();
+  const [files, setFiles] = useState<File[]>([]);
+  const [uploadLabel, setUploadLabel] = useState('');
+  const [uploadFrac, setUploadFrac] = useState(0);
   const [geoBusy, setGeoBusy] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>('form');
   const [error, setError] = useState<string | null>(null);
 
   const pendingSecret = useRef<string | null>(null);
+  const pendingFiles = useRef<File[]>([]);
   const knownIds = useRef<Set<string> | null>(null);
   const gpsTried = useRef(false);
   const prefillTried = useRef(false);
+  const finishStarted = useRef(false);
+  const fileInput = useRef<HTMLInputElement>(null);
 
-  // Film-it-yourself / self-report deep link: ?self=1&address=
   useEffect(() => {
     if (prefillTried.current) return;
     prefillTried.current = true;
@@ -147,28 +153,56 @@ export function ReportCapture() {
     );
   }, [params, forward, reverse]);
 
-  // After createReport, the new draft appears in myReports — save secret and open status.
+  // After createReport: upload evidence, attach_media, submit_report, then open status.
   useEffect(() => {
     if (phase !== 'creating' || !pendingSecret.current || !knownIds.current || !reportsReady) return;
+    if (finishStarted.current) return;
     const fresh = myReports.find((r) => !knownIds.current!.has(idToString(r.report.id)));
     if (!fresh) return;
-    const id = idToString(fresh.report.id);
-    saveReporterSecret(id, pendingSecret.current);
-    const self = isSelfReport;
-    const addr = address ? formatAddress(address) : '';
+    finishStarted.current = true;
+    const id = fresh.report.id;
+    const idStr = idToString(id);
+    saveReporterSecret(idStr, pendingSecret.current);
     pendingSecret.current = null;
     knownIds.current = null;
-    if (self && addr) {
-      router.replace(`/report/${id}?self=1&address=${encodeURIComponent(addr)}`);
-    } else {
-      router.replace(`/report/${id}`);
-    }
-  }, [phase, myReports, reportsReady, router, isSelfReport, address]);
+    const self = isSelfReport;
+    const addr = address ? formatAddress(address) : '';
+    const evidence = pendingFiles.current;
+    setPhase('uploading');
+    void (async () => {
+      try {
+        await uploadAttachSubmit(id, evidence, (label, frac) => {
+          setUploadLabel(label);
+          setUploadFrac(frac);
+        });
+        if (self && addr) {
+          router.replace(`/report/${idStr}?self=1&address=${encodeURIComponent(addr)}`);
+        } else {
+          router.replace(`/report/${idStr}`);
+        }
+      } catch (e) {
+        setPhase('error');
+        setError(
+          e instanceof Error
+            ? `${e.message} Your draft may still be under My submissions (id ${idStr}).`
+            : 'Upload failed after creating the draft.',
+        );
+      }
+    })();
+  }, [
+    phase,
+    myReports,
+    reportsReady,
+    router,
+    isSelfReport,
+    address,
+    uploadAttachSubmit,
+  ]);
 
-  // Timeout if the new row never appears.
   useEffect(() => {
     if (phase !== 'creating') return;
     const t = window.setTimeout(() => {
+      if (finishStarted.current) return;
       pendingSecret.current = null;
       knownIds.current = null;
       setPhase('error');
@@ -197,6 +231,14 @@ export function ReportCapture() {
     }
   }
 
+  function onPickFiles(event: ChangeEvent<HTMLInputElement>) {
+    const list = [...(event.target.files ?? [])];
+    setFiles(list);
+    const v = validateEvidence(list);
+    if (v && list.length > 0) setError(v);
+    else if (error && error.startsWith('Add a photo')) setError(null);
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -206,6 +248,11 @@ export function ReportCapture() {
     }
     if (!address) {
       setError('Confirm an address before submitting.');
+      return;
+    }
+    const evidenceErr = validateEvidence(files);
+    if (evidenceErr) {
+      setError(evidenceErr);
       return;
     }
 
@@ -228,23 +275,24 @@ export function ReportCapture() {
 
     knownIds.current = new Set(myReports.map((r) => idToString(r.report.id)));
     pendingSecret.current = secret;
+    pendingFiles.current = files;
+    finishStarted.current = false;
     setPhase('creating');
     try {
       await createReport({ inputJson: JSON.stringify(parsed.data) });
     } catch (err) {
       pendingSecret.current = null;
       knownIds.current = null;
+      pendingFiles.current = [];
       setPhase('error');
       setError(err instanceof Error ? err.message : 'Could not create the report.');
     }
   }
 
-  return (
-    <div className="min-h-screen bg-slate-200 text-slate-900">
-      <div className="mx-auto min-h-screen max-w-[480px] bg-[#f5f7fa] shadow-[0_0_45px_rgba(15,23,42,0.12)]">
-        <AppHeader dense />
+  const busy = phase === 'creating' || phase === 'uploading';
 
-        <main className="space-y-3 px-3.5 py-3.5 pb-8">
+  return (
+    <AppShell>
           {selfDanger ? <Banner911 reason="You flagged that someone may be in danger on scene." /> : null}
 
           <form
@@ -274,6 +322,7 @@ export function ReportCapture() {
                     onClick={() => setHazard(item.value)}
                     type="button"
                     aria-pressed={hazard === item.value}
+                    disabled={busy}
                   >
                     {item.label}
                   </button>
@@ -290,6 +339,7 @@ export function ReportCapture() {
                   className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-2.5 text-[13px] outline-none focus:border-blue-500"
                   id="addr"
                   value={addressQuery}
+                  disabled={busy}
                   onChange={(ev) => {
                     setAddressQuery(ev.target.value);
                     setAddress(null);
@@ -298,7 +348,7 @@ export function ReportCapture() {
                 />
                 <button
                   className="shrink-0 rounded-xl bg-slate-900 px-3 py-2 text-[12px] font-bold text-white disabled:opacity-50"
-                  disabled={geoBusy}
+                  disabled={geoBusy || busy}
                   onClick={() => void searchAddress()}
                   type="button"
                 >
@@ -319,6 +369,7 @@ export function ReportCapture() {
                               ? 'border-blue-600 bg-blue-50 font-semibold text-blue-900'
                               : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-blue-300'
                           }`}
+                          disabled={busy}
                           onClick={() => {
                             setAddress(s);
                             setAddressQuery(label);
@@ -343,13 +394,14 @@ export function ReportCapture() {
                 className={`relative h-6 w-11 shrink-0 rounded-full transition ${
                   selfDanger ? 'bg-red-600' : 'bg-slate-300'
                 }`}
+                disabled={busy}
                 onClick={() => setSelfDanger((v) => !v)}
                 role="switch"
                 type="button"
               >
                 <span
-                  className={`absolute top-1 size-4 rounded-full bg-white shadow-sm transition-transform ${
-                    selfDanger ? 'translate-x-6' : 'translate-x-1'
+                  className={`absolute top-1 left-1 size-4 rounded-full bg-white shadow-sm transition-transform ${
+                    selfDanger ? 'translate-x-5' : 'translate-x-0'
                   }`}
                 />
               </button>
@@ -364,6 +416,7 @@ export function ReportCapture() {
               </label>
               <input
                 className="w-full rounded-xl border border-slate-200 px-3.5 py-3 text-[13px] outline-none focus:border-blue-500"
+                disabled={busy}
                 id="notes"
                 maxLength={500}
                 onChange={(ev) => setNotes(ev.target.value)}
@@ -372,29 +425,67 @@ export function ReportCapture() {
               />
             </div>
 
+            <div className="mt-4">
+              <p className="mb-2 text-[12px] font-semibold text-slate-700">Evidence</p>
+              <input
+                accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime"
+                className="sr-only"
+                disabled={busy}
+                multiple
+                onChange={onPickFiles}
+                ref={fileInput}
+                type="file"
+              />
+              <button
+                className="w-full rounded-2xl border border-dashed border-blue-300 bg-blue-50/60 px-4 py-4 text-left transition hover:border-blue-500 hover:bg-blue-50 disabled:opacity-60"
+                disabled={busy}
+                onClick={() => fileInput.current?.click()}
+                type="button"
+              >
+                <span className="block text-[13px] font-bold text-slate-800">
+                  {files.length === 0
+                    ? 'Record video or add photos'
+                    : files.length === 1
+                      ? files[0]!.name
+                      : `${files.length} files selected`}
+                </span>
+                <span className="mt-0.5 block text-[11px] text-slate-500">
+                  One MP4/MOV (≤200 MB) or up to 8 photos — required to queue analysis
+                </span>
+              </button>
+            </div>
+
             <label className="mt-4 flex cursor-pointer items-center gap-3">
               <button
                 aria-checked={isSelfReport}
                 className={`relative h-6 w-11 shrink-0 rounded-full transition ${
                   isSelfReport ? 'bg-blue-700' : 'bg-slate-300'
                 }`}
+                disabled={busy}
                 onClick={() => setIsSelfReport((v) => !v)}
                 role="switch"
                 type="button"
               >
                 <span
-                  className={`absolute top-1 size-4 rounded-full bg-white shadow-sm transition-transform ${
-                    isSelfReport ? 'translate-x-6' : 'translate-x-1'
+                  className={`absolute top-1 left-1 size-4 rounded-full bg-white shadow-sm transition-transform ${
+                    isSelfReport ? 'translate-x-5' : 'translate-x-0'
                   }`}
                 />
               </button>
               <span className="text-[13px] font-medium text-slate-700">Is this your property?</span>
             </label>
 
-            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-950">
-              Saves a <strong>draft</strong> now. Attach photo/video and submit in a follow-up step —
-              you can still file the location and hazard details today.
-            </div>
+            {phase === 'uploading' ? (
+              <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 px-3 py-3 text-[12px] text-blue-950">
+                <p className="font-semibold">{uploadLabel || 'Uploading…'}</p>
+                <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-blue-100">
+                  <span
+                    className="block h-full rounded-full bg-blue-600 transition-[width]"
+                    style={{ width: `${Math.round(uploadFrac * 100)}%` }}
+                  />
+                </span>
+              </div>
+            ) : null}
 
             {(error || connError) && (
               <div className="mt-3 space-y-2">
@@ -411,14 +502,16 @@ export function ReportCapture() {
 
             <button
               className="mt-4 w-full rounded-xl bg-blue-700 px-4 py-3.5 text-[14px] font-bold text-white disabled:opacity-60"
-              disabled={phase === 'creating' || !address}
+              disabled={busy || !address || files.length === 0}
               type="submit"
             >
-              {phase === 'creating' ? 'Creating draft…' : 'Create draft report'}
+              {phase === 'creating'
+                ? 'Creating report…'
+                : phase === 'uploading'
+                  ? 'Uploading evidence…'
+                  : 'Submit field report'}
             </button>
           </form>
-        </main>
-      </div>
-    </div>
+    </AppShell>
   );
 }

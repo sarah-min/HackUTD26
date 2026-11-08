@@ -21,7 +21,7 @@ import {
   type ReportRow,
 } from '@/lib/stdb';
 import { Banner911, CellMap } from '@/components/affected/external';
-import { AppHeader } from '@/components/chrome/AppHeader';
+import { AppShell } from '@/components/chrome/AppShell';
 import {
   DAMAGE_LEVEL_TEXT,
   STATUS_TEXT,
@@ -40,10 +40,10 @@ function ReportThumb({ reportId }: { reportId: bigint }) {
   const url = useMediaUrl(frames[0]?.thumbKey ?? null);
   if (url) {
     // eslint-disable-next-line @next/next/no-img-element -- object URL from SpacetimeDB storage
-    return <img src={url} alt="" className="h-16 w-16 flex-none rounded object-cover" />;
+    return <img src={url} alt="" className="h-14 w-14 flex-none rounded-lg object-cover" />;
   }
   return (
-    <div className="grid h-16 w-16 flex-none place-items-center rounded bg-gray-200 px-1 text-center text-[9px] leading-tight text-gray-500">
+    <div className="grid h-14 w-14 flex-none place-items-center rounded-lg bg-slate-200 px-1 text-center text-[9px] leading-tight text-slate-500">
       {frames[0] ? '…' : 'No photo'}
     </div>
   );
@@ -55,18 +55,26 @@ function ReportItem({ r }: { r: ReportRow }) {
     <li>
       <Link
         href={`/affected/report/${idToString(r.id)}`}
-        className="flex items-center gap-3 rounded-lg border p-3 hover:bg-gray-50"
+        className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 hover:border-blue-300"
       >
         <ReportThumb reportId={r.id} />
         <div className="min-w-0 flex-1">
-          <p className="font-medium">{DAMAGE_LEVEL_TEXT[parseLevel(r.overallLevel)]}</p>
-          <p className="text-sm text-gray-600">
+          <p className="text-[13px] font-bold text-slate-900">
+            {DAMAGE_LEVEL_TEXT[parseLevel(r.overallLevel)]}
+          </p>
+          <p className="text-[11px] text-slate-500">
             {r.hazard.replace(/_/g, ' ')} · {new Date(timestampToMs(r.createdAt)).toLocaleString()}
           </p>
-          <p className="text-xs text-gray-500">
+          <p className="text-[11px] text-slate-500">
             {STATUS_TEXT[r.status] ?? r.status}
-            {flags.length > 0 && <span className="ml-2 font-medium text-red-700">⚠ {flags.length} hazard(s)</span>}
-            {r.source !== 'live' && <span className="ml-2 rounded bg-gray-200 px-1">{r.source}</span>}
+            {flags.length > 0 && (
+              <span className="ml-2 font-semibold text-red-700">⚠ {flags.length} hazard(s)</span>
+            )}
+            {r.source !== 'live' && (
+              <span className="ml-2 rounded bg-slate-100 px-1 text-[10px] font-bold uppercase text-slate-600">
+                {r.source}
+              </span>
+            )}
           </p>
         </div>
       </Link>
@@ -87,7 +95,6 @@ export default function AffectedPropertyPage() {
   const { cells: cellRows } = useAreaCells(cellIds);
   const cells = useMemo(() => cellRows.map(toAreaCell), [cellRows]);
 
-  // Own pin: exact geocode when verified; otherwise only the address this device entered.
   const entered = useMemo(() => loadSelectedAddress(), []);
   const ownPin = useMemo(() => {
     if (verified && propertyPrivate?.lat != null && propertyPrivate.lng != null)
@@ -97,8 +104,6 @@ export default function AffectedPropertyPage() {
   }, [verified, propertyPrivate, entered]);
   const center = ownPin ?? (property ? cellCenter(property.cellId) : null);
 
-  // Banner: public area notices for the county (everyone) merged with the newest assessed
-  // report's alerts/declarations (verified only, listed first).
   const newestAssessed = reports.find((r) => r.status === 'assessed');
   const { assessment } = useVerifiedReportData(newestAssessed?.id ?? null);
   const { notices: publicNotices } = useAreaNotices(propertyId);
@@ -108,67 +113,99 @@ export default function AffectedPropertyPage() {
   );
   const anyHazard = reports.some((r) => r.selfDanger || parseFlagsCsv(r.lifeSafetyCsv).length > 0);
 
-  if (propertyId === null) return <main className="px-4 py-6">That link isn't valid.</main>;
-  if (!propReady || !verReady) return <main className="px-4 py-6 text-gray-600">Loading…</main>;
-  if (!property) return <main className="px-4 py-6">We couldn't find that property.</main>;
+  if (propertyId === null) {
+    return (
+      <AppShell>
+        <p className="text-[13px] text-slate-700">That link isn&apos;t valid.</p>
+      </AppShell>
+    );
+  }
+  if (!propReady || !verReady) {
+    return (
+      <AppShell>
+        <p className="text-sm text-slate-600">Loading…</p>
+      </AppShell>
+    );
+  }
+  if (!property) {
+    return (
+      <AppShell>
+        <p className="text-[13px] text-slate-700">We couldn&apos;t find that property.</p>
+      </AppShell>
+    );
+  }
 
-  const addressLine = verified && propertyPrivate ? formatAddress(propertyPrivate) : entered ? formatAddress(entered) : null;
+  const addressLine =
+    verified && propertyPrivate
+      ? formatAddress(propertyPrivate)
+      : entered
+        ? formatAddress(entered)
+        : null;
 
   return (
-    <div className="min-h-screen bg-[#eef1f5]">
-      <AppHeader dense />
-    <main className="mx-auto max-w-2xl space-y-5 px-4 py-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold">Your home</h1>
-        {addressLine && <p className="text-sm text-gray-600">{addressLine}</p>}
+    <AppShell>
+      <header>
+        <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-blue-700">Affected</p>
+        <h1 className="mt-0.5 text-lg font-bold tracking-[-0.02em] text-slate-950">Your home</h1>
+        {addressLine ? <p className="mt-1 text-[12px] text-slate-500">{addressLine}</p> : null}
       </header>
 
-      {verified && anyHazard && <Banner911 reason="Footage of your home shows a possible life-safety hazard." />}
+      {verified && anyHazard ? (
+        <Banner911 reason="Footage of your home shows a possible life-safety hazard." />
+      ) : null}
 
-      {notices.length > 0 && (
-        <section aria-label="Area notices" className="space-y-1 rounded-lg bg-blue-50 p-3 text-sm text-blue-900">
+      {notices.length > 0 ? (
+        <section
+          aria-label="Area notices"
+          className="space-y-1 rounded-2xl border border-blue-100 bg-blue-50 p-3 text-[12px] text-blue-900"
+        >
           {notices.map((n) => (
             <p key={n.key}>
               {n.text}
-              {n.url && (
-                <a href={n.url} target="_blank" rel="noreferrer" className="ml-1 underline">
+              {n.url ? (
+                <a href={n.url} target="_blank" rel="noreferrer" className="ml-1 font-semibold underline">
                   Source
                 </a>
-              )}
+              ) : null}
             </p>
           ))}
         </section>
-      )}
+      ) : null}
 
-      {!verified && (
-        <section className="space-y-2 rounded-lg border p-4">
-          <p className="font-medium">Verify your ID to see reports for your home.</p>
-          <p className="text-sm text-gray-600">Until then you can see what's happening in your area.</p>
-          <Link href="/affected/verify" className="inline-block rounded-lg bg-black px-4 py-2 font-medium text-white">
+      {!verified ? (
+        <section className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4">
+          <p className="text-[13px] font-bold text-slate-900">
+            Verify your ID to see reports for your home.
+          </p>
+          <p className="text-[12px] text-slate-500">Until then you can see what&apos;s happening in your area.</p>
+          <Link
+            href="/affected/verify"
+            className="block rounded-xl bg-blue-700 px-4 py-3 text-center text-[13px] font-bold text-white"
+          >
             Verify
           </Link>
         </section>
-      )}
+      ) : null}
 
-      {verified && (
-        <section className="space-y-3">
+      {verified ? (
+        <section className="space-y-2">
           <div className="flex items-baseline justify-between gap-3">
-            <h2 className="text-lg font-semibold">Reports for your home</h2>
+            <h2 className="text-[13px] font-bold text-slate-900">Reports for your home</h2>
             {newestAssessed ? (
-              <span
-                className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-500"
-                title="Recovery Navigator ships with Part 4"
+              <Link
+                href={`/affected/property/${idToString(propertyId)}/recovery`}
+                className="shrink-0 rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-bold text-blue-800"
               >
-                Recovery coming soon
-              </span>
+                Recovery Navigator
+              </Link>
             ) : null}
           </div>
           {reports.length === 0 ? (
-            <div className="space-y-2 rounded-lg border p-4">
-              <p>No reports for your address yet.</p>
+            <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4">
+              <p className="text-[13px] text-slate-700">No reports for your address yet.</p>
               <Link
                 href={`/report/new?self=1&address=${encodeURIComponent(addressLine ?? '')}`}
-                className="inline-block rounded-lg bg-black px-4 py-2 font-medium text-white"
+                className="block rounded-xl bg-blue-700 px-4 py-3 text-center text-[13px] font-bold text-white"
               >
                 Film it yourself
               </Link>
@@ -181,31 +218,35 @@ export default function AffectedPropertyPage() {
             </ul>
           )}
         </section>
-      )}
+      ) : null}
 
       <section className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Recent reports in your area</h2>
-          <div role="group" aria-label="Map shading" className="flex overflow-hidden rounded-lg border text-sm">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-[13px] font-bold text-slate-900">Recent reports in your area</h2>
+          <div
+            role="group"
+            aria-label="Map shading"
+            className="flex overflow-hidden rounded-lg border border-slate-200 text-[11px] font-semibold"
+          >
             {(['damage', 'hazards'] as const).map((m) => (
               <button
                 key={m}
                 type="button"
                 aria-pressed={mode === m}
                 onClick={() => setMode(m)}
-                className={`px-3 py-1 ${mode === m ? 'bg-black text-white' : ''}`}
+                className={`px-2.5 py-1 ${mode === m ? 'bg-slate-900 text-white' : 'bg-white text-slate-600'}`}
               >
                 {m === 'damage' ? 'Damage' : 'Hazards'}
               </button>
             ))}
           </div>
         </div>
-        {center && <CellMap center={center} ownPin={ownPin} cells={cells} mode={mode} />}
-        <p className="text-xs text-gray-500">
-          Last 72 hours, about 1 km around your home. Reports are grouped into ~250 m squares so no individual home is shown.
+        {center ? <CellMap center={center} ownPin={ownPin} cells={cells} mode={mode} /> : null}
+        <p className="text-[11px] text-slate-500">
+          Last 72 hours, about 1 km around your home. Reports are grouped into ~250 m squares so no
+          individual home is shown.
         </p>
       </section>
-    </main>
-    </div>
+    </AppShell>
   );
 }

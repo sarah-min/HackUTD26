@@ -13,9 +13,10 @@
   "dependencies": {
     "@hack/address": "workspace:*",
     "@hack/contracts": "workspace:*",
+    "@hack/damage": "workspace:*",
     "@hack/finance": "workspace:*",
-    "@hack/storage": "workspace:*",
     "@hack/stdb-bindings": "workspace:*",
+    "@hack/storage": "workspace:*",
     "leaflet": "1.9.4",
     "next": "16.0.1",
     "react": "19.1.0",

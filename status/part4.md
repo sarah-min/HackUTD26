@@ -4,9 +4,17 @@ Owner: Roselyn. Append-only, newest entry first. Format is in [STATUS.md](../STA
 
 ## Requests to other parts (open)
 
-- **P3 (Nemotron / Brev):** Take hosting — Brev (not Vultr), `infra/**` / compose / Dockerfiles / deploy. Update ARCHITECTURE.md / IDEA.md / README / DEMO / SOURCES / STATUS checklist that still say Vultr. Provide the live HTTPS URL and whichever S3-compatible bucket endpoint the app should use. Register P4 `plan`/`coach` handlers when ready.
-- **P2:** Flip `external.ts` RecoverySummaryCard → `@/components/finance`. Confirm web identity `c20031dd…bf61` registered as `web`.
-- **P1:** Workspace members `@hack/finance` + `@hack/storage`.
+- **P3 (Nemotron / Brev):** Register `planHandler` and `coachHandler` from `@hack/finance` in `apps/worker/src/handlers/index.ts` (one import + one registry line each). Hosting stays Brev. Live HTTPS URL when ready.
+- **P2:** Confirm web identity registered as `web` if any legacy `/api/*` auth is kept. `RecoverySummaryCard` is already flipped on reconcile-p4.
+- **P1:** Confirm workspace members `@hack/finance` + `@hack/storage` + `@hack/damage` on main.
+
+## 2026-11-08 06:20: Recovery Navigator UI + plan/coach handlers (branch reconcile-p4)
+
+- **Shipped:** `/affected/property/[propertyId]/recovery` with intake → client `buildRecoveryPlan` / `simulate` what-if → indicators, gap, SVG forecast, funding options, grounded coach. Live `<RecoverySummaryCard>` reads `my_recovery_plans`. Exported `planHandler` / `coachHandler` from `@hack/finance` for P3 to register. Property page CTA to Recovery Navigator.
+- **Verify:** `pnpm --filter @hack/finance typecheck && pnpm --filter @hack/finance test && pnpm --filter @hack/web typecheck`. Open a verified property with an assessed report → Recovery Navigator → Build recovery plan → move what-if sliders.
+- **Fixtures still faked:** Personas are synthetic; coach replies are plan-grounded templates until the worker registers the handlers and (optionally) NIM. Presign/S3 paths remain unused (SpacetimeDB blobs).
+- **Requests to other parts:** see open list (P3 register handlers).
+- **Blocked on:** assessed report + verified identity for a full live walkthrough; worker registration for persisted `recovery_plan` rows.
 
 ## 2026-11-07 19:50: Drop Vultr from P4; hand hosting to P3/Brev (branch part4/finance-contracts)
 
