@@ -1,0 +1,10 @@
+{
+  "description": "Helps on-scene reporters submit geolocated disaster damage photos or videos, track AI-assisted assessments, and flag urgent hazards for response teams.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

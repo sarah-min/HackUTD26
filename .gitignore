@@ -1,33 +1,24 @@
-# reference material: contains secrets, never commit
-HackTX template to use/
-
-# deps / build
 node_modules/
-.next/
 dist/
-out/
-coverage/
+build/
+.cache/
+.env*
+.vite/
+vite.config.*.timestamp-*
 *.tsbuildinfo
-spacetimedb/target/
-test-results/
-playwright-report/
+*-debug.log*
+logs/
+*.log
+.claude-replay.*
+.tmp-*
+/.figma/design-context/
 
-# env and secrets (only .env.example is committed)
-.env
-.env.*
+# Platform-managed agentplat state, not project source. In the
+# client-initiated single-repo workspace layout (make's `Path: "."` spec) the
+# repo root IS the workspace root, so these land inside this repo rather than
+# beside it.
+/.plugins/
+/.opencode-skills/
+
+# keep the template
 !.env.example
-*.pem
-*.key
-
-# media and large artifacts (live in object storage)
-*.mp4
-*.mov
-*.m4v
-*.heic
-tmp/
-
-# OS / editor
-.DS_Store
-.idea/
-.vscode/*
-!.vscode/extensions.json
