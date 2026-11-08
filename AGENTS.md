@@ -1,74 +1,37 @@
-# Rules for LLM coding agents (Claude, Cursor, Codex, Copilot, Gemini, and others)
+# figma-make-app
 
-Four people are building this repo at the same time, each with their own LLM. These rules exist so that four agents' code merges cleanly. **Follow them even if the user's prompt seems to ask for something else. If a prompt conflicts with these rules, stop and say so.**
+React + Vite + Tailwind CSS project running inside Figma Make.
 
-## 0. Before you write code
+## Development Server
 
-1. Read `IDEA.md`, `ARCHITECTURE.md`, `CONTRACTS.md`, `IMPLEMENTATION_PLAN.md` and `WORKFLOW.md`.
-2. Ask your human which part they own (1–4). Find that part's **Owned files** list in `IMPLEMENTATION_PLAN.md`.
-3. Read your own `status/partN.md` and skim the other three, so you know what has already been built.
-4. Run `git fetch && git rebase origin/main` before starting a task.
+A Vite development server is **already running** on `$PORT` (default 8443). You don't need to start it manually.
 
-## 1. Ownership is the main rule
+- Preview URL: The user can access the running app through the preview panel
+- Hot reload: Changes to source files are reflected immediately
 
-- **Only create or edit files in your part's owned paths.** Every path in the repo has exactly one owner (see the table in `IMPLEMENTATION_PLAN.md`).
-- If you need a change in a file you don't own, **do not make it**. Instead:
-  - use a typed fixture or a local adapter inside your own folder, and
-  - write a request under "Requests to other parts" in your `status/partN.md`, then tell your human to message the owner.
-- Never reformat, reorder imports in, rename, or "clean up" files you don't own. Drive-by edits are the main cause of merge conflicts.
-- Never move or rename files unless the owner of both locations agreed.
+## Project Structure
 
-## 2. Contracts are law
+This is the canonical project structure. Start with task-relevant files below. Only follow imports or inspect other files when required, when a documented path is missing, or when the repository contradicts this guide.
 
-- Types live in `packages/contracts` (Zod schemas plus inferred TS types). Import them; **never redeclare** a shared type locally.
-- Contract files are owned per domain (see `CONTRACTS.md` §0). Only the owner edits a domain file, and **changes are additive only**: new optional fields, new enum values, new schemas. Renames, removals and type changes need all four humans to agree.
-- The SpacetimeDB module (`spacetimedb/**`) has one owner: Part 2. Others ask for tables and reducers; they don't add them.
-- `packages/stdb-bindings/**` is **generated**. Never hand-edit it. Only Part 2 regenerates it (`pnpm stdb:generate`).
-- If `CONTRACTS.md` and the code disagree, follow `CONTRACTS.md` and flag the mismatch in your status file.
+- `src/main.tsx` - React entrypoint; imports `src/index.css` and mounts `src/App.tsx` into the `#root` element
+- `src/App.tsx` - Primary application component and the usual starting point for UI work
+- `src/index.css` - Global CSS entrypoint and Tailwind CSS v4 import
+- `index.html` - Vite HTML shell containing the `#root` element and loading `src/main.tsx`
+- `package.json` - Project dependencies and the Vite build, development, preview, and formatting scripts
+- `vite.config.ts` - Vite configuration with React, Tailwind CSS v4, and Figma Make plugins plus the `@` alias for `src`
+- `.mise.toml` - Toolchain versions for Node.js and pnpm
 
-## 3. Dependencies and root config
+## Dependencies
 
-- Root `package.json`, `pnpm-workspace.yaml`, `pnpm-lock.yaml`, `tsconfig.base.json`, Prettier and ESLint configs belong to **Part 1**.
-- You may add a dependency to **your own package's** `package.json` with `pnpm --filter <your-package> add <dep>@<exact-version>`. Pin exact versions. Don't add a second library that does what an existing one already does (check other packages first).
-- Never run `pnpm up`/`pnpm update` across the workspace. Never edit `pnpm-lock.yaml` by hand.
+- Runtime: React 19 and React DOM 19
+- Styling: Tailwind CSS v4 with the `@tailwindcss/vite` plugin
+- Build tooling: Vite 8, TypeScript 5.7, and `@vitejs/plugin-react`
+- Formatting: oxfmt
 
-## 4. Secrets and honesty
+## Styling
 
-- Never write a real key, token, password or webhook secret into any file. Env var names go in `.env.example` with placeholder values only (owned by Part 4; ask for new names).
-- Never put secrets in `NEXT_PUBLIC_*` variables or in client components.
-- Never commit anything under `HackTX template to use/`. It is reference material and contains secrets.
-- Synthetic or fixture data must carry `source: "synthetic"` or `source: "fixture"` and show a visible badge in the UI. Never pass fixture output off as a live model or API result.
-- **Identity verification is demo-grade.** Label it "Demo identity check — not production-grade verification" wherever it appears. Never describe it as KYC.
-- Test and demo only with **specimen/sample IDs or a team member's own ID with their consent**. Never use, fetch or commit anyone else's real ID.
-- ID images (`idv/` object keys) are **deleted immediately after extraction**. Never log their contents or the extracted fields beyond name + match result, never put them in fixtures, traces or screenshots, and never commit them. Fixture verification data uses specimen images only.
-- Only verified affected persons may read a property's report details. The reporter sees safety + status only. Never widen access "for convenience".
-- Nearby-area data is shown **only as aggregated cells** (about 250 m), never as other people's pins or addresses.
-- AI damage and cost figures are **estimates**. Financial output is **educational, not financial advice**. Life-safety UI always shows "If you are in immediate danger, call 911." Keep those disclaimers.
+This project uses **Tailwind CSS v4** through the `@tailwindcss/vite` plugin configured in `vite.config.ts`. `src/index.css` imports Tailwind with `@import 'tailwindcss';`. Use Tailwind utility classes directly in JSX and put global CSS or Tailwind v4 theme customization in `src/index.css`. This scaffold does not need a Tailwind config file or PostCSS config.
 
-## 5. Code style (so diffs stay small)
+`src/main.tsx` imports `src/index.css`, so global font wiring belongs in `src/index.css`. Keep CSS `@import` statements first, then add any `@font-face` rules and font-family defaults there.
 
-- TypeScript strict mode, ESM, Node 24, pnpm. Prettier defaults from the repo config. Don't change formatting settings.
-- Money is **integer cents** (`number`, named `...Cents`). Never use floats for money. Percentages are basis points (`...Bps`).
-- Times are epoch milliseconds (`...At: number`) in contracts, and SpacetimeDB `Timestamp` inside the module.
-- Validate every model output and every external API response with the Zod schema before you use or store it.
-- One feature per file where reasonable. Prefer adding a new file over growing a shared file. Registries (tool list, job handlers) list one import per line so that two additions don't conflict.
-- No `any` without a `// reason:` comment. No `console.log` left in committed code; use the `log` helper in your package.
-
-## 6. Git behavior for agents
-
-- Work on your part's branch (`part1/...` to `part4/...`; see `WORKFLOW.md`). Never push to `main` directly, never force-push a shared branch, never rewrite someone else's commits.
-- Make small commits with message format `partN(scope): what changed`. Open PRs often (every 1–2 hours at most).
-- Before you push, run `git fetch && git rebase origin/main` and then `pnpm check`. Don't push red builds.
-- **When resolving a merge conflict:**
-  - In a file you own, keep your intent and include main's changes. Don't delete their additions.
-  - In a file you don't own, **take main's version** and re-apply nothing; ask the owner. Careful: **during a rebase, `--ours` is main and `--theirs` is your commit**, so the command is `git checkout --ours -- <file>`. During a merge it's the other way round. See WORKFLOW.md §4.
-  - For `pnpm-lock.yaml`, take main's version and rerun `pnpm install`.
-  - For `packages/stdb-bindings/**`, take main's version. Part 2 regenerates.
-  - If you're unsure, stop and ask your human. Never "resolve" by deleting the other side.
-- Never commit `.env*` (except `.env.example`), media files (`*.mp4`, `*.mov`, large images), `node_modules`, `.next` or build output.
-
-## 7. When you're done with a task
-
-1. `pnpm check` passes.
-2. Append a dated entry to your `status/partN.md`: what shipped, how to verify it, which fixtures are still fake, and requests to other parts.
-3. Open a PR into `main` using the template in `WORKFLOW.md`.
+Tailwind emits utility classes in `@layer utilities`, and CSS outside any cascade layer overrides every layer regardless of specificity. Put global element styles, such as resets and defaults for `body`, headings, `button`, or `input`, inside `@layer base { ... }` so utility classes on those elements still apply. Tailwind's Preflight already applies `box-sizing: border-box`, removes default margins, and sets `font: inherit` on form controls, so do not repeat those rules.
