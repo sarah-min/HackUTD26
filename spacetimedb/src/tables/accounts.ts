@@ -1,17 +1,17 @@
-// Passwordless email accounts for AFFECTED persons (reporters stay accountless). ALL tables are private:
-// clients read them only through the sender-scoped views in ../views_account.ts, which never expose
-// email_plain, code_hash, salts, other people's demo codes, or any key. The full address is never kept on an account:
-// it stores only a peppered hash plus a masked display (s***@gmail.com).
+// Recovery-code accounts for AFFECTED persons (reporters stay accountless). ALL tables are private: clients read them only
+// through the sender-scoped views in ../views_account.ts, which never expose recovery_hash, the pepper or any other secret.
+// The module never sees a code except inside create/sign-in/step-up/replace calls and never stores it: only sha256(pepper + code).
 import { table, t } from 'spacetimedb/server';
 
+// SQL name is 'recovery_account' (the earlier email-based 'email_account' table is retired); the TS accessor stays `account`.
 export const account = table(
-  { name: 'email_account' },
+  { name: 'recovery_account' },
   {
     id: t.u64().primaryKey().autoInc(),
-    email_hash: t.string().unique(), // sha256(pepper + normalized email)
-    email_masked: t.string(), // first char + *** + @domain; never the full local part
+    recovery_hash: t.string().unique(), // sha256(pepper + normalized recovery code); indexed lookup
     created_at: t.timestamp(),
     last_login_at: t.timestamp(),
+    replaced_at: t.timestamp().optional(), // set by replace_recovery_code
   }
 );
 
@@ -24,7 +24,7 @@ export const account_device = table(
     label: t.string(),
     linked_at: t.timestamp(),
     last_seen_at: t.timestamp(),
-    stepup_until: t.timestamp().optional(), // set while a recent email step-up is valid; cleared by account_tick
+    stepup_until: t.timestamp().optional(), // set while a recent recovery-code step-up is valid; cleared by account_tick
   }
 );
 
@@ -44,56 +44,52 @@ export const account_property = table(
   }
 );
 
-export const email_challenge = table(
-  { name: 'email_challenge' },
+/**
+ * Failed sign-in / step-up / replace attempts (and create_account `code_taken` / replace `invalid_new_code` probes). Backs the
+ * per-identity lockout (5 in 15 min); there is deliberately NO global cap (identities are free to mint, so a global cap is a
+ * lockout DoS). Only failures are recorded and a success does NOT delete them (they age out of the 15 min window), so
+ * alternating wrong guesses with one valid call cannot reset the lock. Purged after 24 h by the tick.
+ */
+export const code_attempt = table(
+  { name: 'code_attempt' },
   {
     id: t.u64().primaryKey().autoInc(),
     identity: t.identity().index('btree'),
-    purpose: t.string(), // 'enroll' | 'signin' | 'stepup'
-    email_plain: t.string(), // normalized address, only while a send is in flight; '' afterwards (cleared after the send attempt, on success/expiry, or after 15 min)
-    email_hash: t.string().index('btree'),
-    email_masked: t.string(), // carried to the account on enroll (the full address is not kept)
-    salt: t.string(),
-    code_hash: t.string(), // sha256(salt + ':' + code)
-    attempts: t.u8(),
-    expires_at: t.timestamp(),
-    created_at: t.timestamp(),
-    consumed: t.bool(), // true after success, expiry, supersession or lockout
-    delivery_state: t.string(), // 'pending' | 'sent' | 'failed' | 'demo'
-    delivery_error: t.string().optional(),
-    // Additive to the spec'd columns:
-    account_id: t.u64().optional(), // signin: the matched account (undefined = decoy, see `decoy`)
-    decoy: t.bool(), // signin for an email with no account: looks identical to the caller, nothing is sent
-    locked_at: t.timestamp().optional(), // set when 5 wrong codes were entered: locks the email_hash for 15 min
+    at: t.timestamp(),
   }
 );
 
-/** Plaintext code, demo mode only. Visible solely to its requester through my_demo_code. Deleted on consume/expiry. */
-export const demo_code = table(
-  { name: 'demo_code' },
+/**
+ * Written by remove_device (target) and sign_out_device (caller): this identity may no longer use the verification rows it
+ * created BEFORE revoked_at, nor any account access, until it signs in again with a valid code (which deletes this row) or
+ * completes a NEW verification started after revoked_at. delete_account does not write it. See auth.ts ownVerifiedRows.
+ */
+export const device_revocation = table(
+  { name: 'device_revocation' },
   {
-    challenge_id: t.u64().primaryKey(),
-    identity: t.identity().index('btree'),
-    code: t.string(),
-    created_at: t.timestamp(),
+    identity: t.identity().primaryKey(),
+    account_id: t.u64(),
+    revoked_at: t.timestamp(),
   }
 );
 
-/** Single row (id 0). Absent until an admin calls admin_set_email_config: accounts are inert until then. */
-export const email_config = table(
-  { name: 'email_config' },
+/**
+ * Single row (id 0). Absent = defaults (accounts_enabled TRUE, require_stepup FALSE, pepper generated lazily on the first
+ * create/sign-in). The "pepper" is a per-database domain separator, NOT a secret (it comes from the host's timestamp-seeded RNG);
+ * only the 100-bit browser-generated recovery code protects an account. It is never rotated (that would orphan every
+ * account's recovery_hash) and never exposed by a view.
+ */
+export const account_config = table(
+  { name: 'account_config' },
   {
     id: t.u8().primaryKey(),
-    mode: t.string(), // 'demo' | 'brevo'
-    brevo_api_key: t.string(), // NEVER exposed by any view or log
-    sender_email: t.string(), // verified Brevo sender address; never exposed by any view
-    hash_pepper: t.string(),
+    accounts_enabled: t.bool(),
     require_stepup: t.bool(),
-    daily_send_cap: t.u32(),
+    hash_pepper: t.string(),
   }
 );
 
-/** Scheduled every 60 s: clears expired step-ups, purges expired challenges and stale email addresses. */
+/** Scheduled every 60 s: clears expired step-ups and purges the failed-attempt ledger. */
 export const account_tick = table(
   { name: 'account_tick' },
   {

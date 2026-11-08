@@ -20,6 +20,22 @@ export const AccessLog = __t.object("AccessLog", {
 });
 export type AccessLog = __Infer<typeof AccessLog>;
 
+export const AccountCodeResult = __t.object("AccountCodeResult", {
+  ok: __t.bool(),
+  error: __t.string(),
+  retryAfterS: __t.u32(),
+  attemptsLeft: __t.u8(),
+});
+export type AccountCodeResult = __Infer<typeof AccountCodeResult>;
+
+export const AccountConfig = __t.object("AccountConfig", {
+  id: __t.u8(),
+  accountsEnabled: __t.bool(),
+  requireStepup: __t.bool(),
+  hashPepper: __t.string(),
+});
+export type AccountConfig = __Infer<typeof AccountConfig>;
+
 export const AccountDevice = __t.object("AccountDevice", {
   identity: __t.identity(),
   accountId: __t.u64(),
@@ -39,11 +55,28 @@ export const AccountProperty = __t.object("AccountProperty", {
 });
 export type AccountProperty = __Infer<typeof AccountProperty>;
 
+export const AccountStatusRow = __t.object("AccountStatusRow", {
+  id: __t.u8(),
+  enabled: __t.bool(),
+});
+export type AccountStatusRow = __Infer<typeof AccountStatusRow>;
+
 export const AccountTick = __t.object("AccountTick", {
   scheduledId: __t.u64(),
   scheduledAt: __t.scheduleAt(),
 });
 export type AccountTick = __Infer<typeof AccountTick>;
+
+export const AdminAccountConfig = __t.object("AdminAccountConfig", {});
+export type AdminAccountConfig = __Infer<typeof AdminAccountConfig>;
+
+export const AdminAccountConfigRow = __t.object("AdminAccountConfigRow", {
+  id: __t.u8(),
+  accountsEnabled: __t.bool(),
+  requireStepup: __t.bool(),
+  hasPepper: __t.bool(),
+});
+export type AdminAccountConfigRow = __Infer<typeof AdminAccountConfigRow>;
 
 export const AdminClaimConflictRow = __t.object("AdminClaimConflictRow", {
   id: __t.u64(),
@@ -58,20 +91,6 @@ export type AdminClaimConflictRow = __Infer<typeof AdminClaimConflictRow>;
 
 export const AdminClaimConflicts = __t.object("AdminClaimConflicts", {});
 export type AdminClaimConflicts = __Infer<typeof AdminClaimConflicts>;
-
-export const AdminEmailConfig = __t.object("AdminEmailConfig", {});
-export type AdminEmailConfig = __Infer<typeof AdminEmailConfig>;
-
-export const AdminEmailConfigRow = __t.object("AdminEmailConfigRow", {
-  id: __t.u8(),
-  mode: __t.string(),
-  hasKey: __t.bool(),
-  hasSenderEmail: __t.bool(),
-  hasPepper: __t.bool(),
-  requireStepup: __t.bool(),
-  dailySendCap: __t.u32(),
-});
-export type AdminEmailConfigRow = __Infer<typeof AdminEmailConfigRow>;
 
 export const AdminSecurityConfig = __t.object("AdminSecurityConfig", {});
 export type AdminSecurityConfig = __Infer<typeof AdminSecurityConfig>;
@@ -148,13 +167,6 @@ export const Assessment = __t.object("Assessment", {
 });
 export type Assessment = __Infer<typeof Assessment>;
 
-export const AuthStatusRow = __t.object("AuthStatusRow", {
-  id: __t.u8(),
-  mode: __t.string(),
-  configured: __t.bool(),
-});
-export type AuthStatusRow = __Infer<typeof AuthStatusRow>;
-
 export const Blob = __t.object("Blob", {
   objectKey: __t.string(),
   owner: __t.identity(),
@@ -207,54 +219,12 @@ export const CoachMessage = __t.object("CoachMessage", {
 });
 export type CoachMessage = __Infer<typeof CoachMessage>;
 
-export const DemoCode = __t.object("DemoCode", {
-  challengeId: __t.u64(),
-  identity: __t.identity(),
-  code: __t.string(),
-  createdAt: __t.timestamp(),
-});
-export type DemoCode = __Infer<typeof DemoCode>;
-
-export const EmailAccount = __t.object("EmailAccount", {
-  id: __t.u64(),
-  emailHash: __t.string(),
-  emailMasked: __t.string(),
-  createdAt: __t.timestamp(),
-  lastLoginAt: __t.timestamp(),
-});
-export type EmailAccount = __Infer<typeof EmailAccount>;
-
-export const EmailChallenge = __t.object("EmailChallenge", {
+export const CodeAttempt = __t.object("CodeAttempt", {
   id: __t.u64(),
   identity: __t.identity(),
-  purpose: __t.string(),
-  emailPlain: __t.string(),
-  emailHash: __t.string(),
-  emailMasked: __t.string(),
-  salt: __t.string(),
-  codeHash: __t.string(),
-  attempts: __t.u8(),
-  expiresAt: __t.timestamp(),
-  createdAt: __t.timestamp(),
-  consumed: __t.bool(),
-  deliveryState: __t.string(),
-  deliveryError: __t.option(__t.string()),
-  accountId: __t.option(__t.u64()),
-  decoy: __t.bool(),
-  lockedAt: __t.option(__t.timestamp()),
+  at: __t.timestamp(),
 });
-export type EmailChallenge = __Infer<typeof EmailChallenge>;
-
-export const EmailConfig = __t.object("EmailConfig", {
-  id: __t.u8(),
-  mode: __t.string(),
-  brevoApiKey: __t.string(),
-  senderEmail: __t.string(),
-  hashPepper: __t.string(),
-  requireStepup: __t.bool(),
-  dailySendCap: __t.u32(),
-});
-export type EmailConfig = __Infer<typeof EmailConfig>;
+export type CodeAttempt = __Infer<typeof CodeAttempt>;
 
 export const Frame = __t.object("Frame", {
   id: __t.u64(),
@@ -339,10 +309,13 @@ export type MyAccount = __Infer<typeof MyAccount>;
 
 export const MyAccountRow = __t.object("MyAccountRow", {
   id: __t.u64(),
-  emailMasked: __t.string(),
   createdAt: __t.timestamp(),
+  lastLoginAt: __t.timestamp(),
 });
 export type MyAccountRow = __Infer<typeof MyAccountRow>;
+
+export const MyAccountStatus = __t.object("MyAccountStatus", {});
+export type MyAccountStatus = __Infer<typeof MyAccountStatus>;
 
 export const MyAffectedProfiles = __t.object("MyAffectedProfiles", {});
 export type MyAffectedProfiles = __Infer<typeof MyAffectedProfiles>;
@@ -352,9 +325,6 @@ export type MyAgentSteps = __Infer<typeof MyAgentSteps>;
 
 export const MyAssessments = __t.object("MyAssessments", {});
 export type MyAssessments = __Infer<typeof MyAssessments>;
-
-export const MyAuthStatus = __t.object("MyAuthStatus", {});
-export type MyAuthStatus = __Infer<typeof MyAuthStatus>;
 
 export const MyClaimConflictRow = __t.object("MyClaimConflictRow", {
   id: __t.u64(),
@@ -370,16 +340,6 @@ export type MyClaimConflicts = __Infer<typeof MyClaimConflicts>;
 export const MyCoachMessages = __t.object("MyCoachMessages", {});
 export type MyCoachMessages = __Infer<typeof MyCoachMessages>;
 
-export const MyDemoCode = __t.object("MyDemoCode", {});
-export type MyDemoCode = __Infer<typeof MyDemoCode>;
-
-export const MyDemoCodeRow = __t.object("MyDemoCodeRow", {
-  challengeId: __t.u64(),
-  purpose: __t.string(),
-  code: __t.string(),
-});
-export type MyDemoCodeRow = __Infer<typeof MyDemoCodeRow>;
-
 export const MyDeviceRow = __t.object("MyDeviceRow", {
   identityHex: __t.string(),
   label: __t.string(),
@@ -391,19 +351,6 @@ export type MyDeviceRow = __Infer<typeof MyDeviceRow>;
 
 export const MyDevices = __t.object("MyDevices", {});
 export type MyDevices = __Infer<typeof MyDevices>;
-
-export const MyEmailChallenge = __t.object("MyEmailChallenge", {});
-export type MyEmailChallenge = __Infer<typeof MyEmailChallenge>;
-
-export const MyEmailChallengeRow = __t.object("MyEmailChallengeRow", {
-  id: __t.u64(),
-  purpose: __t.string(),
-  expiresAt: __t.timestamp(),
-  attemptsLeft: __t.u8(),
-  deliveryState: __t.string(),
-  deliveryError: __t.option(__t.string()),
-});
-export type MyEmailChallengeRow = __Infer<typeof MyEmailChallengeRow>;
 
 export const MyFrames = __t.object("MyFrames", {});
 export type MyFrames = __Infer<typeof MyFrames>;
@@ -471,6 +418,15 @@ export const ReadBlobResult = __t.object("ReadBlobResult", {
 });
 export type ReadBlobResult = __Infer<typeof ReadBlobResult>;
 
+export const RecoveryAccount = __t.object("RecoveryAccount", {
+  id: __t.u64(),
+  recoveryHash: __t.string(),
+  createdAt: __t.timestamp(),
+  lastLoginAt: __t.timestamp(),
+  replacedAt: __t.option(__t.timestamp()),
+});
+export type RecoveryAccount = __Infer<typeof RecoveryAccount>;
+
 export const RecoveryPlan = __t.object("RecoveryPlan", {
   id: __t.u64(),
   identity: __t.identity(),
@@ -512,14 +468,6 @@ export const ReportPrivate = __t.object("ReportPrivate", {
   submitCount: __t.u8(),
 });
 export type ReportPrivate = __Infer<typeof ReportPrivate>;
-
-export const RequestEmailCodeResult = __t.object("RequestEmailCodeResult", {
-  ok: __t.bool(),
-  error: __t.string(),
-  challengeId: __t.u64(),
-  retryAfterS: __t.u32(),
-});
-export type RequestEmailCodeResult = __Infer<typeof RequestEmailCodeResult>;
 
 export const SecurityConfig = __t.object("SecurityConfig", {
   id: __t.u8(),
@@ -590,14 +538,6 @@ export const VerificationStart = __t.object("VerificationStart", {
   at: __t.timestamp(),
 });
 export type VerificationStart = __Infer<typeof VerificationStart>;
-
-export const VerifyEmailCodeResult = __t.object("VerifyEmailCodeResult", {
-  ok: __t.bool(),
-  error: __t.string(),
-  attemptsLeft: __t.u8(),
-  purpose: __t.string(),
-});
-export type VerifyEmailCodeResult = __Infer<typeof VerifyEmailCodeResult>;
 
 export const WebMediaIndex = __t.object("WebMediaIndex", {});
 export type WebMediaIndex = __Infer<typeof WebMediaIndex>;

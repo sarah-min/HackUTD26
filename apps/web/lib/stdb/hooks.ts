@@ -165,23 +165,33 @@ export function useReportSteps(reportId: bigint | null) {
   return { steps: sorted, ready };
 }
 
-// ── Email accounts (affected persons; reporters never need one) ───────────────────────────────────
-// Flow order, all against spacetimedb/src/reducers/accounts.ts:
-//   1. useAuthStatus(): mode 'off' means accounts are unavailable (hide the UI); 'demo' means show the on-screen code.
-//   2. enroll  (verified owner, no account):  requestEmailCode(email, 'enroll')  -> verifyEmailCode(challengeId, code)
-//      signin  (new device, existing account): requestEmailCode(email, 'signin')  -> verifyEmailCode(challengeId, code)
-//      stepup  (signed-in device, step-up needed): requestEmailCode(email, 'stepup') -> verifyEmailCode(...); the user types the email again
-//   3. Both calls return { ok, error, ... } and never throw for expected failures.
-//      request errors: email_not_configured | invalid_purpose | invalid_email | locked | not_verified_owner | already_signed_in |
-//        email_already_registered | not_signed_in | email_mismatch | cooldown | rate_limited_email | rate_limited_identity | daily_cap
-//      verify errors: not_found | invalid_code (attemptsLeft) | locked | expired | already_signed_in | email_already_registered |
-//        not_verified_owner | not_signed_in | email_mismatch
-//   Label for the identity step: "Demo identity check — not production-grade verification." Codes in demo mode: "Demo mode: code shown on screen. Not a real email."
+// ── Recovery-code accounts (affected persons; reporters never need one) ────────────────────────────
+// No email, no SMS: the browser generates a 20-char recovery code (lib/stdb/recoveryCode.ts), shows it ONCE, and the module
+// stores only its hash. Flow order, all against spacetimedb/src/reducers/accounts.ts:
+//   1. useAccountStatus(): enabled === false means new sign-ups / sign-ins are switched off (hide the entry points).
+//   2. create  (verified owner, no account):   generateRecoveryCode() -> show + have the user save it -> createAccount(code)
+//      signin  (new device, existing account): signInWithCode(code)
+//      stepup  (signed-in device, require_stepup on): stepUpWithCode(code)
+//      rotate  (signed-in device):             replaceRecoveryCode(oldCode, generateRecoveryCode())
+//   3. All four return { ok, error, retryAfterS, attemptsLeft } and never throw for expected failures. Enable submit only when
+//      isRecoveryCodeShape(input); the module normalizes the same way (case, spaces, dashes, O->0, I/L->1).
+//      createAccount errors:  accounts_disabled | locked | rate_limited | already_signed_in | not_verified_owner | invalid_code | code_taken
+//      signInWithCode errors: accounts_disabled | locked | rate_limited | invalid_code (EVERY wrong code, attemptsLeft) | already_signed_in
+//      stepUpWithCode errors: not_signed_in | locked | rate_limited | invalid_code
+//      replaceRecoveryCode errors: not_signed_in | locked | rate_limited | invalid_code (old code) | invalid_new_code | code_unchanged | code_taken
+//      locked / rate_limited carry retryAfterS (seconds); invalid_code carries attemptsLeft (5 failures per 15 min, then locked).
+//   Label for the identity step: "Demo identity check — not production-grade verification."
 
-/** This device's account (null when not signed in). */
+/** This device's account (null when not signed in). The row has no secrets: { id, createdAt, lastLoginAt }. */
 export function useAccount() {
   const [rows, ready] = useTable(T.myAccount);
   return { account: rows[0] ?? null, ready };
+}
+
+/** Are new sign-ups / sign-ins accepted? `enabled` is true until an admin sets account_config.accounts_enabled = false. */
+export function useAccountStatus() {
+  const [rows, ready] = useTable(T.myAccountStatus);
+  return { enabled: rows[0]?.enabled ?? true, ready };
 }
 
 /** Devices on my account, current device first. */
@@ -192,9 +202,9 @@ export function useDevices() {
 }
 
 /**
- * Step-up state of this device. `required` = the module enforces step-up for full reports (email_config.require_stepup);
+ * Step-up state of this device. `required` = the module enforces step-up for full reports (account_config.require_stepup);
  * `active` = a step-up is currently in effect (cleared by the module within ~60 s of expiry); `linked` = device is signed in.
- * When required && !active, full-report views are empty: push the user to enroll (not linked) or step up (linked).
+ * When required && !active, full-report views are empty: push the user to create an account (not linked) or step up (linked).
  */
 export function useStepup() {
   const [rows, ready] = useTable(T.myStepup);
@@ -208,34 +218,28 @@ export function useStepup() {
   };
 }
 
-/** My open code challenge (null when none). Expiry is clock-based on the client: compare `expiresAt` to Date.now(). */
-export function useEmailChallenge() {
-  const [rows, ready] = useTable(T.myEmailChallenge);
-  return { challenge: rows[0] ?? null, ready };
+/** createAccount(recoveryCode) -> { ok, error, retryAfterS, attemptsLeft }. Pass the code the browser generated (any grouping/case). */
+export function useCreateAccount() {
+  const call = useProcedure(P.createAccount);
+  return useCallback((recoveryCode: string) => call({ recoveryCode }), [call]);
 }
 
-/** DEMO MODE only: the code for my open challenge, to show on screen. Always null in brevo mode. */
-export function useDemoCode() {
-  const [rows, ready] = useTable(T.myDemoCode);
-  return { demoCode: rows[0] ?? null, ready };
+/** signInWithCode(recoveryCode) -> { ok, error, retryAfterS, attemptsLeft }. Every wrong code is the same 'invalid_code'. */
+export function useSignInWithCode() {
+  const call = useProcedure(P.signInWithCode);
+  return useCallback((recoveryCode: string) => call({ recoveryCode }), [call]);
 }
 
-/** Which delivery mode applies: 'off' (not configured), 'demo' (code on screen) or 'brevo' (real email). */
-export function useAuthStatus() {
-  const [rows, ready] = useTable(T.myAuthStatus);
-  return { mode: (rows[0]?.mode ?? 'off') as 'off' | 'demo' | 'brevo', configured: rows[0]?.configured ?? false, ready };
+/** stepUpWithCode(recoveryCode) -> { ok, error, retryAfterS, attemptsLeft }. Opens a 15-minute step-up window on success. */
+export function useStepUpWithCode() {
+  const call = useProcedure(P.stepUpWithCode);
+  return useCallback((recoveryCode: string) => call({ recoveryCode }), [call]);
 }
 
-/** requestEmailCode(email, purpose) -> { ok, error, challengeId, retryAfterS }. */
-export function useRequestEmailCode() {
-  const call = useProcedure(P.requestEmailCode);
-  return useCallback((email: string, purpose: 'enroll' | 'signin' | 'stepup') => call({ email, purpose }), [call]);
-}
-
-/** verifyEmailCode(challengeId, code) -> { ok, error, attemptsLeft, purpose }. */
-export function useVerifyEmailCode() {
-  const call = useProcedure(P.verifyEmailCode);
-  return useCallback((challengeId: bigint, code: string) => call({ challengeId, code }), [call]);
+/** replaceRecoveryCode(oldCode, newCode) -> { ok, error, retryAfterS, attemptsLeft }. The old code stops working; other devices stay linked. */
+export function useReplaceRecoveryCode() {
+  const call = useProcedure(P.replaceRecoveryCode);
+  return useCallback((oldCode: string, newCode: string) => call({ oldCode, newCode }), [call]);
 }
 
 /** Reducer wrappers. They throw on error (e.g. 'not_signed_in'). */
@@ -251,7 +255,7 @@ export function useSetDeviceLabel() {
   const call = useReducer(R.setDeviceLabel);
   return useCallback((label: string) => call({ label }), [call]);
 }
-/** Deletes my account, all device links and pending challenges. Verifications and reports stay. */
+/** Deletes my account and all device links (needs an active step-up while require_stepup is on: throws 'stepup_required'). Verifications and reports stay. */
 export function useDeleteAccount() {
   const call = useReducer(R.deleteAccount);
   return useCallback(() => call(), [call]);

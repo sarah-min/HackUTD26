@@ -2,7 +2,23 @@
 
 Owner: Sidd. Append-only, newest entry first. Format is in [STATUS.md](../STATUS.md). Only this part's owner (and their LLM) edits this file.
 
+## 2026-11-08 (night): recovery-code pivot
+
+**Shipped (dev only; check docs/BACKEND_RUNBOOK.md for prod state before claiming prod):**
+- Affected persons get OPTIONAL passwordless recovery-code accounts. After the ID/address check a verified owner may create an account. The browser generates a 20-character recovery code (about 100 bits), shown once; only a hash is stored. No email, no phone, no delivery vendor. On a new device they sign in with the code to get their properties back. If the code is lost they redo the ID check.
+- Account page: device list, rename, remove, sign out, replace code, delete account. The full report can require a step-up (re-enter the code) behind an admin flag, off by default.
+- Security hardening kept from the earlier entry: duplicate-claim hold (second claimant on a verified address is held, the owner is notified in data via my_claim_conflicts, admin resolves), global and per-property verification caps, owner audit log, ID tamper-cue and prompt-injection hardening that routes suspicious IDs to needs_review.
+- Removed: emailed and on-screen demo-mode codes, the email challenge and config tables, the email procedures, Brevo code.
+
+**Honest limits:** identity verification is demo-grade, not KYC. No liveness or deepfake defense (roadmap: liveness vendor, mailed postcard code, owner-of-record check). Real SMS/email delivery was investigated and dropped (Photon SMS needs 10DLC, iMessage needs the recipient to text first, Photon email needs an own domain, Brevo not run), so recovery codes are the second factor.
+
+**How to verify:** `cd spacetimedb && npx vitest run`; `cd scripts && pnpm smoke:p2 && pnpm smoke:accounts`. Manual: verify, create a recovery code, sign in on a second browser profile with it.
+
+**Requests to other parts:** Part 4: BREVO_API_KEY / BREVO_SENDER_EMAIL are no longer needed, do not add them to .env.example.
+
 ## 2026-11-08 (evening): email accounts, security hardening, account UI
+
+> **Superseded by "recovery-code pivot" above.** The email accounts, on-screen demo-mode codes and Brevo items below no longer exist. The security hardening and worker/vision items still stand. Kept for history.
 
 **Shipped (dev only, prod not published):**
 - Passwordless email accounts for affected persons (module, hooks, UI under apps/web/app/affected: enroll card, sign-in, step-up gate, account page). Codes are shown on screen in demo mode ("Demo mode: code shown on screen. Not real email."). Real delivery was dropped after Photon SMS (10DLC), iMessage (recipient texts first) and email (needs own domain) did not fit the time and money; Brevo was never run. require_stepup is off by default.

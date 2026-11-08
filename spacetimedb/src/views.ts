@@ -2,7 +2,7 @@
 // these views, which evaluate per subscriber with ctx.sender (CONTRACTS §5 "Readable by").
 //   Reporter  = report.reporter == sender
 //   Verified  = verification(identity == sender OR any device linked to the sender's account, state 'verified')
-//               for the property (auth.ts verifiedPropertyIds). With email_config.require_stepup ON the FULL-REPORT views
+//               for the property (auth.ts verifiedPropertyIds). With account_config.require_stepup ON the FULL-REPORT views
 //               below additionally need a current step-up (auth.ts reportPropertyIds / hasReportAccess).
 //   Self      = row.identity == sender
 import { t } from 'spacetimedb/server';
@@ -17,7 +17,7 @@ import {
   agent_step,
 } from './tables/core';
 import { verification, affected_profile, recovery_plan, coach_message } from './tables/affected';
-import { accountIdOf, accountIdentities, hasReportAccess, reportPropertyIds, verifiedPropertyIds } from './auth';
+import { accountIdOf, accountIdentities, hasReportAccess, ownVerifiedRows, reportPropertyIds, verifiedPropertyIds } from './auth';
 import type { RoDb } from './constants';
 import type { Identity } from 'spacetimedb';
 
@@ -31,13 +31,16 @@ function verifiedReportIds(db: RoDb, who: Identity): bigint[] {
 }
 
 /**
- * Rows owned by the sender or any device on the same account (affected-person data keyed by identity). Step-up gated:
- * with require_stepup ON and no current step-up the caller gets nothing.
+ * Affected-person rows written by the sender or any device on the same account (keyed by identity), but ONLY for properties
+ * the sender currently owns (auth.ts verifiedPropertyIds). The property filter is what keeps a device that signed in with
+ * someone else's code from exposing its own data to that account, and a revoked device from reading its old rows.
+ * Step-up gated: with require_stepup ON and no current step-up the caller gets nothing.
  */
-function accountRows<R>(db: RoDb, who: Identity, byIdentity: (id: Identity) => Iterable<R>): R[] {
+function accountRows<R extends { property_id: bigint }>(db: RoDb, who: Identity, byIdentity: (id: Identity) => Iterable<R>): R[] {
   if (!hasReportAccess(db, who)) return [];
+  const owned = verifiedPropertyIds(db, who);
   const out: R[] = [];
-  for (const id of accountIdentities(db, who)) out.push(...byIdentity(id));
+  for (const id of accountIdentities(db, who)) for (const r of byIdentity(id)) if (owned.has(r.property_id)) out.push(r);
   return out;
 }
 
@@ -79,9 +82,12 @@ export const my_verifications = spacetimedb.view(
   { name: 'my_verifications', public: true },
   t.array(verification.rowType),
   ctx => {
-    // Own rows, plus the VERIFIED rows of other devices on the same account (so a newly signed-in device can see
-    // which properties it now owns). Not step-up gated: the property list is not report detail.
-    const out = [...ctx.db.verification.identity.filter(ctx.sender)];
+    // Own rows (a revoked device's verified rows from before its revocation are hidden), plus the VERIFIED rows bound to
+    // the account (so a newly signed-in device can see which properties it now owns). Not step-up gated: the property
+    // list is not report detail. KNOWN LIMITATION (CONTRACTS.md §5.3): bound rows are returned whole, including
+    // name_on_doc, secret_hash and identity of the verifying device; the web client depends on these columns.
+    const usable = new Set(ownVerifiedRows(ctx.db, ctx.sender).map(v => v.id));
+    const out = [...ctx.db.verification.identity.filter(ctx.sender)].filter(v => v.state !== 'verified' || usable.has(v.id));
     const seen = new Set(out.map(v => v.id));
     const add = (v: (typeof out)[number] | undefined | null) => {
       if (v && v.state === 'verified' && !seen.has(v.id)) {
@@ -89,9 +95,6 @@ export const my_verifications = spacetimedb.view(
         out.push(v);
       }
     };
-    for (const id of accountIdentities(ctx.db, ctx.sender)) {
-      if (!id.isEqual(ctx.sender)) for (const v of ctx.db.verification.identity.filter(id)) add(v);
-    }
     const accountId = accountIdOf(ctx.db, ctx.sender);
     if (accountId !== undefined) {
       for (const b of ctx.db.account_property.account_id.filter(accountId)) add(ctx.db.verification.id.find(b.verification_id));

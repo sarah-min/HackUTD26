@@ -117,20 +117,23 @@ The SDK call is `conn.reducers.<camelName>({ ...args })` or `useReducer(R.<camel
 | `saveAffectedIntake` | `{ propertyId: bigint, intakeJson: string (AffectedIntake JSON, ≤ 20 000 chars), reportId?: bigint }` | verified for the property | Report = the given one (must be `assessed` and on this property) or the most severe `assessed` report (newest on ties). Upserts `affected_profile`. Enqueues `plan` | `unauthorized: verify for this property first`, `intake_json too large`, `intake_json must be a JSON object`, `report is not on this property`, `report is not assessed yet`, `no assessed report for this property yet` |
 | `askCoach` | `{ propertyId: bigint, reportId: bigint, text: string (1–2000) }` | verified for the property | A recovery plan must exist for (me, property, report). Max one pending coach job per identity. Inserts the user message and enqueues `coach` with payload `{"text": …}` | `unauthorized: verify for this property first`, `text must be 1–2000 chars`, `no recovery plan yet for this report`, `a coach reply is already pending` |
 
-### Email accounts (affected persons; full contract in CONTRACTS.md §5.3)
+### Recovery-code accounts (affected persons; full contract in CONTRACTS.md §5.3)
 
-Inert until an admin configures email. Hooks are in `apps/web/lib/stdb/hooks.ts`: `useAuthStatus`, `useAccount`, `useDevices`, `useStepup`, `useEmailChallenge`, `useDemoCode`, `useRequestEmailCode`, `useVerifyEmailCode`, `useSignOutDevice`, `useRemoveDevice`, `useSetDeviceLabel`, `useDeleteAccount`. Flow order and error codes: `status/part2.md` (2026-11-08 email accounts entry).
+No email or SMS: the browser generates the code (`apps/web/lib/stdb/recoveryCode.ts`), the module stores only its hash. Accounts work out of the box (an admin only needs `admin_set_account_config` to switch them off or to require step-up). Hooks are in `apps/web/lib/stdb/hooks.ts`: `useAccountStatus`, `useAccount`, `useDevices`, `useStepup`, `useCreateAccount`, `useSignInWithCode`, `useStepUpWithCode`, `useReplaceRecoveryCode`, `useSignOutDevice`, `useRemoveDevice`, `useSetDeviceLabel`, `useDeleteAccount`.
 
 | Call | Args | Result |
 |---|---|---|
-| procedure `requestEmailCode` | `{ email: string, purpose: 'enroll'\|'signin'\|'stepup' }` | `{ ok, error, challengeId, retryAfterS }` (returned, not thrown) |
-| procedure `verifyEmailCode` | `{ challengeId: bigint, code: string }` | `{ ok, error, attemptsLeft, purpose }` (returned, not thrown) |
-| reducers `signOutDevice`, `deleteAccount` | `{}` | throw `not_signed_in` |
+| procedure `createAccount` | `{ recoveryCode: string }` | `{ ok, error, retryAfterS, attemptsLeft }` (returned, not thrown). Errors: `accounts_disabled`, `locked`, `rate_limited`, `already_signed_in`, `not_verified_owner`, `invalid_code`, `code_taken` |
+| procedure `signInWithCode` | `{ recoveryCode: string }` | same shape. Errors: `accounts_disabled`, `locked`, `rate_limited`, `already_signed_in`, `invalid_code` (every wrong code, with `attemptsLeft`) |
+| procedure `stepUpWithCode` | `{ recoveryCode: string }` | same shape. Errors: `not_signed_in`, `invalid_code`, `locked`, `rate_limited` |
+| procedure `replaceRecoveryCode` | `{ oldCode: string, newCode: string }` | same shape. Errors: `not_signed_in`, `invalid_code` (old code), `invalid_new_code`, `code_unchanged`, `code_taken`, `locked`, `rate_limited` |
+| reducers `signOutDevice` | `{}` | throws `not_signed_in` |
+| reducer `deleteAccount` | `{}` | throws `not_signed_in`, or `stepup_required` while `require_stepup` is on and the step-up window has lapsed |
 | reducer `removeDevice` | `{ identityHex: string }` | throws `device not found on your account` |
 | reducer `setDeviceLabel` | `{ label: string (1-40) }` | throws `not_signed_in` |
-| views `myAccount` (`emailMasked`), `myDevices`, `myStepup`, `myEmailChallenge`, `myDemoCode`, `myAuthStatus` | | sender-scoped, see CONTRACTS.md §5.3 |
+| views `myAccount` (`id, createdAt, lastLoginAt`), `myDevices`, `myStepup`, `myAccountStatus` (`enabled`) | | sender-scoped, see CONTRACTS.md §5.3 |
 
-`readBlob` now also returns `error: 'stepup_required'` for an owner who needs a step-up (only when an admin turned `require_stepup` on).
+`retryAfterS` is set for `locked` / `rate_limited`; `attemptsLeft` counts failed attempts left before `locked` (5 per identity per 15 min). `readBlob` also returns `error: 'stepup_required'` for an owner who needs a step-up (only when an admin turned `require_stepup` on).
 
 ### Security hardening (CONTRACTS.md §5.4)
 

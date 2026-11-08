@@ -1,9 +1,9 @@
 // Security hardening: duplicate-claim holds, admin resolution, global / per-property start caps, owner audit log.
 // These tests use the PRODUCTION defaults (`setup({ security: 'defaults' })`: no security_config row, hold_duplicate_claims ON).
 import { describe, expect, it } from 'vitest';
-import { setup, mod, addr, BASE_LAT, BASE_LNG, HEX } from './helpers';
+import { setup, mod, addr, BASE_LAT, BASE_LNG, HEX, testCode } from './helpers';
 
-const EMAIL = 'owner@example.com';
+const CODE = testCode('sec-owner');
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 type S = ReturnType<typeof setup>;
@@ -11,9 +11,8 @@ type S = ReturnType<typeof setup>;
 const A = addr('123 Main St', BASE_LAT, BASE_LNG); // the property everything is claimed on
 const elsewhere = (i: number) => addr(`${i} Elm Street`, BASE_LAT + 0.01 * i, BASE_LNG);
 
-function world(opts: { email?: boolean } = {}) {
+function world(opts: { account?: boolean } = {}) {
   const s = setup({ security: 'defaults' });
-  if (opts.email) s.configureEmail('demo');
   const admin = s.user('admin'); // a real client identity with the admin role
   s.call(s.internal, mod.admin_add_service as any, { identity: s.idOf(admin).toHexString(), role: 'admin' });
   const owner = s.user('owner');
@@ -89,16 +88,16 @@ describe('duplicate-claim detection', () => {
   });
 
   it('does not hold another device of the same account, nor a device of the owner account after the first signed out', () => {
-    const { s, owner, propertyId } = world({ email: true });
-    expect(s.emailFlow(owner, EMAIL, 'enroll').ok).toBe(true);
+    const { s, owner, propertyId } = world({ account: true });
+    expect(s.createAccount(owner, CODE).ok).toBe(true);
     const d2 = s.user('d2');
-    expect(s.emailFlow(d2, EMAIL, 'signin').ok).toBe(true);
+    expect(s.signIn(d2, CODE).ok).toBe(true);
     expect(s.verify(d2, A)).toMatchObject({ state: 'verified', property_id: propertyId });
     // the verifying device signs out; a brand-new device of the same account verifies again: the account still owns it
     s.call(owner, mod.sign_out_device as any, {});
     s.call(d2, mod.sign_out_device as any, {});
     const d3 = s.user('d3');
-    expect(s.emailFlow(d3, EMAIL, 'signin').ok).toBe(true);
+    expect(s.signIn(d3, CODE).ok).toBe(true);
     expect(s.verify(d3, A).state).toBe('verified');
     expect(s.h.db.claim_conflict.count()).toBe(0n);
     // a device of a DIFFERENT account is held
@@ -141,9 +140,9 @@ describe('admin resolution of held claims and reviews', () => {
   });
 
   it('approve binds the property to the claimant account when the claimant device is signed in', () => {
-    const { s, admin, claimant } = world({ email: true });
+    const { s, admin, claimant } = world({ account: true });
     s.verify(claimant, elsewhere(7)); // a different property, so the device can enroll
-    expect(s.emailFlow(claimant, 'claimant@example.com', 'enroll').ok).toBe(true);
+    expect(s.createAccount(claimant, testCode('sec-claimant')).ok).toBe(true);
     expect(s.h.db.account_property.count()).toBe(1n);
     const held = s.verify(claimant, A);
     expect(held.fail_reason).toBe('duplicate_claim');
@@ -290,6 +289,27 @@ describe('verification start caps', () => {
     start(s, users[7]!, A);
   });
 
+  it('an existing owner (or a device linked to the owning account) is exempt from the per-property cap; strangers are not', () => {
+    const s = setup({ security: 'defaults' });
+    const owner = s.user('real-owner');
+    expect(s.verify(owner, A).state).toBe('verified'); // 1 start on A
+    expect(s.createAccount(owner, CODE).ok).toBe(true);
+    const d2 = s.user('d2');
+    expect(s.signIn(d2, CODE).ok).toBe(true);
+    // griefers fill the remaining budget of the property (6/day)
+    for (let i = 0; i < 5; i++) start(s, s.user(`griefer${i}`), A);
+    expect(() => start(s, s.user('griefer-x'), A)).toThrow(/too many verification attempts/);
+    const ledger = s.h.db.verification_start.count();
+    start(s, owner, A); // the verified owner can still re-verify
+    start(s, d2, A); // so can a device that inherits the account's property
+    expect(s.h.db.verification_start.count()).toBe(ledger + 2n); // only calls that really started count
+    expect(() => start(s, s.user('griefer-y'), A)).toThrow(/too many verification attempts/);
+    // an unrelated identity that merely owns ANOTHER property gets no exemption
+    const other = s.user('other-owner');
+    s.verify(other, elsewhere(2));
+    expect(() => start(s, other, A)).toThrow(/too many verification attempts/);
+  });
+
   it('the per-identity limit is unchanged (3 per hour, plain rate_limited) and caps are configurable', () => {
     const s = setup({ security: 'defaults' });
     const u = s.user('solo');
@@ -353,12 +373,12 @@ describe('owner audit log', () => {
   });
 
   it('logs the grant on successful verification and sign-in binding; never idv keys or names', () => {
-    const { s, owner, first, propertyId } = world({ email: true });
+    const { s, owner, first, propertyId } = world({ account: true });
     expect(accessLog(s)).toHaveLength(1);
     expect(accessLog(s)[0]).toMatchObject({ kind: 'verify', property_id: propertyId, object_key: undefined });
-    s.emailFlow(owner, EMAIL, 'enroll'); // enroll binds the property to the new account
+    s.createAccount(owner, CODE); // enroll binds the property to the new account
     const d2 = s.user('d2');
-    s.emailFlow(d2, EMAIL, 'signin'); // d2 brings no property of its own: nothing to bind
+    s.signIn(d2, CODE); // d2 brings no property of its own: nothing to bind
     const kinds = accessLog(s).map(l => l.kind);
     expect(kinds).toEqual(['verify', 'claim']);
     // a failed verification writes nothing
@@ -373,7 +393,7 @@ describe('owner audit log', () => {
   it('my_access_log: owners (and their account) see time/kind only, newest first, max 50, never other identities', () => {
     const { s, owner, claimant, admin, propertyId } = mediaWorld();
     for (let i = 0; i < 60; i++) {
-      s.advanceMs(1000);
+      s.advanceMs(61_000); // reads of the same object closer than 60 s are deduped, so space them out
       readBlob(s, owner, mediaWorldKey(s), 0);
     }
     const mine = rows(s, owner, 'my_access_log');

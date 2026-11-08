@@ -10,12 +10,11 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
-export default __t.row({
-  id: __t.u8().primaryKey(),
-  mode: __t.string(),
-  hasKey: __t.bool().name("has_key"),
-  hasSenderEmail: __t.bool().name("has_sender_email"),
-  hasPepper: __t.bool().name("has_pepper"),
-  requireStepup: __t.bool().name("require_stepup"),
-  dailySendCap: __t.u32().name("daily_send_cap"),
-});
+import {
+  AccountCodeResult,
+} from "./types";
+
+export const params = {
+  recoveryCode: __t.string(),
+};
+export const returnType = AccountCodeResult

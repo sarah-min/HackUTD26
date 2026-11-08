@@ -39,14 +39,21 @@ export function isReporter(db: RoDb, who: Identity, reportId: bigint): boolean {
 }
 
 // ---- Owner access (accounts) -------------------------------------------------------------------------------
-// Ownership of a property = a 'verified' verification row held by the caller's identity OR by ANY device linked to
-// the same account (account_device) OR a property bound to the caller's account (account_property, set when a linked
-// device is verified and kept after that device signs out). Every owner-access view, reducer and read_blob goes through the helpers
-// below; nothing else should read `verification` to decide access.
+// Ownership of a property = a 'verified' verification row held by the caller's OWN identity (unless revoked, below) OR a
+// property bound to the caller's account (account_property). Another device's own verification row never grants access to
+// the account's other devices: it only counts once it is explicitly BOUND (create_account, or a linked device completing a
+// verification). sign_in_with_code is inherit-only: the signing device gets the account's properties but never pushes its own
+// into the account. Every owner-access view, reducer and read_blob goes through the helpers below; nothing else should read
+// `verification` to decide access.
 //
-// Step-up (email_config.require_stepup, default OFF): the FULL-REPORT views and read_blob additionally need the caller's
+// Revocation (device_revocation): remove_device / sign_out_device mark the identity revoked. A revoked identity cannot use
+// verification rows it created before revoked_at and, having no account link, gets no account access, until it signs in
+// again with a valid code (row deleted) or completes a NEW verification (created after revoked_at).
+//
+// Step-up (account_config.require_stepup, default OFF): the FULL-REPORT views and read_blob additionally need the caller's
 // account_device.stepup_until to be set (views have no clock; account_tick clears it on expiry) and, where a clock
 // exists (procedures), in the future. A verified owner with no account gets nothing from those views while it is on.
+// Destructive account actions (remove_device, delete_account, set_device_label) ALWAYS need an active step-up window.
 
 /** The account the identity's device is linked to, if any. */
 export function accountIdOf(db: RoDb, who: Identity): bigint | undefined {
@@ -63,7 +70,7 @@ export function accountIdentities(db: RoDb, who: Identity): Identity[] {
 }
 
 export function stepupRequired(db: RoDb): boolean {
-  return db.email_config.id.find(0)?.require_stepup === true;
+  return db.account_config.id.find(0)?.require_stepup === true;
 }
 
 /**
@@ -77,14 +84,33 @@ export function hasReportAccess(db: RoDb, who: Identity, nowMicros?: bigint): bo
   return nowMicros === undefined || dev.stepup_until.microsSinceUnixEpoch > nowMicros;
 }
 
-/** Property ids the caller owns: verified by this identity or any device of the same account. Not step-up gated. */
+/** Epoch micros when this identity was revoked (remove_device / sign_out_device), or undefined. */
+export function revokedAtMicros(db: RoDb, who: Identity): bigint | undefined {
+  return db.device_revocation.identity.find(who)?.revoked_at.microsSinceUnixEpoch;
+}
+
+/** The 'verified' verification rows this identity may still use: all of them, or only those started after its revocation. */
+export function ownVerifiedRows(db: RoDb, who: Identity) {
+  const revoked = revokedAtMicros(db, who);
+  const out = [];
+  for (const v of db.verification.identity.filter(who)) {
+    if (v.state !== 'verified') continue;
+    if (revoked !== undefined && v.created_at.microsSinceUnixEpoch <= revoked) continue;
+    out.push(v);
+  }
+  return out;
+}
+
+/** Fails with 'stepup_required' unless the caller's device has a step-up window that is still open at `nowMicros`. */
+export function requireActiveStepup(db: RoDb, who: Identity, nowMicros: bigint): void {
+  const dev = db.account_device.identity.find(who);
+  if (!dev?.stepup_until || dev.stepup_until.microsSinceUnixEpoch <= nowMicros) fail('stepup_required');
+}
+
+/** Property ids the caller owns: its own non-revoked verifications plus the properties bound to its account. Not step-up gated. */
 export function verifiedPropertyIds(db: RoDb, who: Identity): Set<bigint> {
   const out = new Set<bigint>();
-  for (const id of accountIdentities(db, who)) {
-    for (const v of db.verification.identity.filter(id)) {
-      if (v.state === 'verified') out.add(v.property_id);
-    }
-  }
+  for (const v of ownVerifiedRows(db, who)) out.add(v.property_id);
   // Properties bound to the account (they survive the verifying device signing out).
   const accountId = accountIdOf(db, who);
   if (accountId !== undefined) for (const b of db.account_property.account_id.filter(accountId)) out.add(b.property_id);

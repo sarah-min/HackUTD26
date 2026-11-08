@@ -10,10 +10,11 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
-export default {
-  mode: __t.string(),
-  brevoApiKey: __t.option(__t.string()),
-  senderEmail: __t.option(__t.string()),
-  requireStepup: __t.option(__t.bool()),
-  dailySendCap: __t.option(__t.u32()),
+import {
+  AccountCodeResult,
+} from "./types";
+
+export const params = {
+  recoveryCode: __t.string(),
 };
+export const returnType = AccountCodeResult

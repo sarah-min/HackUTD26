@@ -53,7 +53,7 @@ export const refresh_area_cells = spacetimedb.reducer(
   }
 );
 
-/** Every 60 s: clear expired step-ups, close expired email challenges, purge stale email addresses and demo codes, trim the security ledgers. */
+/** Every 60 s: clear expired step-ups, purge the failed-code ledger (24 h), trim the security ledgers. */
 export const account_maintenance = spacetimedb.reducer(
   { onSchedule: account_tick },
   { arg: account_tick.rowType },

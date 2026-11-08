@@ -1,14 +1,15 @@
-// Live smoke test for email accounts (enroll -> sign out -> sign in on a second identity -> step-up) against the DEV
-// database only, in DEMO mode (no email is sent; codes are read from the my_demo_code view).
+// Live smoke test for recovery-code accounts (create -> sign out -> sign in on a second identity -> lockout -> replace code ->
+// step-up -> delete) against the DEV database only. No email or SMS exists any more: the code is generated here exactly like
+// the browser does (apps/web/lib/stdb/recoveryCode.ts) and the module stores only its hash.
 //
 // Usage:  cd scripts && pnpm install --ignore-workspace && pnpm smoke:accounts     (typecheck: npx tsc -p .)
 //
 // Needs: ../.env.local (STDB_URI, STDB_MODULE ending in -dev, DEV_WORKER_IDENTITY, DEV_WORKER_TOKEN) and the `spacetime`
-// CLI logged in as the dev ADMIN (it calls admin_set_email_config with that login; no admin token is read or printed).
-// Hard-fails on a non -dev database. It writes only its own test rows (a random address, a report marked fixture-like by
-// "SMOKE TEST" notes, a verification for "SPECIMEN PERSON", one account) and deletes the account at the end. It claims
-// ONLY the two jobs it creates (by id), never anyone else's. Takes ~2 minutes (30 s resend cooldowns).
-// Leaves email_config in demo mode with require_stepup = false (safe: the web UI doesn't require step-up yet).
+// CLI logged in as the dev ADMIN (it calls admin_set_account_config with that login; no admin token is read or printed).
+// Hard-fails on a non -dev database. It writes only its own test rows (a random address, a report marked "SMOKE TEST", a
+// verification for "SPECIMEN PERSON", one account) and deletes the account at the end. It claims ONLY the two jobs it
+// creates (by id), never anyone else's. Records ~6 failed code attempts (the global cap is 300 per hour). Takes ~15 s.
+// Leaves account_config with require_stepup = false (the web UI default).
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
@@ -16,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { DbConnection } from '@hack/stdb-bindings';
 import { normalizeParts } from '@hack/address';
+import { generateRecoveryCode } from '../apps/web/lib/stdb/recoveryCode';
 
 const here = dirname(fileURLToPath(import.meta.url));
 function loadEnv(path: string): Record<string, string> {
@@ -88,34 +90,33 @@ async function connect(name: string, token: string | undefined, queries: string[
   });
 }
 
-/** admin_set_email_config via the CLI login (Option args are {"some":v} / {"none":[]}). Never prints anything secret. */
-function setConfig(mode: 'demo', requireStepup: boolean): void {
+/** admin_set_account_config via the CLI login (Option args are {"some":v} / {"none":[]}). Never prints anything secret. */
+function setConfig(requireStepup: boolean): void {
   const none = '{"none":[]}';
   execFileSync(
     'spacetime',
-    ['call', '--server', 'maincloud', STDB_MODULE, 'admin_set_email_config', JSON.stringify(mode), none, none, JSON.stringify({ some: requireStepup }), none],
+    ['call', '--server', 'maincloud', STDB_MODULE, 'admin_set_account_config', none, JSON.stringify({ some: requireStepup })],
     { stdio: ['ignore', 'ignore', 'inherit'] }
   );
 }
 
 const MY = [
-  'my_account', 'my_devices', 'my_stepup', 'my_email_challenge', 'my_demo_code', 'my_auth_status',
+  'my_account', 'my_devices', 'my_stepup', 'my_account_status',
   'my_property_reports', 'my_assessments', 'my_media_assets', 'my_verifications', 'my_property_privates',
 ].map(v => `SELECT * FROM ${v}`);
 
 const houseNo = 1000 + Math.floor(Math.random() * 8000);
 const parts = normalizeParts({ line1: `${houseNo} Cedar Street`, city: 'Dallas', state: 'TX', zip: '75201' });
 const address = { ...parts, lat: 32.7 + Math.random() * 0.15, lng: -96.9 + Math.random() * 0.15, source: 'manual' as const };
-// example.com is a reserved domain that never receives mail (and demo mode sends nothing anyway). Random local parts so
-// reruns don't hit the per-email hourly limit. Mixed case on purpose: the module lowercases before hashing.
-const rnd = () => randomBytes(4).toString('hex');
-const EMAIL_A = `Smoke.${rnd()}@Example.com`;
-const EMAIL_B = `smoke.${rnd()}@example.com`; // never enrolled: used for the decoy check
-const maskedA = (() => { const n = EMAIL_A.toLowerCase(); return `${n[0]}***${n.slice(n.indexOf('@'))}`; })();
+const CODE = generateRecoveryCode();
+const NEW_CODE = generateRecoveryCode();
+/** The same code typed sloppily: lowercase, spaces instead of dashes. The module normalizes it. */
+const sloppy = (c: string) => c.toLowerCase().replace(/-/g, ' ');
+const wrongCode = () => generateRecoveryCode(); // a valid-shape code that belongs to nobody
 
 async function main(): Promise<void> {
   console.log(`Account smoke → ${STDB_URI} / ${STDB_MODULE}  (address: ${parts.normalized})`);
-  setConfig('demo', false);
+  setConfig(false);
 
   const reporter = await connect('reporter', undefined, ['SELECT * FROM my_reports']);
   const worker = await connect('worker', WORKER_TOKEN, ['SELECT * FROM svc_jobs']);
@@ -123,8 +124,8 @@ async function main(): Promise<void> {
   const O = owner.conn;
   const W = worker.conn;
   const R = reporter.conn;
-  const status = await waitFor('auth status', () => [...O.db.myAuthStatus.iter()][0]);
-  check('my_auth_status says demo mode', status?.mode === 'demo' && status.configured, j(status));
+  const status = await waitFor('account status', () => [...O.db.myAccountStatus.iter()][0]);
+  check('my_account_status says accounts are enabled', status?.enabled === true, j(status));
 
   // ---- a report + a verified owner (via the dev worker, claiming only these two jobs) ----
   await R.reducers.createReport({
@@ -163,23 +164,18 @@ async function main(): Promise<void> {
   await waitFor('owner reports', () => [...O.db.myPropertyReports.iter()].length > 0);
   check('require_stepup off: owner (no account) sees the full report', [...O.db.myPropertyReports.iter()].length === 1 && [...O.db.myAssessments.iter()].length === 1);
 
-  // ---- enroll ----
-  const reqE = await O.procedures.requestEmailCode({ email: EMAIL_A, purpose: 'enroll' });
-  check('request enroll code', reqE.ok, reqE.error);
-  const ch = await waitFor('challenge row', () => [...O.db.myEmailChallenge.iter()][0]);
-  check('my_email_challenge: purpose enroll, 5 attempts left, delivery demo', ch?.purpose === 'enroll' && ch.attemptsLeft === 5 && ch.deliveryState === 'demo', j({ ...ch, expiresAt: undefined }));
-  const demo = await waitFor('demo code', () => [...O.db.myDemoCode.iter()][0]);
-  check('demo code visible to the requester (6 digits)', !!demo && /^\d{6}$/.test(demo.code));
-  const wrong = await O.procedures.verifyEmailCode({ challengeId: reqE.challengeId, code: demo!.code === '000000' ? '000001' : '000000' });
-  check('wrong code rejected with attempts left', !wrong.ok && wrong.error === 'invalid_code' && wrong.attemptsLeft === 4, j(wrong));
-  const okE = await O.procedures.verifyEmailCode({ challengeId: reqE.challengeId, code: demo!.code });
-  check('enroll verified', okE.ok && okE.purpose === 'enroll', okE.error);
+  // ---- create ----
+  const weak = await O.procedures.createAccount({ recoveryCode: 'AAAA-AAAA-AAAA-AAAA-AAAA' });
+  check('weak code rejected (invalid_code)', !weak.ok && weak.error === 'invalid_code', j(weak));
+  const created = await O.procedures.createAccount({ recoveryCode: CODE });
+  check('create_account with the browser-generated code', created.ok && created.error === '', j(created));
   const acct = await waitFor('my_account', () => [...O.db.myAccount.iter()][0]);
-  check('my_account shows only the masked address (first char + ***@domain), never the full email', acct?.emailMasked === maskedA, acct ? `masked=${acct.emailMasked}` : 'none');
+  check('my_account has only id/createdAt/lastLoginAt (no email, no hash)', !!acct && Object.keys(acct).sort().join(',') === 'createdAt,id,lastLoginAt', acct ? Object.keys(acct).join(',') : 'none');
   check('one device, current', [...O.db.myDevices.iter()].length === 1 && [...O.db.myDevices.iter()][0]!.isCurrent);
   const su = [...O.db.myStepup.iter()][0];
-  check('step-up active right after enrolling', !!su && su.linked && su.active && !su.requireStepup);
-  check('challenge and demo code are gone', await waitFor('gone', () => [...O.db.myEmailChallenge.iter()].length === 0 && [...O.db.myDemoCode.iter()].length === 0) !== undefined);
+  check('step-up active right after creating', !!su && su.linked && su.active && !su.requireStepup);
+  const again = await O.procedures.createAccount({ recoveryCode: generateRecoveryCode() });
+  check('a second create from the same device is refused', !again.ok && again.error === 'already_signed_in', j(again));
 
   // ---- sign out ----
   await O.reducers.signOutDevice({});
@@ -187,16 +183,13 @@ async function main(): Promise<void> {
   check('sign_out_device unlinks this device', [...O.db.myAccount.iter()].length === 0 && [...O.db.myDevices.iter()].length === 0);
 
   // ---- sign in on a second identity ----
-  console.log('      (waiting 31 s for the resend cooldown on this email)');
-  await sleep(31_000);
   const second = await connect('second', undefined, MY);
   const S = second.conn;
   check('second device starts with no access', [...S.db.myPropertyReports.iter()].length === 0 && [...S.db.myAccount.iter()].length === 0);
-  const reqS = await S.procedures.requestEmailCode({ email: EMAIL_A, purpose: 'signin' });
-  check('request signin code', reqS.ok, reqS.error);
-  const demoS = await waitFor('second demo code', () => [...S.db.myDemoCode.iter()][0]);
-  const okS = await S.procedures.verifyEmailCode({ challengeId: reqS.challengeId, code: demoS!.code });
-  check('signin verified', okS.ok && okS.purpose === 'signin', okS.error);
+  const bad = await S.procedures.signInWithCode({ recoveryCode: wrongCode() });
+  check('wrong code: invalid_code with attemptsLeft 4', !bad.ok && bad.error === 'invalid_code' && bad.attemptsLeft === 4, j(bad));
+  const good = await S.procedures.signInWithCode({ recoveryCode: sloppy(CODE) });
+  check('sign_in_with_code (typed lowercase with spaces) works', good.ok && good.error === '', j(good));
   await waitFor('second sees report', () => [...S.db.myPropertyReports.iter()].length === 1);
   check('second device now sees the account properties (report, assessment, verification, address)',
     [...S.db.myPropertyReports.iter()].length === 1 && [...S.db.myAssessments.iter()].length === 1 &&
@@ -205,54 +198,63 @@ async function main(): Promise<void> {
   check('second device can read the media (read_blob)', rb.ok, rb.error);
   check('second device lists 1 device on the account', [...S.db.myDevices.iter()].length === 1 && [...S.db.myDevices.iter()][0]!.isCurrent);
 
-  // ---- signin for an unknown email looks the same and never links ----
+  // ---- brute force: every wrong code is the same invalid_code, the 5th failure locks the identity ----
   const third = await connect('third', undefined, MY);
   const T = third.conn;
-  const reqD = await T.procedures.requestEmailCode({ email: EMAIL_B, purpose: 'signin' });
-  const chD = await waitFor('decoy challenge', () => [...T.db.myEmailChallenge.iter()][0]);
-  check('unknown email: same ok result and same challenge shape (deliveryState demo, 5 attempts)', reqD.ok && reqD.error === '' && chD?.deliveryState === 'demo' && chD.attemptsLeft === 5);
-  const demoD = await waitFor('decoy demo code', () => [...T.db.myDemoCode.iter()][0]);
-  const decoy = await T.procedures.verifyEmailCode({ challengeId: reqD.challengeId, code: demoD?.code ?? '000000' });
-  check('decoy never verifies and never links', !decoy.ok && decoy.error === 'invalid_code' && [...T.db.myAccount.iter()].length === 0, j(decoy));
+  const fails = [];
+  for (let i = 0; i < 5; i++) fails.push(await T.procedures.signInWithCode({ recoveryCode: wrongCode() }));
+  check('4 wrong codes are all invalid_code (attemptsLeft 4,3,2,1)', fails.slice(0, 4).every((r, i) => !r.ok && r.error === 'invalid_code' && r.attemptsLeft === 4 - i), j(fails.slice(0, 4)));
+  check('the 5th wrong code locks with retryAfterS', !fails[4]!.ok && fails[4]!.error === 'locked' && fails[4]!.retryAfterS > 0, j(fails[4]));
+  const locked = await T.procedures.signInWithCode({ recoveryCode: CODE });
+  check('while locked even the RIGHT code is refused and nothing links', !locked.ok && locked.error === 'locked' && [...T.db.myAccount.iter()].length === 0, j(locked));
 
-  // ---- step-up with require_stepup off, then on ----
-  console.log('      (waiting 31 s for the resend cooldown on this email)');
-  await sleep(31_000);
-  const stepWrongEmail = await S.procedures.requestEmailCode({ email: EMAIL_B, purpose: 'stepup' });
-  check('step-up with a different email is refused (email_mismatch)', !stepWrongEmail.ok && stepWrongEmail.error === 'email_mismatch', stepWrongEmail.error);
-  const reqU = await S.procedures.requestEmailCode({ email: EMAIL_A, purpose: 'stepup' });
-  check('request step-up code (require_stepup off)', reqU.ok, reqU.error);
-  const demoU = await waitFor('step-up demo code', () => [...S.db.myDemoCode.iter()][0]);
-  const okU = await S.procedures.verifyEmailCode({ challengeId: reqU.challengeId, code: demoU!.code });
-  check('step-up verified', okU.ok && okU.purpose === 'stepup', okU.error);
+  // ---- replace the code (second device); the old code stops working, other devices stay linked ----
+  const rep = await S.procedures.replaceRecoveryCode({ oldCode: CODE, newCode: NEW_CODE });
+  check('replace_recovery_code', rep.ok, j(rep));
+  const fourth = await connect('fourth', undefined, MY);
+  const F = fourth.conn;
+  const oldTry = await F.procedures.signInWithCode({ recoveryCode: CODE });
+  check('old code no longer signs in (invalid_code)', !oldTry.ok && oldTry.error === 'invalid_code', j(oldTry));
+  const newTry = await F.procedures.signInWithCode({ recoveryCode: NEW_CODE });
+  check('new code signs in', newTry.ok, j(newTry));
+  await waitFor('fourth sees report', () => [...F.db.myPropertyReports.iter()].length === 1);
+  check('the account now has 2 devices (second + fourth)', [...S.db.myDevices.iter()].length === 2);
+
+  // ---- step-up ----
+  const stepWrong = await S.procedures.stepUpWithCode({ recoveryCode: wrongCode() });
+  check('step-up with a wrong code is invalid_code', !stepWrong.ok && stepWrong.error === 'invalid_code', j(stepWrong));
+  const stepOk = await S.procedures.stepUpWithCode({ recoveryCode: NEW_CODE });
+  check('step_up_with_code with the current code', stepOk.ok, j(stepOk));
   check('my_stepup active for the second device', !!(await waitFor('stepup active', () => [...S.db.myStepup.iter()].find(r => r.active))));
 
-  setConfig('demo', true);
+  setConfig(true);
   await waitFor('require flag', () => [...O.db.myStepup.iter()][0]?.requireStepup);
   check('require_stepup on: my_stepup shows required', [...O.db.myStepup.iter()][0]?.requireStepup === true);
   await waitFor('owner gated', () => [...O.db.myPropertyReports.iter()].length === 0);
   check('require_stepup on: the original device (signed out, no account) sees NO full report', [...O.db.myPropertyReports.iter()].length === 0 && [...O.db.myAssessments.iter()].length === 0 && [...O.db.myMediaAssets.iter()].length === 0);
   const rbO = await O.procedures.readBlob({ objectKey: key, seq: 0 });
-  check('require_stepup on: read_blob for that device returns stepup_required', !rbO.ok && rbO.error === 'stepup_required', rbO.error);
+  check('require_stepup on: read_blob for the signed-out (revoked) device returns forbidden', !rbO.ok && rbO.error === 'forbidden', rbO.error);
   check('require_stepup on: the stepped-up second device still sees the report', [...S.db.myPropertyReports.iter()].length === 1);
   const rbS = await S.procedures.readBlob({ objectKey: key, seq: 0 });
   check('require_stepup on: read_blob works for the stepped-up device', rbS.ok, rbS.error);
 
   // ---- cleanup ----
-  setConfig('demo', false);
+  setConfig(false);
   await S.reducers.deleteAccount({});
   await waitFor('account deleted', () => [...S.db.myAccount.iter()].length === 0);
   check('delete_account removes the account and device links', [...S.db.myAccount.iter()].length === 0 && [...S.db.myDevices.iter()].length === 0);
-  check('verification stays after delete_account (original device still sees its report)', await waitFor('owner back', () => [...O.db.myPropertyReports.iter()].length === 1) !== undefined);
+  const afterDelete = await F.procedures.signInWithCode({ recoveryCode: NEW_CODE });
+  check('after delete_account the code no longer signs anything in', !afterDelete.ok && afterDelete.error === 'invalid_code', j(afterDelete));
+  check('delete_account does not re-grant a signed-out (revoked) device: it still sees nothing', [...O.db.myPropertyReports.iter()].length === 0);
 
-  for (const c of [R, W, O, S, T]) c.disconnect();
+  for (const c of [R, W, O, S, T, F]) c.disconnect();
 }
 
 main()
   .catch(e => {
     check('unexpected error', false, String((e as Error)?.stack ?? e));
     try {
-      setConfig('demo', false);
+      setConfig(false);
     } catch {
       // best effort
     }

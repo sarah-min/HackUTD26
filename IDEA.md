@@ -58,7 +58,7 @@ The reporter does **not** see the cost breakdown, frames with findings, claim dr
 
 1. **Reporter** on a phone: Report damage → hazard → confirm address → danger question → upload video → sees the live status, hazards and 911 banner if needed, and the damage level.
 2. Behind the scenes: frames → Nemotron VL findings → Nemotron agent (cost, OpenFEMA, NWS, geocode, claim draft) → assessment, all streamed live.
-3. **Affected person** on a second device: I've been affected → address → ID photo → verified → sees the report for their address and the area map.
+3. **Affected person** on a second device: I've been affected → address → ID photo → verified → sees the report for their address and the area map. Optionally creates a recovery code (no email or phone) so they can sign back in on a new device; if it is lost they redo the ID check.
 4. Opens the full damage report and agent trace → fills the finance intake → Recovery Navigator with the what-if simulator and coach.
 5. The reporter's "My submissions" pin flips to "claimed" live.
 
@@ -84,6 +84,7 @@ We are submitting to exactly three tracks: **State Farm, PNC and NVIDIA (Nemotro
 | Low AI confidence (< 0.5) | Estimate shown, labeled "low confidence" |
 | Address matching | Both the reporter's confirmed address and the affected person's entered address are geocoded and normalized (CONTRACTS.md). A report matches a property on the same normalized address, or within 30 m of the same geocode point |
 | ID verification | Demo-grade: Nemotron VL extracts the name and address from the ID photo; deterministic code compares the normalized address. Max 3 attempts per identity per hour. The ID image is deleted after extraction. Never call it production KYC. A real IDV provider (e.g. Stripe Identity / Persona) is the production path, and a stretch goal only |
+| Accounts and re-access | Optional. A verified owner can create a passwordless account: the browser generates a 20-character recovery code (about 100 bits), shown once, only a hash stored. No email, no phone, no delivery vendor. Real SMS/email codes were investigated and dropped. A second claimant on a verified address is held for admin review. No liveness or deepfake defense (roadmap: liveness vendor, mailed postcard code, owner-of-record check) |
 | Area map privacy | Nearby reports are shown only as aggregated cells (about 250 m), never as individual pins or addresses. Hazard *types* appear in a cell's tooltip only when the cell has ≥3 reports; otherwise "hazard reported" |
 | Flood damage and policy is homeowners without flood | Navigator assumes $0 dwelling payout for flood unless flood is covered. "Check your policy", not a determination |
 | Cost estimate | Deterministic cost model; the model never invents dollar figures |

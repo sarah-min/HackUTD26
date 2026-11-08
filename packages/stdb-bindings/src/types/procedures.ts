@@ -6,20 +6,26 @@
 import { type Infer as __Infer } from "spacetimedb";
 
 // Import all procedure arg schemas
+import * as CreateAccountProcedure from "../create_account_procedure";
 import * as GeocodeAddressProcedure from "../geocode_address_procedure";
 import * as GeocodePointProcedure from "../geocode_point_procedure";
 import * as ReadBlobProcedure from "../read_blob_procedure";
-import * as RequestEmailCodeProcedure from "../request_email_code_procedure";
-import * as VerifyEmailCodeProcedure from "../verify_email_code_procedure";
+import * as ReplaceRecoveryCodeProcedure from "../replace_recovery_code_procedure";
+import * as SignInWithCodeProcedure from "../sign_in_with_code_procedure";
+import * as StepUpWithCodeProcedure from "../step_up_with_code_procedure";
 
+export type CreateAccountArgs = __Infer<typeof CreateAccountProcedure.params>;
+export type CreateAccountResult = __Infer<typeof CreateAccountProcedure.returnType>;
 export type GeocodeAddressArgs = __Infer<typeof GeocodeAddressProcedure.params>;
 export type GeocodeAddressResult = __Infer<typeof GeocodeAddressProcedure.returnType>;
 export type GeocodePointArgs = __Infer<typeof GeocodePointProcedure.params>;
 export type GeocodePointResult = __Infer<typeof GeocodePointProcedure.returnType>;
 export type ReadBlobArgs = __Infer<typeof ReadBlobProcedure.params>;
 export type ReadBlobResult = __Infer<typeof ReadBlobProcedure.returnType>;
-export type RequestEmailCodeArgs = __Infer<typeof RequestEmailCodeProcedure.params>;
-export type RequestEmailCodeResult = __Infer<typeof RequestEmailCodeProcedure.returnType>;
-export type VerifyEmailCodeArgs = __Infer<typeof VerifyEmailCodeProcedure.params>;
-export type VerifyEmailCodeResult = __Infer<typeof VerifyEmailCodeProcedure.returnType>;
+export type ReplaceRecoveryCodeArgs = __Infer<typeof ReplaceRecoveryCodeProcedure.params>;
+export type ReplaceRecoveryCodeResult = __Infer<typeof ReplaceRecoveryCodeProcedure.returnType>;
+export type SignInWithCodeArgs = __Infer<typeof SignInWithCodeProcedure.params>;
+export type SignInWithCodeResult = __Infer<typeof SignInWithCodeProcedure.returnType>;
+export type StepUpWithCodeArgs = __Infer<typeof StepUpWithCodeProcedure.params>;
+export type StepUpWithCodeResult = __Infer<typeof StepUpWithCodeProcedure.returnType>;
 

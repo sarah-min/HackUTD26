@@ -1,7 +1,9 @@
 // Sender-scoped / admin-only views for the security hardening (CONTRACTS.md §5.4).
 import { t } from 'spacetimedb/server';
 import { spacetimedb } from './schema';
-import { accountIdentities, isAdmin, verifiedPropertyIds } from './auth';
+import { accountIdOf, isAdmin, verifiedPropertyIds } from './auth';
+import type { Identity } from 'spacetimedb';
+import type { RoDb } from './constants';
 import { ACCESS_LOG_VIEW_LIMIT, getSecurityConfig } from './security';
 
 /**
@@ -29,6 +31,13 @@ export const my_claim_conflicts = spacetimedb.view(
   }
 );
 
+const isLinkedBefore = (linked: bigint | undefined, at: bigint) => linked !== undefined && linked <= at;
+
+function accountDevices(db: RoDb, who: Identity) {
+  const id = accountIdOf(db, who);
+  return id === undefined ? [] : [...db.account_device.account_id.filter(id)];
+}
+
 /**
  * Audit trail of reads/grants on properties the caller owns, newest first, at most 50 rows: time + kind only, plus `mine`
  * (was it this account's own device). Never another identity, never an object key.
@@ -45,7 +54,10 @@ export const my_access_log = spacetimedb.view(
     })
   ),
   ctx => {
-    const mine = accountIdentities(ctx.db, ctx.sender);
+    // `mine`: the viewer's own device, or another device CURRENTLY linked to the viewer's account, for reads made after that
+    // device linked. Reads by an identity before it joined the account, or by one that was removed / signed out, are not mine.
+    const linkedAt = new Map<string, bigint>();
+    for (const d of accountDevices(ctx.db, ctx.sender)) linkedAt.set(d.identity.toHexString(), d.linked_at.microsSinceUnixEpoch);
     const rows = [];
     for (const pid of verifiedPropertyIds(ctx.db, ctx.sender)) rows.push(...ctx.db.access_log.property_id.filter(pid));
     rows.sort((a, b) => (a.id < b.id ? 1 : -1));
@@ -54,7 +66,7 @@ export const my_access_log = spacetimedb.view(
       property_id: r.property_id,
       kind: r.kind,
       at: r.at,
-      mine: mine.some(i => i.isEqual(r.identity)),
+      mine: r.identity.isEqual(ctx.sender) || isLinkedBefore(linkedAt.get(r.identity.toHexString()), r.at.microsSinceUnixEpoch),
     }));
   }
 );
