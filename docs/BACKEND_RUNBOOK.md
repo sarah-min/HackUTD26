@@ -173,3 +173,9 @@ This **destroys every report, verification, plan and service identity.** Announc
 | Address search fails | Census or Nominatim unavailable (module geocode procedures) | Retry. If it persists, enter the address by hand. Check upstream status |
 | Verification stuck `pending` | `verify_identity` job queued with no worker | Restart the worker. A decided verification deletes its ID image |
 | Reporter sees nothing in "My submissions" | Wrong browser or cleared storage (the secret lives in the browser) | Same browser profile that filed the report |
+
+## 12. Gotchas
+
+- **Scheduled reducers and the host scheduler (fixed 2026-11-08, PR #11).** `requeue_expired_jobs` and `refresh_area_cells` (`spacetimedb/src/reducers/scheduled.ts`) were rejecting the host scheduler with `unauthorized: scheduled only`, because `ctx.senderAuth.isInternal` is false on a live host. The guard now also accepts `ctx.sender == ctx.databaseIdentity`. Published to dev and prod 2026-11-08 ~12:15 UTC. To check: `spacetime logs -s maincloud <db>` should show no `scheduled only` errors, and expired leases should requeue with `last_error` `lease expired`.
+- **Seed assessments** now carry all 9 `componentLevels`. The live dev (12) and prod (11) rows were patched with a SQL UPDATE.
+- **A local worker claims ANY open job.** Before running one against dev, check `SELECT id,kind,state FROM job` for teammates' queued jobs.
