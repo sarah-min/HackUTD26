@@ -6,7 +6,10 @@
   "description": "Dev/admin scripts. smoke-p2 + dev-fake-worker (Part 2) target the -dev database only.",
   "scripts": {
     "smoke:p2": "tsx --tsconfig tsconfig.run.json smoke-p2.ts",
-    "fake-worker": "tsx --tsconfig tsconfig.run.json dev-fake-worker.ts"
+    "fake-worker": "tsx --tsconfig tsconfig.run.json dev-fake-worker.ts",
+    "verify:identity": "tsx --tsconfig tsconfig.run.json verify-identity.ts",
+    "seed:demo": "tsx --tsconfig tsconfig.run.json seed-demo.ts",
+    "load:dev": "tsx --tsconfig tsconfig.run.json load-dev.ts"
   },
   "dependencies": {
     "spacetimedb": "2.13.0"
