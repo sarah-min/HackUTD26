@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import logoMark from "./assets/logo.png";
 import {
   DamageLegend,
   MapboxDamageMap,
@@ -16,6 +17,21 @@ import {
 
 const hazards = ["Hurricane", "Flood", "Tornado", "Wildfire", "Other"] as const;
 type Hazard = (typeof hazards)[number];
+
+/** App logo. On dark headers it sits on a white tile so the navy mark stays visible. */
+function BrandMark({ size, onDark = false }: { size: number; onDark?: boolean }) {
+  if (onDark) {
+    return (
+      <span
+        className="grid shrink-0 place-items-center rounded-xl bg-white"
+        style={{ width: size, height: size }}
+      >
+        <img alt="" className="block" height={size * 0.8} src={logoMark} width={size * 0.8} />
+      </span>
+    );
+  }
+  return <img alt="" className="block shrink-0" height={size} src={logoMark} width={size} />;
+}
 
 function Icon({
   children,
@@ -89,17 +105,7 @@ function Header({
             type="button"
             aria-label="Aftermath home"
           >
-            <span className="grid size-8 place-items-center rounded-lg bg-white text-[#0f172a]">
-              <Icon size={20}>
-                <path
-                  d="M4 18 9.1 6.8a1 1 0 0 1 1.82 0L16 18M6.3 13h7.4M17.8 7.5 20 12h-4.4"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2.3"
-                />
-              </Icon>
-            </span>
+            <BrandMark size={32} onDark />
             <span className="text-[19px] font-bold tracking-[-0.025em]">Aftermath</span>
           </button>
 
@@ -172,10 +178,10 @@ function EmergencyCard() {
       <div className="flex items-center justify-between gap-4 p-4">
         <div>
           <h1 id="emergency-heading" className="text-[17px] font-bold leading-tight text-slate-950">
-            Is anyone in danger right now?
+            Call first responders if someone is in immediate danger
           </h1>
           <p className="mt-1 text-[12px] leading-relaxed text-slate-500">
-            Don&apos;t wait to submit a report.
+            Don’t wait to call or submit a report.
           </p>
         </div>
         <a
@@ -359,9 +365,9 @@ function CaptureForm({ onSubmit }: { onSubmit: (hazard: Hazard, notes: string) =
             )}
           </div>
           {fileName && (
-            <span className="mt-3 block h-1.5 overflow-hidden rounded-full bg-blue-100">
+            <span className="mt-3 block h-1.5 overflow-hidden rounded-full bg-slate-200">
               <span
-                className="block h-full rounded-full bg-blue-600 transition-[width] duration-200"
+                className="block h-full rounded-full bg-accent transition-[width] duration-200"
                 style={{ width: `${progress}%` }}
               />
             </span>
@@ -860,7 +866,7 @@ function SubmissionsMap({ onBack }: { onBack: () => void }) {
           </label>
           <button
             aria-label="Re-center map"
-            className="grid size-11 shrink-0 place-items-center rounded-xl bg-blue-600 text-white shadow-xl transition hover:bg-blue-500 active:scale-95"
+            className="grid size-11 shrink-0 place-items-center rounded-xl bg-accent text-white shadow-xl transition hover:brightness-110 active:scale-95"
             onClick={() => {
               setSelectedId(0);
               setRecenterKey((key) => key + 1);
@@ -874,7 +880,7 @@ function SubmissionsMap({ onBack }: { onBack: () => void }) {
 
       <div className="app-safe-map-count absolute left-3 top-[82px] z-20 rounded-xl border border-white/10 bg-[#0f172a]/85 px-3 py-2 text-white shadow-lg backdrop-blur-md md:left-6 md:top-[90px]">
         <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-400">
-          My filmed properties
+          My documented properties
         </p>
         <p className="mt-0.5 text-[13px] font-bold">
           {filtered.length} {filtered.length === 1 ? "submission" : "submissions"}
@@ -893,7 +899,7 @@ function SubmissionsList({ onBack, onOpenMap }: { onBack: () => void; onOpenMap:
   );
 
   return (
-    <div className="min-h-screen bg-[#f3f5f7]">
+    <div className="min-h-screen bg-app-gradient">
       <header className="app-safe-header border-b border-slate-200 bg-[#0f172a] px-4 py-4 text-white">
         <div className="mx-auto flex max-w-3xl items-center gap-3">
           <button
@@ -942,7 +948,7 @@ function SubmissionsList({ onBack, onOpenMap }: { onBack: () => void; onOpenMap:
         </label>
         <div className="mb-3 mt-5 flex items-center justify-between">
           <p className="text-[11px] font-bold text-slate-700">
-            {filtered.length} filmed {filtered.length === 1 ? "property" : "properties"}
+            {filtered.length} documented {filtered.length === 1 ? "property" : "properties"}
           </p>
           <span className="text-[9px] font-semibold text-slate-400">Newest first</span>
         </div>
@@ -1186,7 +1192,7 @@ function VerificationPanel({
   }, [idState]);
 
   return (
-    <aside className="app-safe-header relative z-30 mx-auto min-h-screen w-full max-w-[520px] shrink-0 bg-[#f6f7f9] px-4 pb-8 pt-4 md:px-7 md:py-6">
+    <aside className="app-safe-header relative z-30 mx-auto min-h-screen w-full max-w-[520px] shrink-0 px-4 pb-8 pt-4 md:px-7 md:py-6">
       <div className="flex items-center justify-between">
         <button
           className="flex items-center gap-2 text-[12px] font-bold text-slate-600 transition hover:text-slate-950"
@@ -1227,17 +1233,7 @@ function VerificationPanel({
       </div>
 
       <div className="mt-7 flex items-center gap-2">
-        <span className="grid size-9 place-items-center rounded-xl bg-[#0f172a] text-white">
-          <Icon size={21}>
-            <path
-              d="M4 18 9.1 6.8a1 1 0 0 1 1.82 0L16 18M6.3 13h7.4M17.8 7.5 20 12h-4.4"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2.3"
-            />
-          </Icon>
-        </span>
+        <BrandMark size={36} />
         <span className="text-[20px] font-bold tracking-[-0.03em] text-slate-950">Aftermath</span>
       </div>
 
@@ -1440,7 +1436,7 @@ function VerificationPanel({
             </Icon>
           </span>
           <p className="text-[9px] font-semibold leading-relaxed">
-            Demo identity check — Document image is permanently deleted immediately after extraction
+            Demo identity check — the document image is permanently deleted immediately after extraction.
           </p>
         </div>
       </div>
@@ -1639,7 +1635,7 @@ function FindingsPanel() {
               <tr>
                 <td className="px-3 py-3 font-bold text-slate-800 sm:px-4">Structural</td>
                 <td className="hidden px-3 py-3 text-slate-500 sm:table-cell">
-                  Rafters, load wall inspection
+                  Rafters and load-bearing wall inspection
                 </td>
                 <td className="px-3 py-3 text-right font-bold text-slate-800 sm:px-4">$34,500</td>
               </tr>
@@ -1893,17 +1889,7 @@ function PropertyReport({ onBack }: { onBack: () => void }) {
               />
             </Icon>
           </button>
-          <span className="grid size-8 place-items-center rounded-lg bg-[#0f172a] text-white">
-            <Icon size={18}>
-              <path
-                d="M4 18 9.1 6.8a1 1 0 0 1 1.82 0L16 18M6.3 13h7.4M17.8 7.5 20 12h-4.4"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2.3"
-              />
-            </Icon>
-          </span>
+          <BrandMark size={32} />
           <div>
             <p className="text-[12px] font-bold text-slate-950">Aftermath Property Report</p>
             <p className="text-[8px] font-semibold text-slate-400">AM-2841 · Updated 4 min ago</p>
@@ -1935,8 +1921,8 @@ function PropertyReport({ onBack }: { onBack: () => void }) {
             />
           </Icon>
           <p className="text-[10px] font-semibold">
-            <strong>Life-safety risk remains active:</strong> Do not enter the attic or damaged east
-            rooms.
+            <strong>Life-safety risk remains active:</strong> Do not enter the home until local
+            authorities declare the area safe.
           </p>
           <a
             className="ml-auto shrink-0 rounded-lg bg-white px-2.5 py-1.5 text-[9px] font-extrabold text-red-800"
@@ -2031,7 +2017,7 @@ function AffectedPersonView({
   onContinue: () => void;
 }) {
   return (
-    <div className="min-h-screen bg-[#e9edf2]">
+    <div className="min-h-screen bg-app-gradient">
       <VerificationPanel
         address={address}
         onAddressChange={onAddressChange}
@@ -2173,7 +2159,7 @@ function AreaMapView({
               Aerial building assessment
             </h2>
             <p className="mt-1 text-[10px] font-medium leading-relaxed text-slate-700">
-              Colour-coded 3D buildings show assessed structures nearby.
+              Color-coded 3D buildings show assessed structures nearby.
               Neighbor identities and exact report details remain concealed.
             </p>
             <DamageLegend className="mt-2 flex flex-wrap gap-x-3 text-slate-600" />
@@ -2208,21 +2194,11 @@ function HomeScreen({
   onReporter: () => void;
 }) {
   return (
-    <div className="min-h-screen bg-[#eef1f5] text-slate-950">
+    <div className="min-h-screen bg-app-gradient text-slate-950">
       <header className="app-safe-header border-b border-white/10 bg-[#0f172a] px-4 py-4 text-white md:px-7">
         <div className="mx-auto flex max-w-6xl items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <span className="grid size-9 place-items-center rounded-xl bg-white text-[#0f172a]">
-              <Icon size={21}>
-                <path
-                  d="M4 18 9.1 6.8a1 1 0 0 1 1.82 0L16 18M6.3 13h7.4M17.8 7.5 20 12h-4.4"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2.3"
-                />
-              </Icon>
-            </span>
+            <BrandMark size={36} onDark />
             <div>
               <p className="text-[19px] font-bold tracking-[-0.03em]">Aftermath</p>
               <p className="text-[8px] font-semibold uppercase tracking-[0.14em] text-slate-400">
@@ -2239,16 +2215,16 @@ function HomeScreen({
 
       <main className="mx-auto max-w-6xl px-4 py-7 md:px-7 md:py-10">
         <section>
-          <div className="mb-3">
+          <div className="mb-5">
             <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-blue-700">
-              Choose your path
+              Disaster response support
             </p>
             <h2 className="mt-1 text-[20px] font-bold tracking-[-0.025em] text-slate-950">
-              How are you using Aftermath today?
+              Tell us how you’d like to get started
             </h2>
           </div>
 
-          <aside className="mb-3 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-red-950">
+          <aside className="mb-6 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-red-950">
             <span className="mt-0.5 shrink-0 text-red-700">
               <Icon size={17}>
                 <path
@@ -2269,15 +2245,15 @@ function HomeScreen({
             </p>
           </aside>
 
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-6 md:grid-cols-2 md:gap-7">
             <button
-              className="group relative overflow-hidden rounded-[24px] bg-[#0f172a] p-5 text-left text-white shadow-[0_12px_30px_rgba(15,23,42,.14)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_38px_rgba(15,23,42,.2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 md:p-6"
+              className="group relative overflow-hidden rounded-[20px] bg-[#0f172a] p-4 text-left text-white shadow-[0_12px_30px_rgba(15,23,42,.14)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_38px_rgba(15,23,42,.2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 md:p-5"
               onClick={onReporter}
               type="button"
             >
               <div className="flex items-start justify-between gap-4">
-                <span className="grid size-12 place-items-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-950/20">
-                  <Icon size={25}>
+                <span className="grid size-10 place-items-center rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-950/20">
+                  <Icon size={20}>
                     <path
                       d="M4 8.5h3l1.2-2h7.6l1.2 2h3v10H4v-10Z"
                       stroke="currentColor"
@@ -2287,8 +2263,8 @@ function HomeScreen({
                     <circle cx="12" cy="13" r="3" stroke="currentColor" strokeWidth="1.8" />
                   </Icon>
                 </span>
-                <span className="grid size-9 place-items-center rounded-full bg-white/10 text-slate-300 transition group-hover:bg-white group-hover:text-slate-950">
-                  <Icon size={18}>
+                <span className="grid size-8 place-items-center rounded-full bg-white/10 text-slate-300 transition group-hover:bg-white group-hover:text-slate-950">
+                  <Icon size={16}>
                     <path
                       d="m9 6 6 6-6 6"
                       stroke="currentColor"
@@ -2299,19 +2275,15 @@ function HomeScreen({
                   </Icon>
                 </span>
               </div>
-              <p className="mt-5 text-[9px] font-bold uppercase tracking-[0.13em] text-blue-300">
-                Reporter view
+              <h3 className="mt-4 text-[20px] font-bold tracking-[-0.025em]">Document Damage</h3>
+              <p className="mt-1.5 max-w-md text-[11px] leading-relaxed text-slate-400">
+                Capture field evidence, flag urgent hazards, and manage the properties you have
+                documented.
               </p>
-              <h3 className="mt-1 text-[21px] font-bold tracking-[-0.025em]">
-                I&apos;m documenting damage
-              </h3>
-              <p className="mt-2 max-w-md text-[11px] leading-relaxed text-slate-400">
-                Capture field evidence, flag urgent hazards, and manage properties you have filmed.
-              </p>
-              <div className="mt-5 flex flex-wrap gap-2">
+              <div className="mt-3.5 flex flex-wrap gap-1.5">
                 {["Field capture", "AI assessment", "My submissions"].map((item) => (
                   <span
-                    className="rounded-lg bg-white/7 px-2.5 py-1.5 text-[8px] font-semibold text-slate-300 ring-1 ring-inset ring-white/10"
+                    className="rounded-lg bg-white/7 px-2 py-1 text-[9px] font-semibold text-slate-300 ring-1 ring-inset ring-white/10"
                     key={item}
                   >
                     {item}
@@ -2321,13 +2293,13 @@ function HomeScreen({
             </button>
 
             <button
-              className="group relative overflow-hidden rounded-[24px] border border-slate-200 bg-white p-5 text-left shadow-[0_12px_30px_rgba(15,23,42,.07)] transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-[0_18px_38px_rgba(15,23,42,.11)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 md:p-6"
+              className="group relative overflow-hidden rounded-[20px] border border-slate-200 bg-white p-4 text-left shadow-[0_12px_30px_rgba(15,23,42,.07)] transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-[0_18px_38px_rgba(15,23,42,.11)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 md:p-5"
               onClick={onAffected}
               type="button"
             >
               <div className="flex items-start justify-between gap-4">
-                <span className="grid size-12 place-items-center rounded-2xl bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-100">
-                  <Icon size={25}>
+                <span className="grid size-10 place-items-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-100">
+                  <Icon size={20}>
                     <path
                       d="M4 11.5 12 5l8 6.5V20H4v-8.5Z"
                       stroke="currentColor"
@@ -2343,8 +2315,8 @@ function HomeScreen({
                     />
                   </Icon>
                 </span>
-                <span className="grid size-9 place-items-center rounded-full bg-slate-100 text-slate-500 transition group-hover:bg-blue-700 group-hover:text-white">
-                  <Icon size={18}>
+                <span className="grid size-8 place-items-center rounded-full bg-slate-100 text-slate-500 transition group-hover:bg-blue-700 group-hover:text-white">
+                  <Icon size={16}>
                     <path
                       d="m9 6 6 6-6 6"
                       stroke="currentColor"
@@ -2355,20 +2327,17 @@ function HomeScreen({
                   </Icon>
                 </span>
               </div>
-              <p className="mt-5 text-[9px] font-bold uppercase tracking-[0.13em] text-blue-700">
-                Affected person view
-              </p>
-              <h3 className="mt-1 text-[21px] font-bold tracking-[-0.025em] text-slate-950">
-                My home may be affected
+              <h3 className="mt-4 text-[20px] font-bold tracking-[-0.025em] text-slate-950">
+                Search for affected homes
               </h3>
-              <p className="mt-2 max-w-md text-[11px] leading-relaxed text-slate-500">
+              <p className="mt-1.5 max-w-md text-[11px] leading-relaxed text-slate-500">
                 Verify your residence, understand nearby risks, and build a personalized recovery
                 plan.
               </p>
-              <div className="mt-5 flex flex-wrap gap-2">
+              <div className="mt-3.5 flex flex-wrap gap-1.5">
                 {["Private verification", "Area conditions", "Recovery plan"].map((item) => (
                   <span
-                    className="rounded-lg bg-slate-100 px-2.5 py-1.5 text-[8px] font-semibold text-slate-600"
+                    className="rounded-lg bg-slate-100 px-2 py-1 text-[9px] font-semibold text-slate-600"
                     key={item}
                   >
                     {item}
@@ -2442,8 +2411,8 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-200 text-slate-900">
-      <div className="mx-auto min-h-screen max-w-[480px] bg-[#f5f7fa] shadow-[0_0_45px_rgba(15,23,42,0.12)]">
+    <div className="min-h-screen bg-app-gradient text-slate-900">
+      <div className="mx-auto min-h-screen max-w-[480px] shadow-[0_0_45px_rgba(15,23,42,0.12)]">
         <Header
           onAffected={() => setScreen("affected")}
           onHome={() => {

@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+@theme {
+  /* Brand accent: use sparingly (small highlights only). */
+  --color-accent: #fd2b67;
+}
+
 @layer base {
   :root {
     color: #0f172a;
