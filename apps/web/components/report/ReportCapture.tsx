@@ -22,7 +22,7 @@ import {
 } from '@/lib/stdb';
 import { useProcedure } from 'spacetimedb/react';
 import { HAZARD_OPTIONS } from './hazardOptions';
-import { gpsFromEvidenceFiles } from './photoGps';
+import { gpsFromEvidenceFiles, isLikelyImage } from './photoGps';
 import { useReporterEvidence, validateEvidence } from './useReporterEvidence';
 
 type Phase = 'form' | 'creating' | 'uploading' | 'error';
@@ -249,15 +249,23 @@ export function ReportCapture() {
 
   async function applyLocationFromPhoto(list: File[]) {
     setPhotoLocationNote(null);
+    const images = list.filter(isLikelyImage);
+    if (images.length === 0) return;
     const gps = await gpsFromEvidenceFiles(list);
     if (!gps) {
-      if (list.some((f) => f.type.startsWith('image/'))) {
-        setPhotoLocationNote('No GPS in these photos — pick an address from suggestions.');
-      }
+      setPhotoLocationNote(
+        'No GPS in these photos (often stripped by the phone or chat apps) — pick an address from suggestions.',
+      );
       return;
     }
     setDeviceLat(gps.lat);
     setDeviceLng(gps.lng);
+    if (!isActive) {
+      setPhotoLocationNote(
+        'Photo GPS found, but Aftermath is still connecting — wait for Live, then re-add the photo or type the address.',
+      );
+      return;
+    }
     setGeoBusy(true);
     setGeoError(null);
     try {
@@ -520,7 +528,7 @@ export function ReportCapture() {
             <div className="mt-4">
               <p className="mb-2 text-[12px] font-semibold text-slate-700">Evidence</p>
               <input
-                accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime"
+                accept="image/jpeg,image/png,image/webp,image/heic,image/heif,video/mp4,video/quicktime,.heic,.heif"
                 className="sr-only"
                 disabled={busy}
                 multiple

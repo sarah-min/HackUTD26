@@ -8,7 +8,13 @@ import { getPersona } from '../personas/index';
 /** SpacetimeDB SDK connection shape used by the worker (apps/worker/src/stdb/sdk.ts). */
 type ConnDb = {
   db: {
-    svcAffectedProfiles: { iter(): Iterable<{ propertyId: bigint; intakeJson: string }> };
+    svcAffectedProfiles: {
+      iter(): Iterable<{
+        propertyId: bigint;
+        intakeJson: string;
+        identity: { toHexString(): string };
+      }>;
+    };
     svcAssessments: { iter(): Iterable<{ reportId: bigint; json: string }> };
   };
 };
@@ -33,12 +39,13 @@ export const planHandler: JobHandler = async (ctx) => {
 
   let intakeJson: string | undefined;
   for (const p of conn.db.svcAffectedProfiles.iter()) {
-    if (p.propertyId === propId) {
+    // Match subject identity — two verified people on one property must not cross over.
+    if (p.propertyId === propId && p.identity.toHexString() === identity) {
       intakeJson = p.intakeJson;
       break;
     }
   }
-  if (!intakeJson) throw new Error('no affected_profile for plan job');
+  if (!intakeJson) throw new Error('no affected_profile for plan job subject');
 
   let assessmentJson: string | undefined;
   for (const a of conn.db.svcAssessments.iter()) {
