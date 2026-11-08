@@ -11,11 +11,10 @@ import {
 } from "spacetimedb";
 
 import {
-  RequestEmailCodeResult,
+  AccountCodeResult,
 } from "./types";
 
 export const params = {
-  email: __t.string(),
-  purpose: __t.string(),
+  recoveryCode: __t.string(),
 };
-export const returnType = RequestEmailCodeResult
+export const returnType = AccountCodeResult

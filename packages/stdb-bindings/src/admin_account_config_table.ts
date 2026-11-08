@@ -10,12 +10,9 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
-import {
-  VerifyEmailCodeResult,
-} from "./types";
-
-export const params = {
-  challengeId: __t.u64(),
-  code: __t.string(),
-};
-export const returnType = VerifyEmailCodeResult
+export default __t.row({
+  id: __t.u8().primaryKey(),
+  accountsEnabled: __t.bool().name("accounts_enabled"),
+  requireStepup: __t.bool().name("require_stepup"),
+  hasPepper: __t.bool().name("has_pepper"),
+});

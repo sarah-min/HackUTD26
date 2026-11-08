@@ -1,12 +1,11 @@
 'use client';
 // Small chip linking to /affected/account. Shown only when this device has an account.
 import Link from 'next/link';
-import { useAccount, useAuthStatus } from '@/lib/stdb';
+import { useAccount } from '@/lib/stdb';
 
 export function AccountLink() {
-  const { mode, ready } = useAuthStatus();
   const { account } = useAccount();
-  if (!ready || mode === 'off' || !account) return null;
+  if (!account) return null;
   return (
     <Link
       href="/affected/account"

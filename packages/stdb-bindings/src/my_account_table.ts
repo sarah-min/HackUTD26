@@ -12,6 +12,6 @@ import {
 
 export default __t.row({
   id: __t.u64().primaryKey(),
-  emailMasked: __t.string().name("email_masked"),
   createdAt: __t.timestamp().name("created_at"),
+  lastLoginAt: __t.timestamp().name("last_login_at"),
 });

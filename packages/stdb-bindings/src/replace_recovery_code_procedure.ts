@@ -10,8 +10,12 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
-export default __t.row({
-  challengeId: __t.u64().primaryKey().name("challenge_id"),
-  purpose: __t.string(),
-  code: __t.string(),
-});
+import {
+  AccountCodeResult,
+} from "./types";
+
+export const params = {
+  oldCode: __t.string(),
+  newCode: __t.string(),
+};
+export const returnType = AccountCodeResult

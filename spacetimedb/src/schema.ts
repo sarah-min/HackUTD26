@@ -15,7 +15,7 @@ import { verification, affected_profile, recovery_plan, coach_message } from './
 import { job, service_identity, lease_tick, area_tick } from './tables/system';
 import { blob, blob_chunk } from './tables/blobs';
 import { geocode_cache, geocode_throttle } from './tables/geocode';
-import { account, account_device, account_property, email_challenge, demo_code, email_config, account_tick } from './tables/accounts';
+import { account, account_device, account_property, code_attempt, device_revocation, account_config, account_tick } from './tables/accounts';
 import { claim_conflict, security_config, access_log, verification_start } from './tables/security';
 
 export const spacetimedb = schema({
@@ -44,9 +44,9 @@ export const spacetimedb = schema({
   account,
   account_device,
   account_property,
-  email_challenge,
-  demo_code,
-  email_config,
+  code_attempt,
+  device_revocation,
+  account_config,
   account_tick,
   claim_conflict,
   security_config,

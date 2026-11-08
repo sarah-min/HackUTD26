@@ -10,8 +10,7 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
-export default __t.row({
-  id: __t.u8().primaryKey(),
-  mode: __t.string(),
-  configured: __t.bool(),
-});
+export default {
+  accountsEnabled: __t.option(__t.bool()),
+  requireStepup: __t.option(__t.bool()),
+};

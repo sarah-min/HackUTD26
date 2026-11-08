@@ -1,71 +1,64 @@
-// Plain-language copy for the email account flow (CONTRACTS section 5.3 error codes).
-// Never reveals whether an email address has an account.
+// Plain-language copy for the recovery-code account flow (CONTRACTS section 5.3 error codes).
+// Every wrong code gets the same message; nothing here says how close a guess was.
+import type { AccountCodeResult } from '@/lib/stdb';
 
-export type AccountPurpose = 'enroll' | 'signin' | 'stepup';
-
-export const CODE_LENGTH = 6;
-/** Server code lifetime is 10 minutes; used only until the live challenge row arrives. */
-export const CODE_TTL_MS = 10 * 60 * 1000;
-export const RESEND_COOLDOWN_MS = 30 * 1000;
 export const DEMO_IDENTITY_LABEL = 'Demo identity check, not production-grade verification.';
-export const DEMO_CODE_LABEL = 'Demo mode: code shown on screen. Not real email.';
 export const ACCOUNTS_OFF_TEXT = 'Accounts are not enabled yet.';
 export const NETWORK_ERROR_TEXT =
   "We couldn't reach the server. Check your connection and try again.";
+export const GENERIC_ERROR_TEXT = 'Something went wrong. Please try again.';
 
-const GENERIC = 'Something went wrong. Please try again.';
+export const LOSS_WARNING =
+  'We cannot show this again or recover it for you. Anyone with this code can open your reports. If you lose it, you will need to verify your home again.';
 
-const REQUEST_ERRORS: Record<string, string> = {
-  email_not_configured: ACCOUNTS_OFF_TEXT,
-  invalid_purpose: GENERIC,
-  invalid_email: 'Enter a valid email address.',
-  locked: 'Too many wrong codes for this email. Wait 15 minutes and try again.',
-  not_verified_owner: 'Only a verified resident can secure an account. Verify your home first.',
-  already_signed_in: 'This device is already signed in.',
-  email_already_registered:
-    'That email already has an account. Try signing in on this device instead.',
-  not_signed_in: 'Sign in on this device first.',
-  email_mismatch: "That email doesn't match the one on your account.",
-  cooldown: 'Please wait a moment before asking for another code.',
-  rate_limited_email: 'Too many codes were requested for that email. Try again in an hour.',
-  rate_limited_identity: 'Too many codes were requested from this device. Try again in an hour.',
-  daily_cap: "We can't send more codes right now. Please try again tomorrow.",
-};
+export const DOWNLOAD_NAME = 'aftermath-recovery-code.txt';
 
-export function requestErrorText(code: string): string {
-  return REQUEST_ERRORS[code] ?? GENERIC;
+/** Contents of the downloaded file: the code and one line of instructions. */
+export function downloadText(code: string): string {
+  return `${code}\n\nAftermath recovery code. Enter it on the sign-in page to open your reports on a new device. Keep it private.\n`;
 }
 
-export function verifyErrorText(code: string, purpose: AccountPurpose): string {
-  switch (code) {
+/** True for the two refusals that carry a wait time. */
+export function isLockout(error: string): boolean {
+  return error === 'locked' || error === 'rate_limited';
+}
+
+/** "14 minutes", "1 minute", or "40 seconds" for the last minute. Never negative. */
+export function waitText(seconds: number): string {
+  const s = Math.max(0, Math.ceil(seconds));
+  if (s >= 60) {
+    const m = Math.ceil(s / 60);
+    return `${m} ${m === 1 ? 'minute' : 'minutes'}`;
+  }
+  return `${s} ${s === 1 ? 'second' : 'seconds'}`;
+}
+
+/** Message for a refused (not ok, not a lockout) procedure result. */
+export function failureText(r: Pick<AccountCodeResult, 'error' | 'attemptsLeft'>): string {
+  switch (r.error) {
     case 'invalid_code':
-      // Same wording for every purpose so a sign-in attempt never hints at whether the email exists.
-      return purpose === 'signin'
-        ? "That code didn't work. Check the code and the email address you entered."
-        : "That code didn't work. Check it and try again.";
-    case 'expired':
-      return 'That code expired. Request a new one.';
-    case 'not_found':
-      return 'That code is no longer active. Request a new one.';
-    case 'locked':
-      return 'Too many wrong codes. Wait 15 minutes, then start again.';
+      // One message for every wrong code. Only the number of tries left is shown.
+      return r.attemptsLeft > 0
+        ? `That code did not work. ${r.attemptsLeft} ${r.attemptsLeft === 1 ? 'try' : 'tries'} left.`
+        : 'That code did not work.';
+    case 'accounts_disabled':
+      return ACCOUNTS_OFF_TEXT;
+    case 'already_signed_in':
+      return 'This device is already signed in to an account. Sign out first.';
+    case 'not_signed_in':
+      return 'Sign in on this device first.';
+    case 'not_verified_owner':
+      return 'Only a verified resident can create an account. Verify your home first.';
+    case 'code_taken':
+    case 'invalid_new_code':
+    case 'code_unchanged':
+      return 'That new code could not be used. We made a fresh one. Save it and try again.';
     default:
-      return REQUEST_ERRORS[code] ?? GENERIC;
+      return GENERIC_ERROR_TEXT;
   }
 }
 
-/** Mirrors the server display: first character + *** + @domain; a one-character name shows ***@domain. */
-export function maskEmail(email: string): string {
-  const e = email.trim().toLowerCase();
-  const at = e.lastIndexOf('@');
-  if (at < 1) return '***';
-  const local = e.slice(0, at);
-  const domain = e.slice(at);
-  return `${local.length > 1 ? local.slice(0, 1) : ''}***${domain}`;
-}
-
-/** 9:05 style countdown; never negative. */
-export function formatCountdown(ms: number): string {
-  const s = Math.max(0, Math.ceil(ms / 1000));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+/** Errors after which the generated code was refused and should be replaced with a new one. */
+export function needsFreshCode(error: string): boolean {
+  return error === 'code_taken' || error === 'invalid_new_code' || error === 'code_unchanged';
 }

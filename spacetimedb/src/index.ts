@@ -13,7 +13,6 @@ export * from './reducers/notices';
 export * from './reducers/blobs';
 export * from './reducers/geocode';
 export * from './reducers/accounts';
-export * from './reducers/email_admin';
 export * from './reducers/security';
 export * from './views';
 export * from './views_service';

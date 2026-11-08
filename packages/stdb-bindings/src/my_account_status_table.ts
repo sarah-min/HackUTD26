@@ -11,10 +11,6 @@ import {
 } from "spacetimedb";
 
 export default __t.row({
-  id: __t.u64().primaryKey(),
-  purpose: __t.string(),
-  expiresAt: __t.timestamp().name("expires_at"),
-  attemptsLeft: __t.u8().name("attempts_left"),
-  deliveryState: __t.string().name("delivery_state"),
-  deliveryError: __t.option(__t.string()).name("delivery_error"),
+  id: __t.u8().primaryKey(),
+  enabled: __t.bool(),
 });

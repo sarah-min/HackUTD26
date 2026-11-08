@@ -1,5 +1,5 @@
 'use client';
-// /affected/account: masked email, devices, sign out, delete account.
+// /affected/account: account dates, devices, replace recovery code, sign out, delete account.
 // Deleting an account keeps verifications and reports (CONTRACTS section 5.3).
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
@@ -8,17 +8,30 @@ import {
   idToString,
   timestampToMs,
   useAccount,
-  useAuthStatus,
+  useAccountStatus,
   useDeleteAccount,
   useDevices,
   useMyVerifications,
   useRemoveDevice,
+  useReplaceRecoveryCode,
   useSetDeviceLabel,
   useSignOutDevice,
+  useStdb,
+  useStepUpWithCode,
   type DeviceRow,
 } from '@/lib/stdb';
+import { generateRecoveryCode, isRecoveryCodeShape } from '@/lib/stdb/recoveryCode';
 import { AppShell } from '@/components/chrome/AppShell';
-import { ACCOUNTS_OFF_TEXT, DEMO_IDENTITY_LABEL } from '../_account/copy';
+import { CodeEntryForm } from '../_account/CodeEntryForm';
+import { CodeField } from '../_account/CodeField';
+import { FailureNotice, useFailure } from '../_account/Failure';
+import { RecoveryCodeBox } from '../_account/RecoveryCodeBox';
+import {
+  ACCOUNTS_OFF_TEXT,
+  DEMO_IDENTITY_LABEL,
+  failureText,
+  needsFreshCode,
+} from '../_account/copy';
 import {
   amberNotice,
   btnDanger,
@@ -57,8 +70,13 @@ function DeviceItem({ d }: { d: DeviceRow }) {
     try {
       await fn();
       setMode('view');
-    } catch {
-      setError(FAIL_TEXT);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(
+        msg.includes('stepup_required')
+          ? 'This needs a recent code check. Sign out, sign in again with your recovery code, then try again.'
+          : FAIL_TEXT,
+      );
     } finally {
       setBusy(false);
     }
@@ -162,15 +180,153 @@ function DeviceItem({ d }: { d: DeviceRow }) {
   );
 }
 
+/** Rotate the recovery code: current code in, a fresh generated code out. The old code stops working at once. */
+function ReplaceCodeSection() {
+  const { isActive } = useStdb();
+  const replace = useReplaceRecoveryCode();
+  const [open, setOpen] = useState(false);
+  const [oldCode, setOldCode] = useState('');
+  const [newCode, setNewCode] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+  const failure = useFailure();
+  const oldRef = useRef<HTMLInputElement>(null);
+  const doneRef = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    if (open) oldRef.current?.focus();
+  }, [open]);
+  useEffect(() => {
+    if (done) doneRef.current?.focus();
+  }, [done]);
+
+  function begin() {
+    setDone(false);
+    setOldCode('');
+    setSaved(false);
+    failure.clear();
+    setNewCode(generateRecoveryCode());
+    setOpen(true);
+  }
+
+  function close() {
+    setOpen(false);
+    setOldCode('');
+    setNewCode(null);
+    setSaved(false);
+    failure.clear();
+  }
+
+  const ready = isRecoveryCodeShape(oldCode) && newCode !== null && saved;
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (!ready || busy || failure.locked || newCode === null) return;
+    setBusy(true);
+    failure.clear();
+    try {
+      const r = await replace(oldCode, newCode);
+      if (r.ok) {
+        setOldCode('');
+        setNewCode(null);
+        setSaved(false);
+        setOpen(false);
+        setDone(true);
+        return;
+      }
+      if (needsFreshCode(r.error)) {
+        setNewCode(generateRecoveryCode());
+        setSaved(false);
+        failure.text(failureText(r));
+      } else {
+        failure.fail(r);
+        oldRef.current?.focus();
+      }
+    } catch {
+      failure.network();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section aria-labelledby="replace-title" className={card}>
+      <h2 id="replace-title" className="text-[13px] font-bold text-slate-900">
+        Replace recovery code
+      </h2>
+      {done ? (
+        <p
+          ref={doneRef}
+          tabIndex={-1}
+          role="status"
+          className="text-[12px] font-semibold text-slate-900 outline-none"
+        >
+          Recovery code replaced. Your old code no longer works. Your other devices stay signed in.
+        </p>
+      ) : null}
+      {open && newCode ? (
+        <form className="space-y-3" onSubmit={(e) => void submit(e)} noValidate>
+          <CodeField
+            id="replace-old"
+            text="Current recovery code"
+            value={oldCode}
+            onChange={setOldCode}
+            inputRef={oldRef}
+            disabled={failure.locked}
+            invalid={failure.locked || failure.message !== null}
+            describedBy={failure.locked || failure.message !== null ? 'replace-err' : undefined}
+          />
+          <div className="space-y-2">
+            <p className="text-[12px] font-semibold text-slate-700">Your new recovery code</p>
+            <RecoveryCodeBox
+              code={newCode}
+              saved={saved}
+              onSavedChange={setSaved}
+              idPrefix="replace"
+              checkboxText="I saved my new recovery code"
+            />
+          </div>
+          <FailureNotice f={failure} id="replace-err" />
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              className={btnPrimary}
+              disabled={!ready || busy || failure.locked || !isActive}
+            >
+              {busy ? 'Replacing…' : 'Replace recovery code'}
+            </button>
+            <button type="button" className={btnSecondary} disabled={busy} onClick={close}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      ) : (
+        <>
+          <p className="text-[12px] text-slate-500">
+            Make a new recovery code if you lost track of the old one or think someone saw it. The
+            old code stops working right away. Your other devices stay signed in.
+          </p>
+          <button type="button" className={btnSecondary} onClick={begin}>
+            Replace recovery code
+          </button>
+        </>
+      )}
+    </section>
+  );
+}
+
 export default function AffectedAccountPage() {
   const router = useRouter();
-  const { mode, ready: authReady } = useAuthStatus();
+  const { enabled, ready: statusReady } = useAccountStatus();
   const { account, ready: accountReady } = useAccount();
   const { devices } = useDevices();
   const [verifs] = useMyVerifications();
   const signOut = useSignOutDevice();
   const deleteAccount = useDeleteAccount();
+  const stepUp = useStepUpWithCode();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [needStepup, setNeedStepup] = useState(false);
   const [busy, setBusy] = useState<'out' | 'delete' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -182,13 +338,15 @@ export default function AffectedAccountPage() {
     try {
       await (kind === 'out' ? signOut() : deleteAccount());
       router.replace('/affected/start');
-    } catch {
-      setError(FAIL_TEXT);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (kind === 'delete' && msg.includes('stepup_required')) setNeedStepup(true);
+      else setError(FAIL_TEXT);
       setBusy(null);
     }
   }
 
-  if (!authReady || !accountReady) {
+  if (!statusReady || !accountReady) {
     return (
       <AppShell>
         <p className="text-sm text-slate-600">Loading…</p>
@@ -211,12 +369,13 @@ export default function AffectedAccountPage() {
         <h1 className={h1}>Your account</h1>
         {account ? (
           <p className={subtitle}>
-            Signed in with <strong>{account.emailMasked}</strong>
+            Created {new Date(timestampToMs(account.createdAt)).toLocaleDateString()}. Last sign-in{' '}
+            {new Date(timestampToMs(account.lastLoginAt)).toLocaleString()}.
           </p>
         ) : null}
       </header>
 
-      {mode === 'off' ? (
+      {!account && !enabled ? (
         <p role="status" className={amberNotice}>
           {ACCOUNTS_OFF_TEXT}
         </p>
@@ -224,7 +383,8 @@ export default function AffectedAccountPage() {
         <section className={card}>
           <p className="text-[13px] font-bold text-slate-900">No account on this device.</p>
           <p className="text-[12px] text-slate-500">
-            Sign in if you already added an email, or verify your home to get started.
+            Sign in with your recovery code if you already made an account, or verify your home to
+            get started.
           </p>
           <Link href="/affected/signin" className={`block text-center ${btnPrimary}`}>
             Sign in on this device
@@ -249,13 +409,15 @@ export default function AffectedAccountPage() {
             </ul>
           </section>
 
+          <ReplaceCodeSection />
+
           <section aria-labelledby="signout-title" className={card}>
             <h2 id="signout-title" className="text-[13px] font-bold text-slate-900">
               Sign out
             </h2>
             <p className="text-[12px] text-slate-500">
               This device will no longer be linked to your account. You can sign in again with your
-              email.
+              recovery code.
             </p>
             <button
               type="button"
@@ -274,11 +436,40 @@ export default function AffectedAccountPage() {
             <h2 id="delete-title" className="text-[13px] font-bold text-red-800">
               Delete account
             </h2>
-            {confirmDelete ? (
+            {needStepup ? (
+              <div className="space-y-2">
+                <p className="text-[12px] text-slate-700">
+                  Enter your recovery code to confirm it is you. Then your account is deleted.
+                </p>
+                <CodeEntryForm
+                  idPrefix="delete-stepup"
+                  submitLabel="Confirm and delete"
+                  busyLabel="Checking…"
+                  focusOnMount
+                  showDemoLabel={false}
+                  onSubmit={stepUp}
+                  onSuccess={() => {
+                    setNeedStepup(false);
+                    void leave('delete');
+                  }}
+                >
+                  <button
+                    type="button"
+                    className={btnSecondary}
+                    onClick={() => {
+                      setNeedStepup(false);
+                      setConfirmDelete(false);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </CodeEntryForm>
+              </div>
+            ) : confirmDelete ? (
               <div className="space-y-2">
                 <p className="text-[12px] text-slate-700">
                   This deletes your account and unlinks every device. Your reports and your home
-                  verification stay. You can add an email again later.
+                  verification stay. You can create a new account later.
                 </p>
                 <div className="flex gap-2">
                   <button
@@ -302,8 +493,8 @@ export default function AffectedAccountPage() {
             ) : (
               <>
                 <p className="text-[12px] text-slate-500">
-                  Removes your email and all linked devices. Your reports and home verification
-                  stay.
+                  Removes your recovery code and all linked devices. Your reports and home
+                  verification stay.
                 </p>
                 <button
                   type="button"
@@ -321,9 +512,9 @@ export default function AffectedAccountPage() {
               {error}
             </p>
           ) : null}
-          <p className={hint}>{DEMO_IDENTITY_LABEL}</p>
         </>
       )}
+      <p className={hint}>{DEMO_IDENTITY_LABEL}</p>
     </AppShell>
   );
 }

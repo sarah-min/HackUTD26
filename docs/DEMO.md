@@ -26,8 +26,10 @@ Both screens update live from SpacetimeDB.
 | 0:30 | A | Live status: extracting frames → Nemotron VL → agent steps. **Standing water hazard** appears with safety guidance. Overall level: **Major** | "The reporter only gets what they need on scene: hazards, a 911 prompt if needed, and the damage level. Nothing private about the family." |
 | 0:50 | B (laptop) | Landing → **I've been affected** → enter the home address | "Now the family, wherever they are." |
 | 1:00 | B | Photograph the ID → verifying… → **Verified** | "Nemotron VL reads the ID, and code checks the address matches. The image is deleted right after. It's a demo-grade check, not real KYC." |
+| 1:10 | B | **Optional, skippable:** on the property page, **Create your recovery code**. Save the 20-character code | "Optional account, no email or phone. The browser makes a code, shows it once, and we store only a hash." |
 | 1:15 | B | Property page: the report from A, plus the **area map** (own pin + shaded cells of nearby reports, FEMA/NWS banner). Flip the toggle to **Hazards** so cells with life-safety hazards light up | "They see every report filed for their home, and what's happening around them, aggregated so neighbors aren't exposed." |
 | 1:25 | A (phone) | "My submissions" map: the pin flips to **Claimed** live | "Back on the neighbor's phone, the pin just flipped to claimed. That's SpacetimeDB pushing the change." |
+| 1:30 | B | **Optional, skippable:** open a second browser profile, **Sign in** with the recovery code, and the property is back | "New device, same owner, no password." |
 | 1:35 | B | Open the report: frames with findings, cost range with line items, claim-notice draft, agent trace | "The full report: what's damaged, priced line by line by code, and a drafted insurance claim. Every agent step is visible." |
 | 2:00 | B | Recovery Navigator intake (4 people, one elderly, homeowners, no flood policy, persona) → plan: gap, 5 indicators, 90-day forecast with a shortfall day | "Flood isn't covered, so here's the real gap and the day their cash runs out." |
 | 2:20 | B | What-if: drag the payout delay, switch to a CD + card mix; the chart redraws instantly | "They can test what-ifs. The cheapest mix is ranked." |
@@ -41,12 +43,19 @@ Both screens update live from SpacetimeDB.
 - **NVIDIA:** Start on the agent trace. Nemotron VL is used twice (damage frames → structured findings, and ID documents → extracted fields). Then show the agent's multi-step tool calls (cost, OpenFEMA, NWS, geocode, claim draft, finance) and the validated output. The model picks the tools; code owns numbers and matching.
 - **If a judge asks how it stays live across devices:** one sentence. Both browsers talk to SpacetimeDB directly, each only receives rows its views allow, and the reporter's pin flips to Claimed the moment the family verifies. No API server, ORM or websocket code. This is not a separate track pitch.
 
+## If a judge asks about deepfakes or SMS 2FA
+
+- **Deepfakes / spoofed IDs:** "The ID check is demo-grade, not KYC, and we have no liveness or deepfake defense. We harden the ID read against tampered documents and prompt injection, and suspicious IDs go to manual review. A second claimant on an already verified address is held, not approved, and the owner is notified. Roadmap: a liveness vendor, a mailed postcard code, and an owner-of-record check."
+- **SMS or email 2FA:** "We investigated real delivery and dropped it. Photon SMS needs 10DLC registration, iMessage needs the recipient to text first, Photon email needs our own domain, and we never ran Brevo. So the second factor is a recovery code the browser generates (about 100 bits, shown once, only a hash stored). Lose it and you redo the ID check."
+- Do not say the account is verified identity or KYC. Do not claim prod has the account feature unless docs/BACKEND_RUNBOOK.md says it is published there.
+
 ## Pre-demo smoke checklist
 
 - [ ] `/api/health` reports web and stdb OK on the production domain (storage now lives in SpacetimeDB, so `storage` there may be a no-op)
 - [ ] Reporter (fresh private tab): capture → upload → submit works. The status page shows hazards + damage level only (no cost, frames or finances)
 - [ ] Worker logs: claim → frames → VL → agent → assessment within about 90 s
 - [ ] Affected (separate profile): address → ID photo → **Verified** within about 30 s. The `idv/` blob is gone afterwards (`SELECT * FROM blob` as admin shows no `idv/` keys)
+- [ ] (Optional) Create a recovery code after verifying, then sign in with it in a second profile and the property returns. A wrong code is rejected
 - [ ] An unverified identity cannot open `/affected/report/[id]` or the property page (gating works)
 - [ ] A wrong-address ID returns `address_mismatch`, and the 4th attempt within an hour is `rate_limited`
 - [ ] Area map shows cells only (no other pins). The reporter map shows only that reporter's pins. The claimed badge flips live
@@ -72,4 +81,5 @@ Both screens update live from SpacetimeDB.
 - [ ] AI coding tools disclosed (which LLMs and agents each member used)
 - [ ] Tracks selected: **State Farm, PNC and NVIDIA (Nemotron)** only. **VERIFY** the Devpost limit allows three
 - [ ] All 4 team members added; domain and live URL listed
+- [ ] Devpost notes: accounts are optional recovery-code accounts (no email, phone or delivery vendor); ID check is demo-grade with no liveness or deepfake defense; real SMS/email delivery was investigated and dropped (say so, do not list Photon or Brevo as integrations); duplicate-claim hold, verification caps and owner audit log shipped; mention prod state only as documented
 - [ ] Initial submission by 11:00 PM Saturday; final by 12:00 PM Sunday

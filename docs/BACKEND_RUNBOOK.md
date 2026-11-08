@@ -180,97 +180,52 @@ This **destroys every report, verification, plan and service identity.** Announc
 - **Seed assessments** now carry all 9 `componentLevels`. The live dev (12) and prod (11) rows were patched with a SQL UPDATE.
 - **A local worker claims ANY open job.** Before running one against dev, check `SELECT id,kind,state FROM job` for teammates' queued jobs.
 
-## 13. Email accounts (Brevo)
+## 13. Recovery-code accounts
 
-Passwordless accounts for affected persons; the contract is CONTRACTS.md §5.3. **Everything is inert until an admin sets `email_config`** (no row = `my_auth_status.mode` is `off`, `request_email_code` returns `email_not_configured`). Step-up for full reports is **off by default** (`require_stepup = false`) so the UI keeps working until the account flow ships.
+Accounts for affected persons; the contract is CONTRACTS.md §5.3. The browser generates a 20-character recovery code (about 100 bits, `apps/web/lib/stdb/recoveryCode.ts`), shows it once, and the module stores only `sha256(pepper + code)`. Signing in on another device, stepping up and rotating the code all take that code. **There is no delivery vendor and nothing to configure to make accounts work**: no row in `account_config` means accounts are enabled, step-up is off, and the pepper is generated on the first create or sign-in.
 
-**Why not SMS.** The first design sent the code by SMS through Photon. US SMS to real phones needs a registered 10DLC campaign (carrier A2P registration), which takes days to weeks and could not be done in time, so that path was dropped and the Photon adapter deleted. Email through Brevo's HTTP API needs only a verified sender address.
+**Why Photon and Brevo were dropped.** SMS needed a registered US 10DLC campaign (days to weeks, not possible in time) and email needed a verified sender domain plus an unverified API shape; in demo mode the module had to show the one-time code on screen, which proves nothing about who is typing it. A high-entropy code held by the user needs no delivery at all, so the whole send path, its config, its secrets and its daily credit cap were deleted.
 
-### Modes
+### Toggle the config
 
-| Mode | What happens | Use |
-|---|---|---|
-| `demo` | No API call. The code is exposed ONLY to the requesting identity through `my_demo_code`. UI label: "Demo mode: code shown on screen. Not a real email." **No security: anyone who knows an email address can sign in to its account.** | dev, rehearsals, demo without a mail account |
-| `brevo` | `request_email_code` sends a real email through Brevo from inside the module (`ctx.http`). | live test and production, after the live test below passes |
-
-Daily credit protection: `daily_send_cap` (default 200, rolling 24 h of real challenges). Other limits are fixed in `spacetimedb/src/account_constants.ts`. Brevo's free plan has its own daily send limit; keep `daily_send_cap` at or below it.
-
-### Brevo setup (Sidd, one time)
-
-1. Create a Brevo account (https://app.brevo.com) and log in.
-2. **Verify a sender.** Dashboard: Senders, domains & dedicated IPs, Senders, Add a sender. Use an address whose inbox you can open. Free-mail addresses (gmail.com and similar) may be refused as a sender or land in spam because of the provider's DMARC policy, so prefer an address on a domain you control (add its SPF/DKIM DNS records when Brevo asks). Click the confirmation link Brevo emails you. Until the sender shows as verified, sends fail with `brevo:400:...` or `brevo:403:...`. For better delivery add your own domain and its SPF/DKIM/DMARC DNS records (optional for the hackathon).
-3. **Create an API key.** Dashboard: SMTP & API, API Keys, Generate a new API key (v3 key, starts with `xkeysib-`). Copy it once.
-4. Put the two values in the gitignored `.env.local` (never in git, never in `.env.example`, never in chat): `BREVO_API_KEY=...` and `BREVO_SENDER_EMAIL=...` (the verified sender). `scripts/live-email.ts` reads them from there. The module itself gets them only through `admin_set_email_config`.
-5. If Brevo shows an IP allow-list prompt (Security, Authorised IPs), deactivate blocking or allow Maincloud's egress, otherwise calls from the module return 401.
-
-### Set the config (key never lands in shell history)
-
-`spacetime call` takes Option args as `{"some":v}` / `{"none":[]}`. The order is `mode, brevo_api_key?, sender_email?, require_stepup?, daily_send_cap?`.
+`spacetime call` takes Option args as `{"some":v}` / `{"none":[]}`. The order is `accounts_enabled?, require_stepup?`; omitted values keep their current setting.
 
 ```bash
-D=aftermath-hackutd-dev          # prod only after the dev live test passes
+D=aftermath-hackutd-dev          # prod only after the dev smoke passes
 N='{"none":[]}'
+spacetime call --server maincloud $D admin_set_account_config '{"some":false}' $N   # switch new sign-ups / sign-ins OFF
+spacetime call --server maincloud $D admin_set_account_config '{"some":true}' $N    # ...and back ON
+spacetime call --server maincloud $D admin_set_account_config $N '{"some":true}'    # require a step-up (recent code) for full reports
+spacetime call --server maincloud $D admin_set_account_config $N '{"some":false}'   # step-up off (default)
 
-# demo mode (no key needed)
-spacetime call --server maincloud $D admin_set_email_config '"demo"' $N $N $N $N
-
-# brevo mode: read -s keeps the key out of history and the screen
-read -rs BREVO_KEY; echo
-spacetime call --server maincloud $D admin_set_email_config '"brevo"' \
-  "{\"some\":\"$BREVO_KEY\"}" '{"some":"verified-sender@yourdomain.com"}' $N $N
-unset BREVO_KEY
-
-# turn step-up for full reports on / off (omitted values keep their current setting)
-spacetime call --server maincloud $D admin_set_email_config '"demo"' $N $N '{"some":true}' $N
+spacetime sql --server maincloud $D "SELECT * FROM admin_account_config"   # booleans only; only the admin identity gets a row
 ```
 
-- `read -s` is a shell builtin, so the key is not in `~/.zsh_history`. While `spacetime call` runs, the key is briefly visible in the process list to your own user. Don't do this on a shared machine. Never paste the key into chat, a file or `.env.example`.
-- The key is write-only: no view returns it. Check the config without printing it: `spacetime sql --server maincloud $D "SELECT * FROM admin_email_config"` (booleans `has_key`, `has_sender_email`, `has_pepper`, plus `mode`, `require_stepup`, `daily_send_cap`; only the admin identity gets a row). **Do not run `SELECT * FROM email_config`**: as the database owner your CLI can read private tables and it would print the key and pepper.
-- The first call generates `hash_pepper` and it is never rotated (rotating would orphan every account's `email_hash`). A wipe-republish deletes `email_config` and all accounts.
-- `admin_set_email_config` (or the first `request_email_code`) creates the 60 s `account_tick` schedule if it is missing. Check: `SELECT * FROM account_tick` has one row.
-
-### How Brevo sending works (and what is unverified)
-
-`spacetimedb/src/email_brevo.ts` (`sendEmailViaBrevo`) is the only Brevo code: one call, `POST https://api.brevo.com/v3/smtp/email`, headers `api-key`, `content-type: application/json`, `accept: application/json`, body `{sender:{name:"Project Aftermath",email}, to:[{email}], subject, textContent, htmlContent}`. Success is HTTP 201 with `{messageId}`. A 201 means Brevo accepted it, not that it reached the inbox (there is no delivery webhook here, so a bounce or spam-folder delivery still shows as `sent`). Failure is non-fatal: the challenge gets `delivery_state = 'failed'` and a short `delivery_error` built from the status and Brevo's `code` string only (`brevo:401:unauthorized`, `brevo:429:too_many_requests`, `brevo:network`; never the key, a body or the address), visible in `my_email_challenge`, so the UI can offer a resend or demo. No tracking, no links.
-
-**Unverified.** This API shape is best knowledge of Brevo's v3 transactional API and has **never run against the live service**. The unit tests only check what we send and how responses are mapped (mocked `ctx.http`). It is verified only by the live test below. If the live test shows a different shape, only `email_brevo.ts` changes.
-
-### Live test (dev only, your own inbox)
-
-Needs `BREVO_API_KEY` and `BREVO_SENDER_EMAIL` in `.env.local`, the `spacetime` CLI logged in as the dev admin, and a token file for a dev identity that is already verified for a property (for example the scratchpad `aff.token`, verified for property 2). The scripts never print the key or the token. Use only your own address.
-
-```bash
-cd scripts
-pnpm live:email config                          # sets brevo mode from .env.local
-pnpm live:email request you@example.com ./aff.token   # sends the email; prints delivery_state / delivery_error (address printed masked)
-pnpm live:email verify 123456 ./aff.token       # the code from the inbox: enrolls the account
-pnpm live:email cleanup ./aff.token             # deletes the account, sets the config back to demo
-```
-
-If `request` prints `failed`, read `delivery_error`: `brevo:401:unauthorized` = bad key (or IP blocking, step 5 above), `brevo:400:invalid_parameter` / `brevo:403:...` = sender not verified or the body shape was rejected, `brevo:429:...` = Brevo rate limit, `brevo:network` = the module could not reach api.brevo.com. `spacetime logs --server maincloud aftermath-hackutd-dev` shows module errors. Open questions the live test answers: the exact success status and error `code` strings, whether a free-mail sender is accepted, and inbox vs spam placement.
+- **Step-up is off by default** (`require_stepup = false`) so the UI keeps working with or without an account.
+- **Do not run `SELECT * FROM account_config` or `recovery_account`**: as the database owner your CLI can read private tables and would print the pepper and the hashes. Use `admin_account_config` and `SELECT COUNT(*)`.
+- The pepper is never rotated (rotating would orphan every account's `recovery_hash`). A wipe-republish deletes `account_config` and all accounts.
+- `admin_set_account_config` (or the first create/sign-in) creates the 60 s `account_tick` schedule if it is missing. Check: `SELECT * FROM account_tick` has one row.
 
 ### Smoke test
 
 ```bash
-cd scripts && pnpm smoke:accounts     # dev only, demo mode, ~2 minutes (30 s resend cooldowns), needs `spacetime login` as the dev admin
+cd scripts && pnpm smoke:accounts     # dev only, ~15 s, needs `spacetime login` as the dev admin
 ```
 
-Covers enroll, a wrong code, sign out, sign in on a second identity (property access follows the account), an unknown email (decoy), step-up with `require_stepup` off then on, `read_blob` with `stepup_required`, and `delete_account`. It leaves the dev config in demo mode with `require_stepup = false`. It never calls Brevo.
+Covers a weak code, create, sign out, a wrong code (`attemptsLeft`), sign in on a second identity with the code typed in lowercase, five wrong codes -> `locked` (even the right code is refused), `replace_recovery_code` (old code dead, new code works, other device stays), step-up, `require_stepup` on (gated device sees nothing, `read_blob` -> `stepup_required`), and `delete_account`. It leaves `require_stepup = false` and records about 6 failed attempts (the global cap is 300 per hour).
 
-### Schema migration note (phone to email, 2026-11-08)
+### Schema migration note (email to recovery code, 2026-11-08)
 
-The phone design had briefly been published to dev. The email conversion renames `phone_challenge` to `email_challenge`, `sms_config` to `email_config`, and changes the columns of `account` (`phone_hash`, `phone_last_4` replaced by `email_hash`, `email_masked`). A plain publish is rejected for `account` ("Removing a column phone_hash from table account requires a manual migration"). Dev holds only smoke-test accounts, but `--delete-data` would also wipe the seeded data and service identities, so it needs explicit approval. See `status/part2.md` for the options and what was decided.
+The account tables changed shape again: `email_account` is replaced by `recovery_account`, and `email_challenge`, `demo_code` and `email_config` are removed (they were only ever test data). SpacetimeDB refuses to remove a table that still has rows ("table contains data"), and publishing a changed table needs `--delete-data` which destroys EVERYTHING. So on a database that ran the email build, first clear the rows of exactly those tables (and of `account_device` / `account_property`, whose `account_id` values point at the old account ids and would otherwise attach devices to the wrong new accounts), then publish normally. A database that never ran the email build publishes without any of this. There is no bulk-delete reducer; if the dev data is disposable, the wipe-and-republish fallback (section 8) does the same thing for the whole database. Check prod with `SELECT COUNT(*) FROM email_account` before its first publish of this build.
 
 ### Gotchas
 
-- **Step-up is only as fresh as the 60 s tick.** Views have no clock, so a step-up that expired is cleared by `account_maintenance` within about a minute; `read_blob` (a procedure) checks the clock exactly.
-- **Demo mode is not security.** Don't leave a prod database in `demo` with real people's accounts.
-- **Codes are derived from a secret pepper, not taken from `ctx.random`**, because the module's random source is seeded from the call timestamp (not secret). See `spacetimedb/src/email_flow.ts`.
-- **An address can be locked out by someone else**: 5 wrong codes lock it for 15 min, and 3 requests per hour per address apply to anyone. Accepted for a demo-grade check.
-- **Signin never reveals whether an email has an account**, but `enroll` does say `email_already_registered` (only verified owners can reach it).
-- **A failed Brevo send on a real signin shows `failed`; a decoy always shows `sent`** (it never sends). This only leaks if Brevo is failing.
-- **Gmail-style aliases are different accounts.** `a+x@gmail.com`, `a.b@gmail.com` and `ab@gmail.com` hash differently (no provider-specific normalization). The user must type the same address they enrolled with.
-- **Env names (not secrets) for the team:** `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`. Only `scripts/live-email.ts` reads them; the web app and worker never need them. `.env.example` is owned by Part 4.
+- **The code is the account.** Anyone holding it can sign in. The UI must show it once, ask the user to save it, and never log or store it (not in `localStorage`, analytics or error reports). The module never sees it outside the four procedure calls.
+- **Lost code = lost account** (the properties themselves stay verified on the original device). `replace_recovery_code` needs the old code. This is accepted for a demo-grade check.
+- **Step-up is only as fresh as the 60 s tick.** Views have no clock, so a step-up that expired is cleared by `account_maintenance` within about a minute; `read_blob` and `delete_account` check the clock exactly.
+- **An identity can lock itself out** (5 wrong codes, 15 min). Other identities are unaffected. A botnet of fresh identities hits the global cap (300 failures per hour), which blocks sign-in for everyone until it ages out: an accepted trade for a demo.
+- **Failures are the same everywhere.** `sign_in_with_code` never distinguishes a wrong code, a near-miss or an unknown account (always `invalid_code`).
+- **The 5th wrong code already answers `locked`**, not `invalid_code` (with `retryAfterS`).
 
 ## 12. Security hardening: duplicate claims, caps, audit log (2026-11-08)
 

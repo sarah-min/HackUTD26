@@ -40,6 +40,17 @@ export function logAccess(db: Db, who: Identity, propertyId: bigint, kind: Acces
   db.access_log.insert({ id: 0n, identity: who, property_id: propertyId, kind, object_key: objectKey, at: now });
 }
 
+/** A repeat read of the same object by the same identity inside this window is not logged again. */
+export const ACCESS_LOG_DEDUPE_MICROS = 60n * 1_000_000n;
+
+/** Audit entry for an owner's media/frames read; skips an identical (identity, object_key) entry from the last 60 s. */
+export function logBlobAccess(db: Db, who: Identity, propertyId: bigint, now: Timestamp, objectKey: string): void {
+  for (const r of db.access_log.identity.filter(who)) {
+    if (r.kind === 'blob' && r.object_key === objectKey && now.microsSinceUnixEpoch - r.at.microsSinceUnixEpoch < ACCESS_LOG_DEDUPE_MICROS) return;
+  }
+  logAccess(db, who, propertyId, 'blob', now, objectKey);
+}
+
 /** Run by the 60 s maintenance tick: drop start-ledger rows older than 24 h and audit entries older than 30 days. */
 export function runSecurityMaintenance(db: Db, nowMicros: bigint): void {
   for (const r of [...db.verification_start.iter()]) {

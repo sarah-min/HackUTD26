@@ -1,18 +1,11 @@
-// Timings and limits for email accounts (CONTRACTS.md §5.3).
+// Timings and limits for recovery-code accounts (CONTRACTS.md §5.3).
 import { HOUR_MICROS } from './constants';
 
 export const MIN = 60n * 1_000_000n;
-export const CODE_TTL_MICROS = 10n * MIN;
-export const RESEND_COOLDOWN_MICROS = 30n * 1_000_000n;
-export const EMAIL_LOCK_MICROS = 15n * MIN;
 export const STEPUP_TTL_MICROS = 15n * MIN;
-export const EMAIL_PURGE_MICROS = 15n * MIN;
-export const CHALLENGE_KEEP_MICROS = 24n * HOUR_MICROS;
-export const SENDS_PER_EMAIL_PER_HOUR = 3;
-export const SENDS_PER_IDENTITY_PER_HOUR = 5;
+/** Failed sign-in / step-up / replace attempts per identity inside this rolling window before `locked`. */
 export const MAX_CODE_ATTEMPTS = 5;
-export const DEFAULT_DAILY_SEND_CAP = 200;
-export const PURPOSES = ['enroll', 'signin', 'stepup'] as const;
-export type Purpose = (typeof PURPOSES)[number];
-
+export const ATTEMPT_WINDOW_MICROS = 15n * MIN;
+// No global failure cap: identities are free to mint, so one would let ~60 anonymous identities lock everyone out.
+export const ATTEMPT_KEEP_MICROS = 24n * HOUR_MICROS;
 export const ACCOUNT_TICK_MICROS = 60n * 1_000_000n;

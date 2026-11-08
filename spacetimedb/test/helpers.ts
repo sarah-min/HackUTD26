@@ -2,6 +2,7 @@
 import { createModuleTestHarness, TestAuth, TestClock } from 'spacetimedb/server/test-utils';
 import { ConnectionId, Timestamp } from 'spacetimedb';
 import * as mod from '../src/index';
+import { sha256Hex } from '../src/sha256';
 
 export { mod };
 export const T0 = Timestamp.fromDate(new Date('2026-11-07T18:00:00Z'));
@@ -129,40 +130,32 @@ export function setup(opts: { security?: 'off' | 'defaults' } = {}) {
     return h.db.verification.id.find(v.id)!;
   };
 
-  // ---- email accounts ----
-  /** Sets the email config as admin (the module's own identity). Omitted fields keep their value. */
-  const configureEmail = (mode: 'demo' | 'brevo' = 'demo', extra: Record<string, unknown> = {}) =>
-    call(internal, mod.admin_set_email_config as any, {
-      mode,
-      brevo_api_key: undefined,
-      sender_email: undefined,
-      require_stepup: undefined,
-      daily_send_cap: undefined,
-      ...extra,
-    });
-  const BREVO = { brevo_api_key: 'xkeysib-TESTKEY0123456789abcdef', sender_email: 'noreply@aftermath.example' };
-  const requestCode = (auth: TestAuth, email: string, purpose: string) =>
-    (mod.request_email_code as any)(h.procedureContext(auth), { email, purpose }) as {
-      ok: boolean; error: string; challenge_id: bigint; retry_after_s: number;
-    };
-  const verifyCode = (auth: TestAuth, challengeId: bigint, code: string) =>
-    (mod.verify_email_code as any)(h.procedureContext(auth), { challenge_id: challengeId, code }) as {
-      ok: boolean; error: string; attempts_left: number; purpose: string;
-    };
-  /** The demo code shown to `auth` (demo mode). */
-  const demoCode = (auth: TestAuth): string | undefined => view(auth, mod.my_demo_code as any)[0]?.code;
-  /** request + verify with the on-screen demo code. Returns the verify result. */
-  const emailFlow = (auth: TestAuth, email: string, purpose: string) => {
-    advanceMs(31_000); // clear the resend cooldown
-    const r = requestCode(auth, email, purpose);
-    if (!r.ok) throw new Error(`request failed: ${r.error}`);
-    return verifyCode(auth, r.challenge_id, demoCode(auth)!);
-  };
+  // ---- recovery-code accounts ----
+  /** Sets account_config as admin (the module's own identity). Omitted fields keep their value. */
+  const configureAccounts = (extra: { accounts_enabled?: boolean; require_stepup?: boolean } = {}) =>
+    call(internal, mod.admin_set_account_config as any, { accounts_enabled: undefined, require_stepup: undefined, ...extra });
+  type CodeResult = { ok: boolean; error: string; retry_after_s: number; attempts_left: number };
+  const proc = (name: string, auth: TestAuth, args: Record<string, unknown>) =>
+    (mod as any)[name](h.procedureContext(auth), args) as CodeResult;
+  const createAccount = (auth: TestAuth, code: string) => proc('create_account', auth, { recovery_code: code });
+  const signIn = (auth: TestAuth, code: string) => proc('sign_in_with_code', auth, { recovery_code: code });
+  const stepUp = (auth: TestAuth, code: string) => proc('step_up_with_code', auth, { recovery_code: code });
+  const replaceCode = (auth: TestAuth, oldCode: string, newCode: string) =>
+    proc('replace_recovery_code', auth, { old_code: oldCode, new_code: newCode });
   /** Fires the 60 s account_tick as the module itself. */
   const tick = () => call(internal, mod.account_maintenance as any, { arg: { scheduled_id: 1n, scheduled_at: { tag: 'Interval', value: 0n } } });
 
   return {
     h, clock, internal, call, user, idOf, view, worker, advanceMs, createReport, upload, attach, assess, verify, jobsFor,
-    configureEmail, BREVO, requestCode, verifyCode, demoCode, emailFlow, tick,
+    configureAccounts, createAccount, signIn, stepUp, replaceCode, tick,
   };
+}
+
+/** A deterministic, valid recovery code (20 Crockford chars, grouped 4-4-4-4-4) for tests. */
+export function testCode(n: number | string): string {
+  const alphabet = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+  const hexs = sha256Hex(`test-recovery-code-${n}`);
+  let out = '';
+  for (let i = 0; i < 20; i++) out += alphabet[parseInt(hexs.slice(i * 2, i * 2 + 2), 16) % 32];
+  return out.match(/.{4}/g)!.join('-');
 }

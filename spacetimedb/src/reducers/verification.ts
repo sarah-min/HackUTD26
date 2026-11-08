@@ -1,7 +1,7 @@
 // Affected-person verification reducers (CONTRACTS §5.2).
 import { t } from 'spacetimedb/server';
 import { spacetimedb } from '../schema';
-import { requireService } from '../auth';
+import { isVerifiedFor, requireService } from '../auth';
 import { parseAddress, upsertProperty } from '../matching';
 import { enqueueJob } from '../jobs';
 import { grantOrHold } from '../verification_decide';
@@ -51,7 +51,11 @@ export const start_verification = spacetimedb.reducer(
     for (const r of ctx.db.verification_start.property_id.filter(propertyId)) {
       if (now - r.at.microsSinceUnixEpoch < DAY_MICROS) propertyRecent++;
     }
-    if (propertyRecent >= cfg.maxStartsPerPropertyPerDay) fail(TOO_MANY); // rolls back the property upsert too
+    // A caller that already owns this property (own verification, or bound to its account) is exempt, so strangers cannot
+    // burn the per-property budget to stop the real owner from re-verifying. Everyone else is still capped. Only calls that
+    // got this far insert a ledger row; a rejected call rolls back and is never counted.
+    const ownsProperty = isVerifiedFor(ctx.db, ctx.sender, propertyId);
+    if (!ownsProperty && propertyRecent >= cfg.maxStartsPerPropertyPerDay) fail(TOO_MANY); // rolls back the property upsert too
     ctx.db.verification_start.insert({ id: 0n, property_id: propertyId, at: ctx.timestamp });
     ctx.db.verification.insert({
       id: 0n,

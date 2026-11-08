@@ -1,17 +1,16 @@
-// Sender-scoped views for email accounts (CONTRACTS.md §5.3). They never expose email_plain, email_hash, code_hash, salt,
-// any key or another account's rows. Views have no clock: expiry shows up when account_tick (60 s) updates the tables.
+// Sender-scoped views for recovery-code accounts (CONTRACTS.md §5.3). They never expose recovery_hash, the pepper, any
+// code or another account's rows. Views have no clock: expiry shows up when account_tick (60 s) updates the tables.
 import { t } from 'spacetimedb/server';
 import { spacetimedb } from './schema';
 import { accountIdOf, isAdmin } from './auth';
-import { MAX_CODE_ATTEMPTS } from './account_constants';
 
 export const my_account = spacetimedb.view(
   { name: 'my_account', public: true },
-  t.array(t.row('MyAccountRow', { id: t.u64().primaryKey(), email_masked: t.string(), created_at: t.timestamp() })),
+  t.array(t.row('MyAccountRow', { id: t.u64().primaryKey(), created_at: t.timestamp(), last_login_at: t.timestamp() })),
   ctx => {
     const id = accountIdOf(ctx.db, ctx.sender);
     const a = id === undefined ? undefined : ctx.db.account.id.find(id);
-    return a ? [{ id: a.id, email_masked: a.email_masked, created_at: a.created_at }] : [];
+    return a ? [{ id: a.id, created_at: a.created_at, last_login_at: a.last_login_at }] : [];
   }
 );
 
@@ -59,99 +58,39 @@ export const my_stepup = spacetimedb.view(
         linked: !!dev,
         active: !!dev?.stepup_until,
         stepup_until: dev?.stepup_until,
-        require_stepup: ctx.db.email_config.id.find(0)?.require_stepup === true,
+        require_stepup: ctx.db.account_config.id.find(0)?.require_stepup === true,
       },
     ];
   }
 );
 
-/** The caller's open (unconsumed) challenge, newest only. Never the code or the address. */
-export const my_email_challenge = spacetimedb.view(
-  { name: 'my_email_challenge', public: true },
+/** Always exactly one row: are new sign-ins / sign-ups accepted? (account_config.accounts_enabled, default true). */
+export const my_account_status = spacetimedb.view(
+  { name: 'my_account_status', public: true },
+  t.array(t.row('AccountStatusRow', { id: t.u8().primaryKey(), enabled: t.bool() })),
+  ctx => [{ id: 0, enabled: ctx.db.account_config.id.find(0)?.accounts_enabled !== false }]
+);
+
+/** Admin only: booleans, never the pepper. `spacetime sql <db> "SELECT * FROM admin_account_config"` while logged in as admin. */
+export const admin_account_config = spacetimedb.view(
+  { name: 'admin_account_config', public: true },
   t.array(
-    t.row('MyEmailChallengeRow', {
-      id: t.u64().primaryKey(),
-      purpose: t.string(),
-      expires_at: t.timestamp(),
-      attempts_left: t.u8(),
-      delivery_state: t.string(),
-      delivery_error: t.string().optional(),
-    })
-  ),
-  ctx => {
-    let best;
-    for (const c of ctx.db.email_challenge.identity.filter(ctx.sender)) {
-      if (!c.consumed && (!best || c.id > best.id)) best = c;
-    }
-    if (!best) return [];
-    return [
-      {
-        id: best.id,
-        purpose: best.purpose,
-        expires_at: best.expires_at,
-        attempts_left: Math.max(0, MAX_CODE_ATTEMPTS - best.attempts),
-        delivery_state: best.delivery_state,
-        delivery_error: best.delivery_error,
-      },
-    ];
-  }
-);
-
-/**
- * Demo mode ONLY: the plaintext code of the caller's own open challenge. UI label: "Demo mode: code shown on screen.
- * Not a real email." In any other mode (or for anyone else) this is empty.
- */
-export const my_demo_code = spacetimedb.view(
-  { name: 'my_demo_code', public: true },
-  t.array(t.row('MyDemoCodeRow', { challenge_id: t.u64().primaryKey(), purpose: t.string(), code: t.string() })),
-  ctx => {
-    if (ctx.db.email_config.id.find(0)?.mode !== 'demo') return [];
-    const out = [];
-    for (const d of ctx.db.demo_code.identity.filter(ctx.sender)) {
-      const c = ctx.db.email_challenge.id.find(d.challenge_id);
-      if (c && !c.consumed) out.push({ challenge_id: d.challenge_id, purpose: c.purpose, code: d.code });
-    }
-    return out;
-  }
-);
-
-/** Public-safe: which delivery mode applies. mode is 'off' until an admin configures email (then accounts are unavailable). */
-export const my_auth_status = spacetimedb.view(
-  { name: 'my_auth_status', public: true },
-  t.array(t.row('AuthStatusRow', { id: t.u8().primaryKey(), mode: t.string(), configured: t.bool() })),
-  ctx => {
-    const cfg = ctx.db.email_config.id.find(0);
-    return [{ id: 0, mode: cfg ? cfg.mode : 'off', configured: !!cfg }];
-  }
-);
-
-/** Admin only: booleans, never the key. `spacetime sql <db> "SELECT * FROM admin_email_config"` while logged in as admin. */
-export const admin_email_config = spacetimedb.view(
-  { name: 'admin_email_config', public: true },
-  t.array(
-    t.row('AdminEmailConfigRow', {
+    t.row('AdminAccountConfigRow', {
       id: t.u8().primaryKey(),
-      mode: t.string(),
-      has_key: t.bool(),
-      has_sender_email: t.bool(),
-      has_pepper: t.bool(),
+      accounts_enabled: t.bool(),
       require_stepup: t.bool(),
-      daily_send_cap: t.u32(),
+      has_pepper: t.bool(),
     })
   ),
   ctx => {
     if (!isAdmin(ctx.db, ctx.sender)) return [];
-    const c = ctx.db.email_config.id.find(0);
-    if (!c) return [];
+    const c = ctx.db.account_config.id.find(0);
     return [
       {
         id: 0,
-        mode: c.mode,
-        has_key: c.brevo_api_key.length > 0,
-        has_sender_email: c.sender_email.length > 0,
-        has_pepper: c.hash_pepper.length > 0,
-        require_stepup: c.require_stepup,
-        daily_send_cap: c.daily_send_cap,
+        accounts_enabled: c ? c.accounts_enabled : true,
+        require_stepup: c ? c.require_stepup : false,
+        has_pepper: !!c && c.hash_pepper.length > 0,
       },
     ];
   }
