@@ -54,6 +54,13 @@ Owner: Sidd. Append-only, newest entry first. Format is in [STATUS.md](../STATUS
 - Dev `aftermath-hackutd-dev` is republished with all of this (smoke test 100% pass, load probe clean). **Prod is republished at merge time** (see `docs/BACKEND_RUNBOOK.md`).
 - Still stale (not mine to edit unasked): ARCHITECTURE.md and CONTRACTS §8's REST tables still describe `/api/uploads/presign`, `/api/media` and `/api/geocode`; `apps/web/app/api/uploads/presign` can be deleted by Part 4.
 
+## 2026-11-08 12:30: scheduled reducer auth fix, seed componentLevels, regression test
+- **Shipped:** `requeue_expired_jobs` and `refresh_area_cells` (`spacetimedb/src/reducers/scheduled.ts`) were rejecting the host scheduler with `unauthorized: scheduled only`, because `ctx.senderAuth.isInternal` is false on a live host. The guard now also accepts `ctx.sender == ctx.databaseIdentity`. Fixed in PR #11 and published to dev and prod 2026-11-08 ~12:15 UTC. Seed assessments now carry all 9 `componentLevels`; live dev (12) and prod (11) rows were patched by SQL UPDATE. New test `spacetimedb/test/scheduled_auth.test.ts`. Runbook section 12 "Gotchas" added.
+- **Verify:** `spacetime logs -s maincloud <db>` shows no `scheduled only` errors, and expired leases requeue with `last_error` `lease expired`. `cd spacetimedb && npx vitest run && npx tsc --noEmit`. The database-identity sender case can't be expressed in the test harness, so it is only checked live.
+- **Caution:** a local worker claims ANY open job, so before running one on dev check `SELECT id,kind,state FROM job` for teammates' queued jobs.
+- **Fixtures still faked:** none new.
+- **Requests to other parts:** none.
+
 ## 2026-11-07 19:10: web-server role for P4 routes; live smoke + fake worker; geocode verified (branch part2/backend-foundation, uncommitted)
 - **Shipped:** new service role `web` + 3 narrow views (`web_report_upload_auth`, `web_verification_auth`, `web_media_index`) so `/api/uploads/presign` and `/api/media` can authorize. `web` can't call worker reducers or read `svc_*`. Republished dev + prod (additive, no data loss); bindings regenerated. `scripts/smoke-p2.ts` (27 live checks on dev) and `scripts/dev-fake-worker.ts` (fixture stand-in worker, dev only). `packages/stdb-bindings/README.md` backend guide. Geocode parsers verified against live Census + Nominatim responses (saved as fixtures). `lib/stdb/config.ts` defaults → Maincloud dev DB.
 - **Verify:** module 42 tests (5 new web-role tests; mutation removing the gate fails a test). `pnpm --dir scripts smoke:p2` → ALL CHECKS PASSED after the republish. Web scratch tsc 0 errors, 19 tests.
