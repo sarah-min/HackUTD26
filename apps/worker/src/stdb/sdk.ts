@@ -14,7 +14,8 @@ import type {
 
 // ServiceConnection over the SpacetimeDB SDK and Part 2's generated bindings (packages/stdb-bindings/README.md §6).
 // Reads come from the local subscription cache: the worker-only svc_* views (rows exist only while their job is
-// queued or leased) plus the public report/property tables. Writes are the typed service reducers.
+// queued or leased, including svc_reports now that report is private) plus the public property table. Writes are the
+// typed service reducers.
 
 /** Minimal structural types for SDK values, so this file doesn't depend on SDK internals. */
 type Ident = { toHexString(): string };
@@ -40,7 +41,7 @@ export const SERVICE_TABLES = [
   tables.svcAffectedProfiles,
   tables.svcRecoveryPlans,
   tables.svcCoachMessages,
-  tables.report,
+  tables.svcReports, // report is private: reports for open jobs only, same row shape
   tables.property,
 ] as const;
 
@@ -112,7 +113,7 @@ export class SdkServiceConnection implements ServiceConnection {
 
   async getReport(reportId: string): Promise<ReportRow | null> {
     const id = toU64(reportId);
-    for (const r of this.conn.db.report.iter())
+    for (const r of this.conn.db.svcReports.iter())
       if (r.id === id)
         return {
           id: reportId, reporter: hex(r.reporter) ?? '', propertyId: sid(r.propertyId)!, cellId: r.cellId, status: r.status,
