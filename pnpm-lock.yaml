@@ -17,7 +17,7 @@ importers:
         specifier: workspace:*
         version: link:../../packages/contracts
       '@hack/damage':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../../packages/damage
       '@hack/finance':
         specifier: workspace:*
@@ -166,13 +166,13 @@ importers:
   packages/finance:
     dependencies:
       '@hack/agent':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../agent
       '@hack/contracts':
         specifier: workspace:*
         version: link:../contracts
       '@hack/damage':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../damage
     devDependencies:
       typescript:
