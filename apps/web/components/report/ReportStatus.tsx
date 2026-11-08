@@ -115,6 +115,15 @@ export function ReportStatus({ reportIdParam }: { reportIdParam: string }) {
   const status = report.status;
   const needsEvidence = status === 'draft' || status === 'needs_more_footage';
   const waitingOnWorker = status === 'queued' || status === 'processing';
+  const assessed = status === 'assessed';
+  // A finished report with level 'none' means nothing in the evidence shows damage to the home
+  // (street or area shots only raise hazards). Before that, the level simply isn't known yet.
+  const noHomeDamage = assessed && report.overallLevel === 'none';
+  const levelLabel = noHomeDamage
+    ? 'No visible damage to the home'
+    : report.overallLevel === 'none'
+      ? 'Not assessed yet'
+      : (DAMAGE_LEVEL_LABEL[report.overallLevel as keyof typeof DAMAGE_LEVEL_LABEL] ?? report.overallLevel);
 
   return (
     <AppShell>
@@ -168,15 +177,21 @@ export function ReportStatus({ reportIdParam }: { reportIdParam: string }) {
         <p
           className={`mt-2 inline-flex rounded-full px-3 py-1.5 text-[12px] font-bold ${damageLevelClasses(report.overallLevel)}`}
         >
-          {DAMAGE_LEVEL_LABEL[report.overallLevel as keyof typeof DAMAGE_LEVEL_LABEL] ??
-            report.overallLevel}
+          {levelLabel}
         </p>
+        {noHomeDamage ? (
+          <p className="mt-2 text-[12px] leading-relaxed text-slate-600">
+            {flags.length > 0
+              ? 'These photos show hazards near the property, but no damage to the home itself. To assess the home, add photos or a video of the house.'
+              : 'Nothing in these photos shows damage to the home.'}
+          </p>
+        ) : null}
         <div className="mt-3">
           <p className="mb-2 text-[12px] font-bold text-slate-800">Life-safety flags</p>
           {flags.length > 0 ? (
             <HazardList flags={flags} />
           ) : (
-            <p className="text-[12px] text-slate-400">None yet</p>
+            <p className="text-[12px] text-slate-400">{assessed ? 'None found' : 'None yet'}</p>
           )}
         </div>
       </section>

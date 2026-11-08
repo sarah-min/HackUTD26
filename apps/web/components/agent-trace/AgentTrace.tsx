@@ -50,12 +50,15 @@ function pipelineView(steps: AgentStep[], status?: string) {
     const step = latest.get(name);
     let label: string = PIPELINE_STEP_LABELS[name as PipelineStepName];
     if (name === 'finalize' && status === 'needs_more_footage') label = 'More footage needed';
-    return { name, label, state, detail: step && step.summary !== label ? step.summary : undefined };
+    // The last step turns green once the run finished with an assessment (not for 'More footage needed').
+    const complete = name === 'finalize' && state === 'done' && status !== 'needs_more_footage' && status !== 'failed';
+    return { name, label, state, complete, detail: step && step.summary !== label ? step.summary : undefined };
   });
 }
 
-function Dot({ state }: { state: StepState }) {
+function Dot({ state, complete = false }: { state: StepState; complete?: boolean }) {
   const base = 'relative mt-1 flex h-3 w-3 shrink-0 rounded-full';
+  if (complete) return <span className={`${base} bg-emerald-600 dark:bg-emerald-400`} aria-hidden />;
   if (state === 'done') return <span className={`${base} bg-zinc-900 dark:bg-zinc-100`} aria-hidden />;
   if (state === 'failed') return <span className={`${base} bg-red-600`} aria-hidden />;
   if (state === 'active')
@@ -77,11 +80,17 @@ export function AgentTraceView({ reportId, steps, mode = 'full', status, classNa
       <ol className={`w-full space-y-3 ${className}`} aria-label="Processing status" aria-live="polite">
         {view.map((s) => (
           <li key={s.name} className="flex items-start gap-3">
-            <Dot state={s.state} />
+            <Dot state={s.state} complete={s.complete} />
             <div className="min-w-0">
               <p
                 className={`text-sm leading-5 ${
-                  s.state === 'pending' ? 'text-zinc-400 dark:text-zinc-500' : s.state === 'failed' ? 'text-red-700 dark:text-red-400' : 'text-zinc-900 dark:text-zinc-100'
+                  s.complete
+                    ? 'font-medium text-emerald-700 dark:text-emerald-400'
+                    : s.state === 'pending'
+                      ? 'text-zinc-400 dark:text-zinc-500'
+                      : s.state === 'failed'
+                        ? 'text-red-700 dark:text-red-400'
+                        : 'text-zinc-900 dark:text-zinc-100'
                 } ${s.state === 'active' ? 'font-medium' : ''}`}
               >
                 {s.state === 'failed' ? `${s.label} — failed` : s.label}
