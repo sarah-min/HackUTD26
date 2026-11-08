@@ -2,6 +2,14 @@
 
 Owner: Roselyn. Append-only, newest entry first. Format is in [STATUS.md](../STATUS.md). Only this part's owner (and their LLM) edits this file.
 
+## 2026-11-08 09:58: Match live recovery UI to navigator chrome; drop fixture preview (branch part4/recovery-match-fixture)
+
+- **Shipped:** Shared `RecoveryWorkspace` (disclaimer → intake → what-if → PlanView → coach). Live `RecoveryNavigator` uses it. `RecoverySummaryCard` on the damage report shows WhatIf + PlanView + coach when a plan exists. Deleted fixture `/recovery/preview` + `RecoveryFixturePreview`.
+- **Verify:** `/affected/property/0/recovery/preview` → 404; live `/recovery` and report summary card show the shared plan chrome.
+- **Fixtures still faked:** none new (personas still synthetic).
+- **Requests to other parts:** none.
+- **Blocked on:** none.
+
 ## Requests to other parts (open)
 
 - **P2 (Sidd):** `c20050ec1127b417108012e8359d013e783d4186e6a0bad9f1c4a0db7c448468` is registered as worker on **dev**; still needs the same on **prod** (`aftermath-hackutd`) if we run against it. Local fake-worker restarted on `aftermath-hackutd-dev` after stale connection (report 14 / job 18).
