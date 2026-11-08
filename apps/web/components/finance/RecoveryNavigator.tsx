@@ -22,12 +22,9 @@ import {
   useVerifiedReportData,
 } from '@/lib/stdb';
 import { AppShell } from '@/components/chrome/AppShell';
-import { CoachChat } from './CoachChat';
-import { IntakeForm } from './IntakeForm';
-import { PlanView } from './PlanView';
 import { FinanceDisclaimer } from './FinanceDisclaimer';
+import { RecoveryWorkspace } from './RecoveryWorkspace';
 import { useRecoveryData } from './useRecoveryData';
-import { WhatIfPanel } from './WhatIfPanel';
 
 export function RecoveryNavigator({ propertyIdParam }: { propertyIdParam: string }) {
   const propertyId = idFromString(propertyIdParam);
@@ -176,71 +173,67 @@ export function RecoveryNavigator({ propertyIdParam }: { propertyIdParam: string
 
   return (
     <AppShell>
-      <header className="space-y-2">
-        <h1 className="text-lg font-bold tracking-[-0.02em] text-slate-950">Recovery Navigator</h1>
-        <FinanceDisclaimer />
-        <p>
-          <Link
-            href={`/affected/property/${idToString(propertyId)}`}
-            className="text-[12px] font-semibold text-slate-600 underline decoration-slate-300 underline-offset-2 hover:text-blue-700"
-          >
-            Back to your property
-          </Link>
-        </p>
-      </header>
-
-      {assessed.length > 1 ? (
-        <label className="block space-y-1 rounded-2xl border border-slate-200 bg-white p-4">
-          <span className="text-[12px] font-semibold text-slate-700">Report</span>
-          <select
-            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[13px]"
-            value={chosenReportId != null ? idToString(chosenReportId) : ''}
-            onChange={(e) => {
-              setReportId(idFromString(e.target.value));
-              setLocalPlan(null);
-            }}
-          >
-            {assessed.map((r) => (
-              <option key={idToString(r.id)} value={idToString(r.id)}>
-                Report {idToString(r.id)} · {r.overallLevel} · {r.hazard.replace(/_/g, ' ')}
-              </option>
-            ))}
-          </select>
-        </label>
-      ) : null}
-
-      {assessed.length === 0 ? (
-        <p className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-[12px] text-amber-900">
-          No assessed report yet. Submit footage and wait for analysis before building a recovery
-          plan.
-        </p>
-      ) : (
-        <IntakeForm initial={activeIntake} busy={busy} onSubmit={(v) => void onIntake(v)} />
-      )}
-
-      {error ? <p className="text-[12px] font-semibold text-red-700">{error}</p> : null}
-
-      {plan ? (
-        <>
-          <WhatIfPanel scenario={scenario} onChange={setScenario} />
-          <PlanView plan={plan} sim={sim} />
-          <CoachChat
-            plan={plan}
-            remote={coachMsgs}
-            onAsk={
-              chosenReportId
-                ? async (text) => {
-                    try {
-                      await askCoach({ propertyId, reportId: chosenReportId, text });
-                    } catch {
-                      throw new Error('coach_unavailable');
-                    }
-                  }
-                : undefined
-            }
-          />
-        </>
-      ) : null}
+      <RecoveryWorkspace
+        banner={
+          <p>
+            <Link
+              href={`/affected/property/${idToString(propertyId)}`}
+              className="text-[12px] font-semibold text-slate-600 underline decoration-slate-300 underline-offset-2 hover:text-blue-700"
+            >
+              Back to your property
+            </Link>
+          </p>
+        }
+        beforeIntake={
+          assessed.length > 1 ? (
+            <label className="block space-y-1 rounded-2xl border border-slate-200 bg-white p-4">
+              <span className="text-[12px] font-semibold text-slate-700">Report</span>
+              <select
+                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[13px]"
+                value={chosenReportId != null ? idToString(chosenReportId) : ''}
+                onChange={(e) => {
+                  setReportId(idFromString(e.target.value));
+                  setLocalPlan(null);
+                }}
+              >
+                {assessed.map((r) => (
+                  <option key={idToString(r.id)} value={idToString(r.id)}>
+                    Report {idToString(r.id)} · {r.overallLevel} · {r.hazard.replace(/_/g, ' ')}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null
+        }
+        emptyState={
+          assessed.length === 0 ? (
+            <p className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-[12px] text-amber-900">
+              No assessed report yet. Submit footage and wait for analysis before building a recovery
+              plan.
+            </p>
+          ) : undefined
+        }
+        intakeInitial={activeIntake}
+        intakeBusy={busy}
+        onIntake={assessed.length === 0 ? undefined : (v) => void onIntake(v)}
+        error={error}
+        plan={plan}
+        sim={sim}
+        scenario={scenario}
+        onScenario={setScenario}
+        coachRemote={coachMsgs}
+        onAskCoach={
+          chosenReportId
+            ? async (text) => {
+                try {
+                  await askCoach({ propertyId, reportId: chosenReportId, text });
+                } catch {
+                  throw new Error('coach_unavailable');
+                }
+              }
+            : undefined
+        }
+      />
     </AppShell>
   );
 }
