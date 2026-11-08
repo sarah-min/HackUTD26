@@ -1,13 +1,5 @@
-import {
-  ComponentSchema,
-  DAMAGE_LEVEL_RANK,
-  LifeSafetyFlagSchema,
-  type Component,
-  type DamageLevel,
-  type FrameFinding,
-  type Hazard,
-  type LifeSafetyFlag,
-} from '@hack/contracts';
+import { type FrameFinding } from '@hack/contracts/assessment';
+import { ComponentSchema, DAMAGE_LEVEL_RANK, LifeSafetyFlagSchema, type Component, type DamageLevel, type Hazard, type LifeSafetyFlag } from '@hack/contracts/common';
 
 export const CONFIDENCE_THRESHOLD = 0.5;
 

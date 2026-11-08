@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CostEstimateSchema } from '@hack/contracts';
+import { CostEstimateSchema } from '@hack/contracts/assessment';
 import { estimateRepairCost, mulDivRound } from '../src';
 
 describe('estimateRepairCost (cost-v1)', () => {

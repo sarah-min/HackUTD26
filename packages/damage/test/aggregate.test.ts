@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { FrameFinding } from '@hack/contracts';
+import type { FrameFinding } from '@hack/contracts/assessment';
 import { aggregateFindings, needsMoreFootage } from '../src';
 
 const f = (p: Partial<FrameFinding> & { frameIndex: number }): FrameFinding => ({

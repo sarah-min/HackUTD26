@@ -1,12 +1,25 @@
-import type { AgentStep } from '@hack/contracts';
+import type { AgentStep } from '@hack/contracts/agent';
 import type { JobKind, JobRow, Logger, NimClient, ServiceConnection } from '@hack/agent';
 import type { StoragePort } from '@hack/storage';
 import type { JobContext, JobHandler } from './handlers/types';
 
-// ARCHITECTURE §6.6: poll queued jobs → claim_job(lease) → proceed only when leaseOwner == self →
-// run the handler → complete_job. Lease expiry + requeue_expired_jobs (module) handle crashes.
+// ARCHITECTURE §6.6 / stdb-bindings README §6: watch svc_jobs → claim_job(lease) → proceed only when the row shows
+// state 'leased' with leaseOwner == self → run the handler → complete_job. Lease expiry + requeue_expired_jobs
+// (module, max 2 attempts) handle crashes.
 
 export const LEASE_MS = 120_000;
+/** How long to wait for our own claim to appear in the subscription cache. */
+const LEASE_CONFIRM_MS = 3_000;
+
+/**
+ * First agent_step seq for a job. The worker can't read agent_step (no svc view), so seqs are partitioned:
+ * 1000 per analyze round (re-shoots) and 100 per retry attempt, which keeps the timeline ordered across both.
+ */
+export function stepSeqBase(job: Pick<JobRow, 'attempts'>, payload: unknown): number {
+  const round = Number((payload as { round?: unknown } | null)?.round ?? 0);
+  const r = Number.isInteger(round) && round >= 0 ? Math.min(round, 60) : 0;
+  return r * 1000 + Math.min(job.attempts, 9) * 100;
+}
 
 export interface RunnerOptions {
   stdb: ServiceConnection;
@@ -79,9 +92,17 @@ export class Runner {
       log.debug('claim rejected', { jobId: job.id, error: (e as Error).message });
       return null;
     }
-    const fresh = await stdb.getJob(job.id);
-    if (!fresh || fresh.leaseOwner !== stdb.identityHex) return null;
-    return fresh;
+    const deadline = Date.now() + LEASE_CONFIRM_MS;
+    for (;;) {
+      const fresh = await stdb.getJob(job.id);
+      if (fresh && fresh.state === 'leased' && fresh.leaseOwner === stdb.identityHex) return fresh;
+      if (fresh && fresh.leaseOwner && fresh.leaseOwner !== stdb.identityHex) return null; // another worker won
+      if (Date.now() >= deadline) {
+        log.warn('claim not confirmed in time; leaving the job for the lease scheduler', { jobId: job.id });
+        return null;
+      }
+      await new Promise((r) => setTimeout(r, 100));
+    }
   }
 
   private async execute(job: JobRow): Promise<void> {
@@ -94,7 +115,7 @@ export class Runner {
     } catch {
       payload = {};
     }
-    let seq = job.reportId ? (await stdb.maxAgentStepSeq(job.reportId).catch(() => -1)) + 1 : 0;
+    let seq = stepSeqBase(job, payload);
     const ctx: JobContext = {
       job: {
         id: job.id,

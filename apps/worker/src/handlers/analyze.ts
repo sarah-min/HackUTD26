@@ -1,21 +1,14 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import {
-  AgentFinishSchema,
-  FrameFindingSchema,
-  type AgentFinish,
-  type AssessmentLocation,
-  type DisasterDeclaration,
-  type FrameFinding,
-  type Hazard,
-  type WeatherAlert,
-} from '@hack/contracts';
+import { AgentFinishSchema, FrameFindingSchema, type AgentFinish, type AssessmentLocation, type DisasterDeclaration, type FrameFinding, type WeatherAlert } from '@hack/contracts/assessment';
+import { type Hazard } from '@hack/contracts/common';
 import { aggregateFindings, estimateRepairCost, needsMoreFootage } from '@hack/damage';
 import {
   AGENT_PROMPT_VERSION,
   AGENT_SYSTEM_PROMPT,
   analyzeTools,
+  buildAreaNotices,
   collectAllowedCents,
   runAgentLoop,
   scratchOf,
@@ -75,14 +68,37 @@ async function runToolDirect(ctx: JobContext, tool: AnyAgentTool, pipelineSent: 
   }
 }
 
+async function publishAreaNotices(ctx: JobContext, propertyId: string): Promise<void> {
+  const built = buildAreaNotices(ctx);
+  if ('skip' in built) {
+    await ctx.step({ kind: 'tool_result', name: 'record_area_notices', summary: `Area notices not updated: ${built.skip}`, visibility: 'affected' });
+    return;
+  }
+  const t0 = Date.now();
+  try {
+    await ctx.stdb.recordAreaNotices({ propertyId, countyFips: built.countyFips, noticesJson: JSON.stringify(built.notices) });
+    await ctx.step({
+      kind: 'tool_result', name: 'record_area_notices',
+      summary: `Published ${built.notices.length} area notice${built.notices.length === 1 ? '' : 's'} for county ${built.countyFips}`,
+      visibility: 'affected', durationMs: Date.now() - t0,
+    });
+  } catch (e) {
+    // Not fatal: the assessment still carries the alerts and declarations for verified viewers.
+    await ctx.step({ kind: 'error', name: 'record_area_notices', summary: `Area notices failed: ${(e as Error).message}`.slice(0, 400), visibility: 'affected' });
+  }
+}
+
 export const analyzeHandler: JobHandler = async (ctx) => {
   const started = Date.now();
   const reportId = ctx.job.reportId;
   if (!reportId) throw new Error('analyze job without report_id');
   const report = await ctx.stdb.getReport(reportId);
   if (!report) throw new Error(`report ${reportId} not found`);
-  const media = await ctx.stdb.listMedia(reportId);
-  if (!media.length) throw new Error('report has no media');
+  // payload {"round": n}: only this upload round's media (a re-shoot adds a new round; older rounds are old footage).
+  const rawRound = (ctx.job.payload as { round?: unknown } | null)?.round;
+  const round = Number.isInteger(rawRound) ? (rawRound as number) : undefined;
+  const media = await ctx.stdb.listMedia(reportId, round);
+  if (!media.length) throw new Error(round === undefined ? 'report has no media' : `report has no media in round ${round}`);
   const scratch = scratchOf(ctx);
   const fixtures = ctx.nim.useFixtures;
 
@@ -227,6 +243,9 @@ export const analyzeHandler: JobHandler = async (ctx) => {
         if (out) toolOutputs.push(out);
       }
     }
+    // 5. Public county notices (NWS alerts + FEMA declarations) so unverified visitors see them too.
+    if (!tooLittle) await publishAreaNotices(ctx, report.propertyId);
+
     const cost = estimateRepairCost({ componentLevels: agg.componentLevels });
     const location = (scratch.get('location') as { location: AssessmentLocation | null } | undefined)?.location ?? undefined;
     const declarations = (scratch.get('declarations') as { declarations: DisasterDeclaration[] } | undefined)?.declarations ?? [];

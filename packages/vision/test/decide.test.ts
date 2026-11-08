@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeAddress } from '@hack/address';
-import { IdDocumentFieldsSchema, VerificationResultSchema } from '@hack/contracts';
+import { normalizeParts } from '@hack/address';
+import type { NormalizedAddress } from '@hack/contracts/property';
+import { IdDocumentFieldsSchema, VerificationResultSchema } from '@hack/contracts/verification';
 import { decideVerification, parseAddressText } from '../src';
 import specimen from '../../../fixtures/verification/id-fields-specimen.json';
 import expired from '../../../fixtures/verification/id-fields-expired.json';
 import notId from '../../../fixtures/verification/id-fields-not-an-id.json';
 import wrong from '../../../fixtures/verification/id-fields-wrong-address.json';
 
-const property = normalizeAddress({ line1: '1234 Main St', city: 'Dallas', state: 'TX', zip: '75201', lat: 32.78, lng: -96.8, source: 'census' });
+const property: NormalizedAddress = { ...normalizeParts({ line1: '1234 Main St', city: 'Dallas', state: 'TX', zip: '75201' }), lat: 32.78, lng: -96.8, source: 'census' };
 const today = new Date('2026-11-07T12:00:00Z');
 const f = (x: unknown) => IdDocumentFieldsSchema.parse(x);
 

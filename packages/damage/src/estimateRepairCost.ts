@@ -1,11 +1,5 @@
-import {
-  COST_DISCLAIMER,
-  CostEstimateSchema,
-  type Component,
-  type CostEstimate,
-  type CostLineItem,
-  type DamageLevel,
-} from '@hack/contracts';
+import { COST_DISCLAIMER, CostEstimateSchema, type CostEstimate, type CostLineItem } from '@hack/contracts/assessment';
+import { type Component, type DamageLevel } from '@hack/contracts/common';
 import {
   COMPONENT_SHARE_BPS,
   CONTENTS_CENTS,

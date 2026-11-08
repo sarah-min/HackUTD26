@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { HazardSchema } from '@hack/contracts';
+import { HazardSchema } from '@hack/contracts/common';
 import { DEFAULT_HOME } from '@hack/damage';
 import { defineTool } from './types';
 import { loadCoordinates, requireReportId } from './shared';

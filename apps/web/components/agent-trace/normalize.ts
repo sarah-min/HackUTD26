@@ -1,4 +1,4 @@
-import type { AgentStep } from '@hack/contracts';
+import type { AgentStep } from '@hack/contracts/agent';
 
 /** Accepts rows from the generated bindings (bigint ids, Timestamp objects) or plain AgentStep JSON. */
 export interface AgentStepRowLike {

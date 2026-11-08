@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FrameFindingSchema } from '@hack/contracts';
+import { FrameFindingSchema } from '@hack/contracts/assessment';
 import { aggregateFindings, estimateRepairCost } from '@hack/damage';
 import { collectAllowedCents } from '@hack/agent';
 import { CALL_911, buildAssessment, deterministicFinish } from '../src/handlers/assessment';

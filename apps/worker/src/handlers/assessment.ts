@@ -1,15 +1,5 @@
-import {
-  DamageAssessmentSchema,
-  HazardSchema,
-  SEVERE_FLAGS,
-  type AgentFinish,
-  type AssessmentLocation,
-  type CostEstimate,
-  type DamageAssessment,
-  type DisasterDeclaration,
-  type Hazard,
-  type WeatherAlert,
-} from '@hack/contracts';
+import { DamageAssessmentSchema, type AgentFinish, type AssessmentLocation, type CostEstimate, type DamageAssessment, type DisasterDeclaration, type WeatherAlert } from '@hack/contracts/assessment';
+import { HazardSchema, SEVERE_FLAGS, type Hazard } from '@hack/contracts/common';
 import type { AggregatedFindings } from '@hack/damage';
 import { stripUnsupportedSentences, unsupportedAmounts } from '@hack/agent';
 

@@ -1,10 +1,6 @@
-import { matchAddresses, normalizeAddress } from '@hack/address';
-import {
-  VerificationResultSchema,
-  type IdDocumentFields,
-  type NormalizedAddress,
-  type VerificationResult,
-} from '@hack/contracts';
+import { matchAddresses, normalizeParts } from '@hack/address';
+import { type NormalizedAddress } from '@hack/contracts/property';
+import { VerificationResultSchema, type IdDocumentFields, type VerificationResult } from '@hack/contracts/verification';
 import { parseAddressText } from './parseAddressText';
 
 const ID_KINDS = new Set(['drivers_license', 'state_id']);
@@ -36,7 +32,7 @@ export function decideVerification(
   }
   const parts = parseAddressText(fields.addressText);
   if (!parts) return { ok: false, failReason: 'address_mismatch' };
-  const docAddress = normalizeAddress(parts);
+  const docAddress = normalizeParts(parts); // { line1, city, state, zip, normalized }
   if (!matchAddresses(docAddress, propertyAddress)) return { ok: false, failReason: 'address_mismatch' };
   const nameOnDoc = fields.fullName.trim();
   return VerificationResultSchema.parse({

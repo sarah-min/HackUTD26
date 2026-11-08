@@ -1,4 +1,4 @@
-import type { Component, DamageLevel } from '@hack/contracts';
+import type { Component, DamageLevel } from '@hack/contracts/common';
 
 // CONTRACTS.md §6 (cost-v1). Illustrative defaults only; labeled as such in the UI.
 // Shares and fractions are basis points so every multiplication stays in integers.

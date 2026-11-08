@@ -1,4 +1,4 @@
-import type { AgentStep } from '@hack/contracts';
+import type { AgentStep } from '@hack/contracts/agent';
 import type { JobRow, ServiceConnection } from '@hack/agent';
 import type { StoragePort } from '@hack/storage';
 
@@ -26,7 +26,6 @@ export function fakeStdb(init: Partial<ServiceConnection> = {}) {
   const steps: Omit<AgentStep, 'at'>[] = [];
   const stdb = {
     identityHex: 'aa',
-    call: async () => {},
     getJob: async () => null,
     listQueuedJobs: async () => [],
     getReport: async () => null,
@@ -34,7 +33,6 @@ export function fakeStdb(init: Partial<ServiceConnection> = {}) {
     getPropertyPrivate: async () => null,
     listMedia: async () => [],
     listFrames: async () => [],
-    maxAgentStepSeq: async () => -1,
     getVerification: async () => null,
     claimJob: async (id: string, ms: number) => void calls.push({ name: 'claim_job', args: { id, ms } }),
     completeJob: async (id: string, ok: boolean, error?: string) => void calls.push({ name: 'complete_job', args: { id, ok, error } }),
@@ -42,6 +40,9 @@ export function fakeStdb(init: Partial<ServiceConnection> = {}) {
     recordAgentStep: async (s: Omit<AgentStep, 'at'>) => void steps.push(s),
     recordAssessment: async (a: unknown) => void calls.push({ name: 'record_assessment', args: a }),
     recordVerification: async (a: unknown) => void calls.push({ name: 'record_verification', args: a }),
+    recordAreaNotices: async (a: unknown) => void calls.push({ name: 'record_area_notices', args: a }),
+    recordRecoveryPlan: async (a: unknown) => void calls.push({ name: 'record_recovery_plan', args: a }),
+    recordCoachReply: async (a: unknown) => void calls.push({ name: 'record_coach_reply', args: a }),
     ...init,
   } as ServiceConnection;
   return { stdb, calls, steps };
@@ -49,7 +50,7 @@ export function fakeStdb(init: Partial<ServiceConnection> = {}) {
 
 export const job = (p: Partial<JobRow>): JobRow => ({
   id: '1', kind: 'analyze', reportId: null, propertyId: null, verificationId: null, subject: null, payloadJson: '{}',
-  state: 'queued', attempts: 0, leaseOwner: null, leaseExpiresAt: null, createdAt: 0, ...p,
+  state: 'queued', attempts: 0, leaseOwner: null, leaseExpiresAt: null, lastError: null, createdAt: 0, ...p,
 });
 
 export const silentLog = { debug() {}, info() {}, warn() {}, error() {}, child() { return silentLog; } };

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AssessmentLocationSchema } from '@hack/contracts';
+import { AssessmentLocationSchema } from '@hack/contracts/assessment';
 import { scratchOf, type JobContext } from '../context';
 import { fetchJson } from '../http';
 import { defineTool } from './types';

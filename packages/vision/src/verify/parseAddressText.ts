@@ -1,4 +1,4 @@
-import type { NormalizedAddress } from '@hack/contracts';
+import type { NormalizedAddress } from '@hack/contracts/property';
 
 /**
  * Splits a printed one-line US address ("123 Main St Apt 2, Dallas, TX 75201-1234") into the parts

@@ -1,4 +1,4 @@
-import { IdDocumentFieldsSchema, type IdDocumentFields } from '@hack/contracts';
+import { IdDocumentFieldsSchema, type IdDocumentFields } from '@hack/contracts/verification';
 import type { ChatMessage, NimClient } from '@hack/agent';
 import { toDataUrl, type ImageMime } from './image';
 import { clampString, clampUnit, parseModelJson } from './json';

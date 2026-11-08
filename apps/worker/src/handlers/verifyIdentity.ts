@@ -1,4 +1,5 @@
-import { IdDocumentFieldsSchema, type IdDocumentFields, type NormalizedAddress, type VerificationResult } from '@hack/contracts';
+import { type NormalizedAddress } from '@hack/contracts/property';
+import { IdDocumentFieldsSchema, type IdDocumentFields, type VerificationResult } from '@hack/contracts/verification';
 import { decideVerification, extractIdDocument, sniffImageMime } from '@hack/vision';
 import { loadFixture } from '../fixtures';
 import type { JobHandler } from './types';

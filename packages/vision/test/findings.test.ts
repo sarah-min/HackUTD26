@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FrameFindingSchema } from '@hack/contracts';
+import { FrameFindingSchema } from '@hack/contracts/assessment';
 import { analyzeFrame, createMemoryCache } from '../src';
 import { scriptedNim } from './fakeNim';
 

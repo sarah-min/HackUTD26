@@ -1,13 +1,8 @@
 'use client';
 
 import { useMemo, useState, type ReactNode } from 'react';
-import {
-  DamageAssessmentSchema,
-  FrameFindingSchema,
-  type DamageAssessment,
-  type DamageLevel,
-  type FrameFinding,
-} from '@hack/contracts';
+import { DamageAssessmentSchema, FrameFindingSchema, type DamageAssessment, type FrameFinding } from '@hack/contracts/assessment';
+import { type DamageLevel } from '@hack/contracts/common';
 import { HazardList } from '@/components/safety';
 import { formatCents } from '@/lib/format';
 import { mediaResolver, useMediaUrl, type MediaUrlResolver } from './useMediaUrl';
@@ -19,7 +14,8 @@ export interface FrameRowLike {
   findingJson: string;
 }
 
-export interface DamageReportProps {
+/** Presentational report: takes the assessment and frame rows directly. */
+export interface DamageReportViewProps {
   reportId: string;
   /** assessment row JSON (string) or a parsed DamageAssessment; null while processing. */
   assessment: DamageAssessment | string | null | undefined;
@@ -119,7 +115,7 @@ function printText(title: string, text: string) {
   w.print();
 }
 
-export function DamageReport({ reportId, assessment, frames = [], mediaAuth, resolveMediaUrl, className = '' }: DamageReportProps) {
+export function DamageReportView({ reportId, assessment, frames = [], mediaAuth, resolveMediaUrl, className = '' }: DamageReportViewProps) {
   const [copied, setCopied] = useState(false);
   const parsed = useMemo(() => {
     if (!assessment) return null;
@@ -353,4 +349,4 @@ export function DamageReport({ reportId, assessment, frames = [], mediaAuth, res
   );
 }
 
-export default DamageReport;
+export default DamageReportView;

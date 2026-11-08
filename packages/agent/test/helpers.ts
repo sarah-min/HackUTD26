@@ -1,4 +1,4 @@
-import type { AgentStep } from '@hack/contracts';
+import type { AgentStep } from '@hack/contracts/agent';
 import { NimClient, type JobContext, type ServiceConnection } from '../src';
 
 type Reply = { content?: string | null; tool_calls?: { name: string; arguments: unknown }[] } | { status: number };

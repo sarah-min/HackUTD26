@@ -1,2 +1,3 @@
-export { DamageReport, type DamageReportProps, type FrameRowLike } from './DamageReport';
+export { DamageReport, type DamageReportProps } from './connected';
+export { DamageReportView, type DamageReportViewProps, type FrameRowLike } from './DamageReport';
 export { mediaResolver, useMediaUrl, type MediaUrlResolver } from './useMediaUrl';

@@ -1,4 +1,4 @@
-import type { AgentStep } from '@hack/contracts';
+import type { AgentStep } from '@hack/contracts/agent';
 import type { StoragePort } from '@hack/storage';
 import type { Logger } from './log';
 import type { NimClient } from './nim';
@@ -17,19 +17,22 @@ import type {
 
 export type JobKind = JobRow['kind'];
 
-/** Typed service-identity access to the module (reducer calls + private reads). */
+/**
+ * Typed service-identity access to the module. Reads come from Part 2's worker-only `svc_*` views (rows exist only
+ * while their job is queued or leased) plus the public `report` / `property` tables; writes are service reducers.
+ * The concrete adapter is apps/worker/src/stdb/sdk.ts (SpacetimeDB SDK + generated bindings).
+ */
 export interface ServiceConnection {
   readonly identityHex: string;
-  call(reducer: string, args: unknown[]): Promise<void>;
   // reads
   getJob(jobId: string): Promise<JobRow | null>;
   listQueuedJobs(kinds: readonly JobKind[], limit: number): Promise<JobRow[]>;
   getReport(reportId: string): Promise<ReportRow | null>;
   getReportPrivate(reportId: string): Promise<ReportPrivateRow | null>;
   getPropertyPrivate(propertyId: string): Promise<PropertyPrivateRow | null>;
-  listMedia(reportId: string): Promise<MediaAssetRow[]>;
+  /** Media for the report; with `round`, only that upload round (analyze payload `{"round": n}`). */
+  listMedia(reportId: string, round?: number): Promise<MediaAssetRow[]>;
   listFrames(reportId: string): Promise<FrameRow[]>;
-  maxAgentStepSeq(reportId: string): Promise<number>;
   getVerification(verificationId: string): Promise<VerificationRow | null>;
   // service reducers (CONTRACTS §5.2)
   claimJob(jobId: string, leaseMs: number): Promise<void>;
@@ -45,6 +48,11 @@ export interface ServiceConnection {
     lifeSafetyCsv: string;
   }): Promise<void>;
   recordVerification(args: { verificationId: string; ok: boolean; failReason?: string; nameOnDoc?: string }): Promise<void>;
+  /** Replaces the county's public notices (CONTRACTS §5.2 record_area_notices). `noticesJson` = AreaNoticeInput[] JSON. */
+  recordAreaNotices(args: { propertyId: string; countyFips: string; noticesJson: string }): Promise<void>;
+  /** For Part 4's plan/coach handlers. `identity` = the job's `subject` (64-char hex). */
+  recordRecoveryPlan(args: { identity: string; propertyId: string; reportId: string; json: string }): Promise<void>;
+  recordCoachReply(args: { identity: string; propertyId: string; reportId: string; text: string }): Promise<void>;
 }
 
 export interface JobInfo {

@@ -1,10 +1,12 @@
-// Part 3 smoke test for NVIDIA NIM (T3.1/T3.3). Verifies model IDs, image input, FrameFinding parsing and tool calling.
+// Part 3 smoke test for the Nemotron model server on the Vultr GPU instance (T3.1/T3.3).
+// Verifies both servers serve the configured models, image input, FrameFinding parsing and tool calling.
 //   node --env-file=.env.local --import tsx scripts/smoke-nim.ts --image ./fema-roof.jpg [--capture]
+// Needs NEMOTRON_VL_BASE_URL, NEMOTRON_AGENT_BASE_URL and NEMOTRON_API_KEY (see apps/worker/model-server/README.md).
 // --image accepts a local JPEG/PNG/WebP path or an https URL of a public-domain image (e.g. FEMA media library).
 // Prints one JSON report; paste the VERIFY results into status/part3.md and SOURCES.md.
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { FrameFindingSchema } from '@hack/contracts';
+import { FrameFindingSchema } from '@hack/contracts/assessment';
 import { NimClient, NimHttpError } from '@hack/agent';
 import { DAMAGE_FRAME_PROMPT_VERSION, analyzeFrame, sniffImageMime } from '@hack/vision';
 
@@ -24,14 +26,13 @@ async function loadImage(src: string): Promise<Buffer> {
 
 async function main() {
   const nim = NimClient.fromEnv();
-  const report: Record<string, unknown> = { at: new Date().toISOString(), baseUrl: process.env.NVIDIA_BASE_URL, models: nim.models };
+  const report: Record<string, unknown> = {
+    at: new Date().toISOString(),
+    servers: { vision: nim.endpoints.vision.baseUrl, agent: nim.endpoints.agent.baseUrl },
+    models: nim.models,
+  };
 
-  try {
-    const ids = await nim.listModels();
-    report.modelsListed = { vision: ids.includes(nim.models.vision), agent: ids.includes(nim.models.agent), total: ids.length };
-  } catch (e) {
-    report.modelsListed = { error: (e as Error).message };
-  }
+  report.modelsListed = await nim.checkModels();
 
   const t0 = Date.now();
   try {

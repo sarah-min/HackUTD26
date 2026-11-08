@@ -1,5 +1,5 @@
-// Row shapes the worker reads through ServiceConnection (camelCase; u64 ids as strings; times in epoch ms).
-// They mirror CONTRACTS.md §5.1. The concrete adapter lives in apps/worker/src/stdb.
+// Row shapes the worker reads through ServiceConnection (camelCase; u64 ids as decimal strings; identities as hex;
+// times in epoch ms). They mirror the generated @hack/stdb-bindings row types (Part 2); apps/worker/src/stdb/sdk.ts converts.
 
 export interface ReportRow {
   id: string;
@@ -50,6 +50,8 @@ export interface MediaAssetRow {
   sizeBytes: number;
   sha256: string;
   uploadedAt: number;
+  /** Upload round: 0 for the first submission, +1 per re-shoot after needs_more_footage. */
+  round: number;
 }
 
 export interface FrameRow {
@@ -85,5 +87,6 @@ export interface JobRow {
   attempts: number;
   leaseOwner: string | null;
   leaseExpiresAt: number | null;
+  lastError: string | null;
   createdAt: number;
 }

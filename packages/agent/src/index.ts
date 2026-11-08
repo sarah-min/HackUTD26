@@ -6,5 +6,6 @@ export * from './http';
 export * from './dollarCheck';
 export * from './loop';
 export * from './tools';
+export * from './areaNotices';
 export { AGENT_PROMPT_VERSION, AGENT_SYSTEM_PROMPT } from './prompts/agent';
 export { CLAIM_PROMPT_VERSION } from './prompts/claim';

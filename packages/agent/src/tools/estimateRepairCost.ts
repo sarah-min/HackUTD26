@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CostEstimateSchema } from '@hack/contracts';
+import { CostEstimateSchema } from '@hack/contracts/assessment';
 import { aggregateFindings, estimateRepairCost } from '@hack/damage';
 import { scratchOf } from '../context';
 import { defineTool } from './types';

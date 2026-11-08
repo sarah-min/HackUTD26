@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { AgentFinishSchema, FrameFindingSchema, IdDocumentFieldsSchema, VerificationResultSchema } from '@hack/contracts';
+import { AgentFinishSchema, FrameFindingSchema } from '@hack/contracts/assessment';
+import { IdDocumentFieldsSchema, VerificationResultSchema } from '@hack/contracts/verification';
 
 const root = path.resolve(__dirname, '../../../fixtures');
 const read = (p: string) => JSON.parse(readFileSync(path.join(root, p), 'utf8'));

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AgentFinishSchema, type AgentFinish } from '@hack/contracts';
+import { AgentFinishSchema, type AgentFinish } from '@hack/contracts/assessment';
 import { scratchOf, type JobContext } from './context';
 import { FixtureModeError, NimHttpError, type ChatMessage, type ToolDefinition } from './nim';
 import { JSON_PROTOCOL } from './prompts/agent';

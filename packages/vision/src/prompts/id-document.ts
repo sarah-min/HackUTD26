@@ -1,4 +1,4 @@
-import { DocKindSchema } from '@hack/contracts';
+import { DocKindSchema } from '@hack/contracts/verification';
 
 export const ID_DOCUMENT_PROMPT_VERSION = 'id-document-v1';
 

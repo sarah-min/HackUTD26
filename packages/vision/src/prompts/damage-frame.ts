@@ -1,10 +1,4 @@
-import {
-  ComponentSchema,
-  DamageLevelSchema,
-  HazardSchema,
-  LifeSafetyFlagSchema,
-  type Hazard,
-} from '@hack/contracts';
+import { ComponentSchema, DamageLevelSchema, HazardSchema, LifeSafetyFlagSchema, type Hazard } from '@hack/contracts/common';
 
 export const DAMAGE_FRAME_PROMPT_VERSION = 'damage-frame-v1';
 

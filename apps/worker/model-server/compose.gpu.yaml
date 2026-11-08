@@ -1,0 +1,82 @@
+# Nemotron model server for the Vultr GPU instance (Part 3). Two vLLM servers on one GPU, OpenAI-compatible:
+#   :8001  vision  nvidia/NVIDIA-Nemotron-Nano-12B-v2-VL-FP8   (~14 GB weights)
+#   :8002  agent   nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8   (~35 GB weights, native tool calling)
+# Sized for one 80 GB GPU (Vultr Cloud GPU, 1x H100 80GB). Run on the GPU box:
+#   cp model-server.env.example .env   # set NEMOTRON_API_KEY and BIND_ADDR
+#   docker compose -f compose.gpu.yaml up -d && docker compose -f compose.gpu.yaml logs -f
+# The worker VM points NEMOTRON_VL_BASE_URL / NEMOTRON_AGENT_BASE_URL at http://<BIND_ADDR>:8001/v1 and :8002/v1.
+
+x-vllm: &vllm
+  image: ${VLLM_IMAGE:-vllm/vllm-openai:v0.28.0}
+  restart: unless-stopped
+  ipc: host
+  environment:
+    HF_TOKEN: ${HF_TOKEN:-}
+    HF_HOME: /models
+    NEMOTRON_API_KEY: ${NEMOTRON_API_KEY:?set NEMOTRON_API_KEY in .env}
+  volumes:
+    - hf-cache:/models
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: all
+            capabilities: [gpu]
+
+services:
+  nemotron-vl:
+    <<: *vllm
+    ports:
+      - "${BIND_ADDR:-127.0.0.1}:8001:8001"
+    entrypoint: ["/bin/bash", "-lc"]
+    command:
+      - >-
+        exec vllm serve nvidia/NVIDIA-Nemotron-Nano-12B-v2-VL-FP8
+        --trust-remote-code
+        --quantization modelopt
+        --max-model-len 16384
+        --gpu-memory-utilization ${VL_GPU_FRACTION:-0.30}
+        --max-num-seqs 16
+        --api-key "$$NEMOTRON_API_KEY"
+        --host 0.0.0.0 --port 8001
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://127.0.0.1:8001/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 80
+      start_period: 120s
+
+  nemotron-agent:
+    <<: *vllm
+    # Start after the vision server has claimed its share of GPU memory, so the two don't race at startup.
+    depends_on:
+      nemotron-vl:
+        condition: service_healthy
+    ports:
+      - "${BIND_ADDR:-127.0.0.1}:8002:8002"
+    entrypoint: ["/bin/bash", "-lc"]
+    command:
+      - >-
+        PARSER=$$(python3 -c "from huggingface_hub import hf_hub_download as d; print(d('nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8', 'nano_v3_reasoning_parser.py'))")
+        && exec vllm serve nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8
+        --trust-remote-code
+        --max-model-len 32768
+        --kv-cache-dtype fp8
+        --gpu-memory-utilization ${AGENT_GPU_FRACTION:-0.60}
+        --max-num-seqs 16
+        --enable-auto-tool-choice
+        --tool-call-parser qwen3_coder
+        --reasoning-parser-plugin "$$PARSER"
+        --reasoning-parser nano_v3
+        --api-key "$$NEMOTRON_API_KEY"
+        --host 0.0.0.0 --port 8002
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://127.0.0.1:8002/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 80
+      start_period: 180s
+
+volumes:
+  hf-cache:

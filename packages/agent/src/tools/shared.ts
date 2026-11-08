@@ -1,4 +1,4 @@
-import { FrameFindingSchema, type FrameFinding } from '@hack/contracts';
+import { FrameFindingSchema, type FrameFinding } from '@hack/contracts/assessment';
 import { scratchOf, type JobContext } from '../context';
 
 export function requireReportId(ctx: JobContext): string {

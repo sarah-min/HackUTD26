@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { DisasterDeclarationSchema, type DisasterDeclaration } from '@hack/contracts';
+import { DisasterDeclarationSchema, type DisasterDeclaration } from '@hack/contracts/assessment';
 import { scratchOf } from '../context';
 import { fetchJson } from '../http';
 import { defineTool } from './types';

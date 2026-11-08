@@ -1,10 +1,11 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { PIPELINE_STEPS, PIPELINE_STEP_LABELS, type AgentStep, type PipelineStepName } from '@hack/contracts';
+import { PIPELINE_STEPS, PIPELINE_STEP_LABELS, type AgentStep, type PipelineStepName } from '@hack/contracts/agent';
 import { formatDuration, normalizeSteps, type AgentStepRowLike } from './normalize';
 
-export interface AgentTraceProps {
+/** Presentational trace: takes the step rows directly (tests, storybook, custom pages). */
+export interface AgentTraceViewProps {
   reportId: string;
   /** agent_step rows for this report (live from the module; the caller subscribes). */
   steps: readonly AgentStepRowLike[];
@@ -66,7 +67,7 @@ function Dot({ state }: { state: StepState }) {
   return <span className={`${base} border border-zinc-300 dark:border-zinc-600`} aria-hidden />;
 }
 
-export function AgentTrace({ reportId, steps, mode = 'full', status, className = '' }: AgentTraceProps) {
+export function AgentTraceView({ reportId, steps, mode = 'full', status, className = '' }: AgentTraceViewProps) {
   const normalized = useMemo(() => normalizeSteps(steps, reportId), [steps, reportId]);
   const [showStatus, setShowStatus] = useState(false);
 
@@ -136,4 +137,4 @@ export function AgentTrace({ reportId, steps, mode = 'full', status, className =
   );
 }
 
-export default AgentTrace;
+export default AgentTraceView;

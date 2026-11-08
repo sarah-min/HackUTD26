@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
-import { DamageAssessmentSchema, FrameFindingSchema } from '@hack/contracts';
+import { DamageAssessmentSchema, FrameFindingSchema } from '@hack/contracts/assessment';
 import { NimClient, type JobContext } from '@hack/agent';
 import { FFMPEG_PATH } from '@hack/vision';
 import { analyzeHandler } from '../src/handlers/analyze';
@@ -33,11 +33,16 @@ function setup(nim: NimClient) {
   const { stdb, calls, steps } = fakeStdb({
     getReport: async () => ({ id: '7', reporter: 'r', propertyId: '9', cellId: '1:2', status: 'processing', hazard: 'hurricane_wind', selfDanger: false, lifeSafetyCsv: '', overallLevel: 'none', usableFrames: 0, totalFrames: 0, statusReason: null, claimed: false, source: 'live', createdAt: 0, updatedAt: 0 }),
     getReportPrivate: async () => ({ reportId: '7', isSelfReport: false, addressLine1: 'x', lat: 32.77, lng: -96.79, notes: 'water still rising' }),
-    listMedia: async () => [{ id: '1', reportId: '7', kind: 'video', objectKey: 'media/7/clip.mp4', contentType: 'video/mp4', sizeBytes: 1, sha256: 'x', uploadedAt: 0 }],
+    // Round 0 is old footage whose object is gone; the job is for round 1 and must only read round 1.
+    listMedia: async (_reportId: string, round?: number) =>
+      [
+        { id: '1', reportId: '7', kind: 'video' as const, objectKey: 'media/7/old.mp4', contentType: 'video/mp4', sizeBytes: 1, sha256: 'x', uploadedAt: 0, round: 0 },
+        { id: '2', reportId: '7', kind: 'video' as const, objectKey: 'media/7/clip.mp4', contentType: 'video/mp4', sizeBytes: 1, sha256: 'x', uploadedAt: 0, round: 1 },
+      ].filter((m) => round === undefined || m.round === round),
   });
   let seq = 0;
   const ctx = {
-    job: { id: '1', kind: 'analyze', reportId: '7', payload: {} }, stdb, storage, nim, log: silentLog, scratch: new Map(),
+    job: { id: '1', kind: 'analyze', reportId: '7', payload: { round: 1 } }, stdb, storage, nim, log: silentLog, scratch: new Map(),
     step: async (s: any) => stdb.recordAgentStep({ ...s, reportId: '7', seq: seq++ }),
   } as unknown as JobContext;
   return { ctx, calls, steps, puts };
@@ -61,6 +66,9 @@ describe('analyze handler end to end', () => {
     expect(reporter.every((s) => s.kind === 'pipeline')).toBe(true);
     expect(new Set(reporter.map((s) => s.name))).toEqual(new Set(['uploaded', 'extract_frames', 'analyze_frames', 'estimate_cost', 'check_declarations', 'finalize']));
     expect(reporter.some((s) => /\$|roof|claim/i.test(s.summary))).toBe(false);
+    // Public county notices: full list (here empty = clears stale ones), county from the geocode.
+    const notices = calls.find((c) => c.name === 'record_area_notices')!.args as any;
+    expect(notices).toEqual({ propertyId: '9', countyFips: '48113', noticesJson: '[]' });
   }, 60_000);
 
   it('live path with a scripted model: agent tools run and no invented $ survives', async () => {

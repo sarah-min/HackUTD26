@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { NimClient } from '@hack/agent';
-import { Runner } from '../src/runner';
+import { Runner, stepSeqBase } from '../src/runner';
 import { fakeStdb, fakeStorage, job, silentLog } from './fakes';
 
 describe('Runner', () => {
@@ -48,5 +48,13 @@ describe('Runner', () => {
     await runner.tick();
     await runner.stop();
     expect(calls.find((c) => c.name === 'complete_job')!.args).toEqual({ id: '3', ok: false, error: 'boom' });
+  });
+
+  it('step seqs stay ordered across re-shoot rounds and retries (agent_step is not readable by the worker)', () => {
+    expect(stepSeqBase(job({ attempts: 0 }), { round: 0 })).toBe(0);
+    expect(stepSeqBase(job({ attempts: 1 }), { round: 0 })).toBe(100);
+    expect(stepSeqBase(job({ attempts: 0 }), { round: 2 })).toBe(2000);
+    expect(stepSeqBase(job({ attempts: 0 }), {})).toBe(0);
+    expect(stepSeqBase(job({ attempts: 0 }), { round: 999 })).toBeLessThanOrEqual(65_535 - 1000);
   });
 });

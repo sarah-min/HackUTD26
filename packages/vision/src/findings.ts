@@ -1,4 +1,5 @@
-import { FrameFindingSchema, type FrameFinding, type Hazard } from '@hack/contracts';
+import { FrameFindingSchema, type FrameFinding } from '@hack/contracts/assessment';
+import { type Hazard } from '@hack/contracts/common';
 import type { ChatMessage, NimClient } from '@hack/agent';
 import { findingCacheKey, sha256Hex, type FindingCache } from './cache';
 import { toDataUrl, type ImageMime } from './image';

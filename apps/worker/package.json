@@ -7,7 +7,8 @@
     "dev": "tsx watch --env-file=../../.env.local src/main.ts",
     "start": "tsx src/main.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "identity": "tsx src/identity.ts"
   },
   "dependencies": {
     "@hack/address": "workspace:*",
@@ -17,9 +18,11 @@
     "@hack/storage": "workspace:*",
     "@hack/vision": "workspace:*",
     "tsx": "4.23.15",
-    "zod": "4.6.7"
+    "zod": "4.6.7",
+    "@hack/stdb-bindings": "workspace:*",
+    "spacetimedb": "2.13.0"
   },
   "devDependencies": {
-    "vitest": "5.1.0"
+    "vitest": "3.2.4"
   }
 }

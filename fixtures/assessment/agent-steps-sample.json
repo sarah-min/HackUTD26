@@ -42,7 +42,7 @@
       "reportId": "7",
       "seq": 4,
       "kind": "vision",
-      "name": "nvidia/nemotron-nano-12b-v2-vl",
+      "name": "nvidia/NVIDIA-Nemotron-Nano-12B-v2-VL-FP8",
       "summary": "Frame 1 at 0.5 s: roof major, yard_debris minor",
       "visibility": "affected",
       "durationMs": 548,
@@ -61,7 +61,7 @@
       "reportId": "7",
       "seq": 6,
       "kind": "model",
-      "name": "nvidia/nemotron-3-super-120b-a12b",
+      "name": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8",
       "summary": "Plan: get_report_context, get_frame_findings",
       "visibility": "affected",
       "at": 1794100007800
@@ -89,7 +89,7 @@
       "reportId": "7",
       "seq": 9,
       "kind": "model",
-      "name": "nvidia/nemotron-3-super-120b-a12b",
+      "name": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8",
       "summary": "Plan: reverse_geocode, lookup_disaster_declarations",
       "visibility": "affected",
       "at": 1794100011700
@@ -173,7 +173,7 @@
       "reportId": "7",
       "seq": 18,
       "kind": "model",
-      "name": "nvidia/nemotron-3-super-120b-a12b",
+      "name": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8",
       "summary": "Plan: finish",
       "visibility": "affected",
       "at": 1794100023400
