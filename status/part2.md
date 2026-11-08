@@ -45,6 +45,15 @@ Owner: Sidd. Append-only, newest entry first. Format is in [STATUS.md](../STATUS
 - **Bucket CORS** must allow GET from the domain (report thumbnails go through `/api/media` → presigned GET).
 - **Component Part 2's report page imports from you:** `<RecoverySummaryCard>` from `@/components/finance`. **Props are in `apps/web/components/affected/placeholders/types.ts`.** The recovery route `app/affected/property/[propertyId]/recovery/**` is yours.
 
+
+### 2026-11-08: `report` is private, upload caps, dev republished
+
+- **`report` is now a private table** (team agreed; the privacy matrix found it exposed per-report damage/hazard data to anyone). Read it through `my_reports` (reporter), **`my_property_reports`** (verified owner) or **`svc_reports`** (worker, open jobs only). In the web app use `useReport` / `useReportsForProperty` from `apps/web/lib/stdb/hooks.ts` (already switched). Worker: `tables.svcReports` replaces `tables.report` (Sarah did this on `p3-svc-reports`).
+- **Upload caps** in `begin_upload`: 9 media blobs and 60 MB per report (each re-shoot round gets a fresh budget), 3 `idv/` blobs per verification. Completed `media/` blobs never attached to a report are purged after 1 hour.
+- Storage and geocoding live in the module (Sarah's change, reviewed and approved). `attach_media` / `submit_verification` need a completed upload first.
+- Dev `aftermath-hackutd-dev` is republished with all of this (smoke test 100% pass, load probe clean). **Prod is republished at merge time** (see `docs/BACKEND_RUNBOOK.md`).
+- Still stale (not mine to edit unasked): ARCHITECTURE.md and CONTRACTS §8's REST tables still describe `/api/uploads/presign`, `/api/media` and `/api/geocode`; `apps/web/app/api/uploads/presign` can be deleted by Part 4.
+
 ## 2026-11-07 19:10: web-server role for P4 routes; live smoke + fake worker; geocode verified (branch part2/backend-foundation, uncommitted)
 - **Shipped:** new service role `web` + 3 narrow views (`web_report_upload_auth`, `web_verification_auth`, `web_media_index`) so `/api/uploads/presign` and `/api/media` can authorize. `web` can't call worker reducers or read `svc_*`. Republished dev + prod (additive, no data loss); bindings regenerated. `scripts/smoke-p2.ts` (27 live checks on dev) and `scripts/dev-fake-worker.ts` (fixture stand-in worker, dev only). `packages/stdb-bindings/README.md` backend guide. Geocode parsers verified against live Census + Nominatim responses (saved as fixtures). `lib/stdb/config.ts` defaults → Maincloud dev DB.
 - **Verify:** module 42 tests (5 new web-role tests; mutation removing the gate fails a test). `pnpm --dir scripts smoke:p2` → ALL CHECKS PASSED after the republish. Web scratch tsc 0 errors, 19 tests.

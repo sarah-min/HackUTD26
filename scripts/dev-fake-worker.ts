@@ -127,7 +127,7 @@ async function connect(): Promise<Conn> {
             tables.svcAffectedProfiles,
             tables.svcRecoveryPlans,
             tables.svcCoachMessages,
-            tables.report,
+            tables.svcReports,
             tables.property,
           ] as any); // reason: heterogeneous typed queries; the SDK accepts an array of them
       })
@@ -152,7 +152,7 @@ async function step(reportId: bigint, seq: number, name: string, summary: string
 }
 
 function findReport(id: bigint) {
-  for (const r of conn.db.report.iter()) if (r.id === id) return r;
+  for (const r of conn.db.svcReports.iter()) if (r.id === id) return r;
   return undefined;
 }
 function findPropertyPrivate(pid: bigint) {
@@ -169,6 +169,12 @@ async function handleAnalyze(job: any) {
   await step(reportId, seq++, 'extract_frames', 'Extracted 3 frames', 500);
   const findings = [0, 1, 2].map(i => fixtureFinding(i, i === 0 ? level : 'minor', flags));
   for (const f of findings) {
+    // Frame thumbnails are stored in SpacetimeDB (worker-only put_blob): a tiny fixture JPEG header.
+    await conn.reducers.putBlob({
+      objectKey: `frames/${reportId}/${f.frameIndex}.jpg`,
+      contentType: 'image/jpeg',
+      bytes: new Uint8Array([0xff, 0xd8, 0xff, 0xd9]),
+    });
     await conn.reducers.recordFrame({
       reportId,
       frameIndex: f.frameIndex,

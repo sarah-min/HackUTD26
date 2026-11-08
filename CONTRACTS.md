@@ -382,7 +382,7 @@ Below are logical definitions. Part 2 translates them into the current TS module
 |---|---|---|---|
 | `property` | public | `id u64 pk autoInc`, `cell_id string` (index), `created_at`, `county_fips string?` (5-digit county FIPS, set by the service; coarse, not PII) | everyone (no PII) |
 | `property_private` | private | `property_id pk`, `normalized string` (unique index), `line1`, `city`, `state`, `zip`, `lat f64?`, `lng f64?`, `county_fips string?` | Verified for this property; service |
-| `report` | public | `id u64 pk autoInc`, `reporter Identity` (index), `property_id` (index), `cell_id` (index), `created_at`, `updated_at`, `status`, `hazard`, `self_danger bool`, `life_safety_csv string`, `overall_level` (default `none`), `usable_frames u8`, `total_frames u8`, `status_reason string?`, `claimed bool`, `source` | everyone (no address, no coordinates, no finances) |
+| `report` | **private** (since 2026-11-08; read via `my_reports`, `my_property_reports`, `svc_reports`) | `id u64 pk autoInc`, `reporter Identity` (index), `property_id` (index), `cell_id` (index), `created_at`, `updated_at`, `status`, `hazard`, `self_danger bool`, `life_safety_csv string`, `overall_level` (default `none`), `usable_frames u8`, `total_frames u8`, `status_reason string?`, `claimed bool`, `source` | the reporter (own reports), a verified owner of the property, the worker (open jobs). Never anyone else |
 | `report_private` | private | `report_id pk`, `reporter_secret_hash`, `is_self_report bool`, `address_line1`, `lat f64?`, `lng f64?` (device GPS or geocode), `notes string?` | Reporter of the report; Verified for its property; service |
 | `media_asset` | private | `id pk autoInc`, `report_id` (index), `kind 'video'|'image'`, `object_key`, `content_type`, `size_bytes u64`, `sha256`, `uploaded_at` | Verified for the report's property; service |
 | `frame` | private | `id pk autoInc`, `report_id` (index), `frame_index u8`, `t_sec f32`, `thumb_key`, `finding_json` (FrameFinding) | Verified; service |
@@ -416,7 +416,9 @@ An empty array clears the county's notices. Send the full current list each time
 
 | View | Returns (row type of) | Rows |
 |---|---|---|
-| `my_reports` | `report` | reports the sender submitted (convenience; `report` is public anyway) |
+| `my_reports` | `report` | reports the sender submitted |
+| `my_property_reports` | `report` | reports on properties the sender is verified for (the affected person's list) |
+| `svc_reports` (worker) | `report` | reports tied to open jobs (queued/leased) |
 | `my_report_privates` | `report_private` | sender's own reports + reports on properties the sender is verified for |
 | `my_verifications` | `verification` | sender's own verification rows (the client reads the matched `property_id` here) |
 | `my_property_privates` | `property_private` | properties the sender is verified for |

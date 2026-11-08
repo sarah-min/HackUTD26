@@ -201,6 +201,9 @@ export type MyMediaAssets = __Infer<typeof MyMediaAssets>;
 export const MyPropertyPrivates = __t.object("MyPropertyPrivates", {});
 export type MyPropertyPrivates = __Infer<typeof MyPropertyPrivates>;
 
+export const MyPropertyReports = __t.object("MyPropertyReports", {});
+export type MyPropertyReports = __Infer<typeof MyPropertyReports>;
+
 export const MyRecoveryPlans = __t.object("MyRecoveryPlans", {});
 export type MyRecoveryPlans = __Infer<typeof MyRecoveryPlans>;
 
@@ -317,6 +320,9 @@ export type SvcRecoveryPlans = __Infer<typeof SvcRecoveryPlans>;
 
 export const SvcReportPrivates = __t.object("SvcReportPrivates", {});
 export type SvcReportPrivates = __Infer<typeof SvcReportPrivates>;
+
+export const SvcReports = __t.object("SvcReports", {});
+export type SvcReports = __Infer<typeof SvcReports>;
 
 export const SvcVerifications = __t.object("SvcVerifications", {});
 export type SvcVerifications = __Infer<typeof SvcVerifications>;

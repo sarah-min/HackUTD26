@@ -54,20 +54,24 @@ export function useProperty(propertyId: bigint | null) {
   return { property: rows[0], ready };
 }
 
-/** Public report rows for one property (no PII), newest first. */
+/** Report rows for one property, newest first. Only a verified owner of that property gets rows (`report` is private). */
 export function useReportsForProperty(propertyId: bigint | null) {
-  const [rows, ready] = useTable(T.report.where((r) => r.propertyId.eq(propertyId ?? 0n)), {
+  const [rows, ready] = useTable(T.myPropertyReports.where((r) => r.propertyId.eq(propertyId ?? 0n)), {
     enabled: propertyId !== null,
   });
   const sorted = useMemo(() => [...rows].sort((a, b) => (a.id < b.id ? 1 : -1)), [rows]);
   return { reports: sorted, ready };
 }
 
+/** One report: the reporter's own (my_reports) or a verified owner's (my_property_reports). */
 export function useReport(reportId: bigint | null) {
-  const [rows, ready] = useTable(T.report.where((r) => r.id.eq(reportId ?? 0n)), {
+  const [mine, readyMine] = useTable(T.myReports.where((r) => r.id.eq(reportId ?? 0n)), {
     enabled: reportId !== null,
   });
-  return { report: rows[0], ready };
+  const [owned, readyOwned] = useTable(T.myPropertyReports.where((r) => r.id.eq(reportId ?? 0n)), {
+    enabled: reportId !== null,
+  });
+  return { report: mine[0] ?? owned[0], ready: readyMine && readyOwned };
 }
 
 /** Aggregated area cells (public). Filtered client-side to the requested cell ids. */
