@@ -37,6 +37,17 @@ export const my_reports = spacetimedb.view({ name: 'my_reports', public: true },
   ...ctx.db.report.reporter.filter(ctx.sender),
 ]);
 
+/** Reports on properties the sender is verified for (the affected person's report list). Never anyone else's. */
+export const my_property_reports = spacetimedb.view(
+  { name: 'my_property_reports', public: true },
+  t.array(report.rowType),
+  ctx => {
+    const out = [];
+    for (const pid of verifiedPropertyIds(ctx.db, ctx.sender)) out.push(...ctx.db.report.property_id.filter(pid));
+    return out;
+  }
+);
+
 export const my_report_privates = spacetimedb.view(
   { name: 'my_report_privates', public: true },
   t.array(report_private.rowType),

@@ -1,5 +1,6 @@
-// Core report/property tables (CONTRACTS.md §5.1). Only `property`, `report` and
-// `area_cell_summary` are public; everything else is private and exposed to clients
+// Core report/property tables (CONTRACTS.md §5.1). Only `property` and
+// `area_cell_summary` are public (`report` is private since 2026-11-08: per-report damage/hazard data is
+// exposed only through my_reports / my_property_reports / svc_reports); everything else is private and exposed to clients
 // solely through the sender-scoped views in ../views.ts.
 import { table, t } from 'spacetimedb/server';
 
@@ -30,7 +31,7 @@ export const property_private = table(
 );
 
 export const report = table(
-  { name: 'report', public: true },
+  { name: 'report' },
   {
     id: t.u64().primaryKey().autoInc(),
     reporter: t.identity().index('btree'),

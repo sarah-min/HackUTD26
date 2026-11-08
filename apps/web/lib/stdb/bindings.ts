@@ -15,7 +15,7 @@ export { DbConnection };
 export const T = {
   // public tables
   property: tables.property,
-  report: tables.report,
+  myPropertyReports: tables.myPropertyReports, // reports on properties I'm verified for (report is private since 2026-11-08)
   areaCellSummary: tables.areaCellSummary,
   areaNotice: tables.areaNotice, // NWS alerts + FEMA declarations per county (public, no PII)
 

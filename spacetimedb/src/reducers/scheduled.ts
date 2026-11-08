@@ -5,7 +5,7 @@ import { refreshAllCells } from '../cells';
 import { failAttempt, leaseExpired } from '../jobs';
 import { fail } from '../constants';
 import { purgeExpiredNotices } from '../notices';
-import { BLOB_STALE_MICROS, deleteBlob } from '../blobs';
+import { BLOB_STALE_MICROS, deleteBlob, parseKey } from '../blobs';
 
 function requireScheduler(isInternal: boolean): void {
   // Scheduled reducers run as the module itself; block direct client calls.
@@ -24,7 +24,17 @@ export const requeue_expired_jobs = spacetimedb.reducer(
     const now = ctx.timestamp.microsSinceUnixEpoch;
     for (const b of [...ctx.db.blob.iter()]) {
       if (now - b.created_at.microsSinceUnixEpoch < BLOB_STALE_MICROS) continue;
-      if (!b.complete || b.object_key.startsWith('idv/')) deleteBlob(ctx.db, b.object_key);
+      if (!b.complete || b.object_key.startsWith('idv/')) {
+        deleteBlob(ctx.db, b.object_key);
+        continue;
+      }
+      // Complete media never attached to a report (abandoned uploads) goes after the same hour.
+      if (b.object_key.startsWith('media/')) {
+        let attached = false;
+        const k = parseKey(b.object_key);
+        if (k.kind === 'media') for (const m of ctx.db.media_asset.report_id.filter(k.reportId)) if (m.object_key === b.object_key) attached = true;
+        if (!attached) deleteBlob(ctx.db, b.object_key);
+      }
     }
   }
 );

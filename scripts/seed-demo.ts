@@ -222,8 +222,8 @@ function fixtureAssessment(reportId: bigint, propertyId: bigint, hazard: string,
 }
 
 async function main(): Promise<void> {
-  const reporter = await connect('reporter', undefined, ['SELECT * FROM report', 'SELECT * FROM area_cell_summary']);
-  const worker = await connect('worker', TOKEN, ['SELECT * FROM svc_jobs', 'SELECT * FROM report']);
+  const reporter = await connect('reporter', undefined, ['SELECT * FROM my_reports', 'SELECT * FROM area_cell_summary']);
+  const worker = await connect('worker', TOKEN, ['SELECT * FROM svc_jobs', 'SELECT * FROM svc_reports']);
   console.log(`reporter ${reporter.idHex.slice(0, 12)}…, worker ${worker.idHex.slice(0, 12)}… (distinct: ${reporter.idHex !== worker.idHex})`);
   const R = reporter.conn;
   const W = worker.conn;
@@ -233,7 +233,7 @@ async function main(): Promise<void> {
 
   for (const { c, pts } of plan) {
     const cell = cellId(pts[0]!.lat, pts[0]!.lng);
-    const existing = [...R.db.report.iter()].filter(r => r.cellId === cell && r.status === 'assessed').length;
+    const existing = [...R.db.myReports.iter()].filter(r => r.cellId === cell && r.status === 'assessed').length;
     if (existing >= c.seeds.length) {
       console.log(`skip cluster ${c.name}: cell ${cell} already has ${existing} assessed reports`);
       skipped += c.seeds.length;
@@ -245,7 +245,7 @@ async function main(): Promise<void> {
       const p = pts[i]!;
       const parts = normalizeParts({ line1: `${4100 + i * 2 + (c.hazard.length % 7) * 20} ${STREETS[i % STREETS.length]}`, city: 'Richardson', state: 'TX', zip: '75080' });
       const address = { ...parts, lat: p.lat, lng: p.lng, source: 'manual' as const };
-      const before = new Set([...R.db.report.iter()].map(r => r.id));
+      const before = new Set([...R.db.myReports.iter()].map(r => r.id));
       await R.reducers.createReport({
         inputJson: JSON.stringify({
           hazard: c.hazard,
@@ -257,10 +257,13 @@ async function main(): Promise<void> {
         }),
       });
       const report = await waitFor('new report row', () =>
-        [...R.db.report.iter()].find(r => !before.has(r.id) && !seen.has(r.id) && hex(r.reporter) === reporter.idHex)
+        [...R.db.myReports.iter()].find(r => !before.has(r.id) && !seen.has(r.id) && hex(r.reporter) === reporter.idHex)
       );
       seen.add(report.id);
       const sha = sha256(`seed-${report.id}`);
+      // Files live in SpacetimeDB: upload the bytes (one 1000-byte chunk) before attach_media.
+      await R.reducers.beginUpload({ objectKey: `media/${report.id}/${sha}.mp4`, contentType: 'video/mp4', sizeBytes: 1000n, sha256: sha, chunkCount: 1 });
+      await R.reducers.uploadChunk({ objectKey: `media/${report.id}/${sha}.mp4`, seq: 0, bytes: new Uint8Array(1000) });
       await R.reducers.attachMedia({ reportId: report.id, kind: 'video', objectKey: `media/${report.id}/${sha}.mp4`, contentType: 'video/mp4', sizeBytes: 1000n, sha256: sha });
       await R.reducers.submitReport({ reportId: report.id });
 

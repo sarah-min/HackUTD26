@@ -9,6 +9,10 @@ export const IDV_IMAGE_MAX_BYTES = 15 * 1024 * 1024;
 export const FRAME_MAX_BYTES = 2 * 1024 * 1024;
 export const MEDIA_CONTENT_TYPES = ['video/mp4', 'video/quicktime', 'image/jpeg', 'image/png', 'image/webp'] as const;
 export const IMAGE_CONTENT_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
+/** Per-report storage caps (SpacetimeDB holds table data in memory). */
+export const MAX_MEDIA_BLOBS_PER_REPORT = 9;
+export const MAX_MEDIA_BYTES_PER_REPORT = 60 * 1024 * 1024;
+export const MAX_IDV_BLOBS_PER_VERIFICATION = 3;
 /** Unfinished uploads and leftover ID images are purged after this long. */
 export const BLOB_STALE_MICROS = 3600n * 1_000_000n;
 
@@ -26,6 +30,13 @@ export function parseKey(key: string): KeyKind {
 export function deleteBlob(db: Db, key: string): void {
   for (const c of [...db.blob_chunk.object_key.filter(key)]) db.blob_chunk.id.delete(c.id);
   db.blob.object_key.delete(key);
+}
+
+/** Blobs under `prefix` (e.g. `media/12/`), excluding `exceptKey`. */
+export function blobsWithPrefix(db: RoDb, prefix: string, exceptKey: string) {
+  const out = [];
+  for (const b of db.blob.iter()) if (b.object_key.startsWith(prefix) && b.object_key !== exceptKey) out.push(b);
+  return out;
 }
 
 /** A complete blob uploaded by `who`, or a reducer error. */

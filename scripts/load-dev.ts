@@ -151,7 +151,11 @@ async function phase1(): Promise<void> {
       }
       const s = sha256(`load-${reportId}-${Math.random()}`);
       const a = await timed(
-        R.reducers.attachMedia({ reportId, kind: 'video', objectKey: `media/${reportId}/${s}.mp4`, contentType: 'video/mp4', sizeBytes: 1000n, sha256: s })
+        (async () => {
+          await R.reducers.beginUpload({ objectKey: `media/${reportId}/${s}.mp4`, contentType: 'video/mp4', sizeBytes: 1000n, sha256: s, chunkCount: 1 });
+          await R.reducers.uploadChunk({ objectKey: `media/${reportId}/${s}.mp4`, seq: 0, bytes: new Uint8Array(1000) });
+          return R.reducers.attachMedia({ reportId, kind: 'video', objectKey: `media/${reportId}/${s}.mp4`, contentType: 'video/mp4', sizeBytes: 1000n, sha256: s });
+        })()
       );
       attach.push(a.ms);
       noteErr('attach_media', a.err);

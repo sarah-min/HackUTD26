@@ -84,7 +84,7 @@ describe('report status machine', () => {
 
     // Re-shoot: a fresh round allows up to 8 photos again.
     for (let i = 0; i < 8; i++) s.attach(alice, rid, 'image', i);
-    expect(() => s.attach(alice, rid, 'image', 9)).toThrow(/max 8 photos/);
+    expect(() => s.attach(alice, rid, 'image', 9)).toThrow(/max 8 photos|too many files/);
     s.assess(alice, rid, { level: 'major', usable: 8, total: 8, flags: 'downed_power_line' });
     const done = s.h.db.report.id.find(rid)!;
     expect(done.status).toBe('assessed');

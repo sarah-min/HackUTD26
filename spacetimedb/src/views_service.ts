@@ -6,7 +6,7 @@
 import { t } from 'spacetimedb/server';
 import type { Identity } from 'spacetimedb';
 import { spacetimedb } from './schema';
-import { report_private, property_private, media_asset, frame, assessment } from './tables/core';
+import { report, report_private, property_private, media_asset, frame, assessment } from './tables/core';
 import { verification, affected_profile, recovery_plan, coach_message } from './tables/affected';
 import { job } from './tables/system';
 import { isService } from './auth';
@@ -29,6 +29,15 @@ function uniq<T>(xs: (T | undefined | null)[]): T[] {
 export const svc_jobs = spacetimedb.view({ name: 'svc_jobs', public: true }, t.array(job.rowType), ctx =>
   openJobs(ctx.db, ctx.sender)
 );
+
+export const svc_reports = spacetimedb.view({ name: 'svc_reports', public: true }, t.array(report.rowType), ctx => {
+  const out = [];
+  for (const id of uniq<bigint>(openJobs(ctx.db, ctx.sender).map(j => j.report_id))) {
+    const row = ctx.db.report.id.find(id);
+    if (row) out.push(row);
+  }
+  return out;
+});
 
 export const svc_report_privates = spacetimedb.view(
   { name: 'svc_report_privates', public: true },

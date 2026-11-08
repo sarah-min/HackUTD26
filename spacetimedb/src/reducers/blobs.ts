@@ -10,7 +10,7 @@ import { spacetimedb } from '../schema';
 import { isReporter, isService, isVerifiedFor, requireService } from '../auth';
 import { fail, oneOf, type Db } from '../constants';
 import {
-  BLOB_CHUNK_BYTES, FRAME_MAX_BYTES, IDV_IMAGE_MAX_BYTES, IMAGE_CONTENT_TYPES, MEDIA_CONTENT_TYPES,
+  BLOB_CHUNK_BYTES, FRAME_MAX_BYTES, MAX_IDV_BLOBS_PER_VERIFICATION, MAX_MEDIA_BLOBS_PER_REPORT, MAX_MEDIA_BYTES_PER_REPORT, blobsWithPrefix, IDV_IMAGE_MAX_BYTES, IMAGE_CONTENT_TYPES, MEDIA_CONTENT_TYPES,
   MEDIA_IMAGE_MAX_BYTES, MEDIA_VIDEO_MAX_BYTES, deleteBlob, parseKey,
 } from '../blobs';
 
@@ -51,6 +51,20 @@ export const begin_upload = spacetimedb.reducer(
     if (a.size_bytes === 0n) fail('empty file');
     const expected = Number((a.size_bytes + BigInt(BLOB_CHUNK_BYTES) - 1n) / BigInt(BLOB_CHUNK_BYTES));
     if (a.chunk_count !== expected) fail(`chunk_count must be ${expected} for ${a.size_bytes} bytes`);
+    const k = parseKey(a.object_key);
+    if (k.kind === 'media') {
+      // Re-shoots get a fresh budget: files attached in earlier rounds don't count against this round's cap.
+      const round = ctx.db.report_private.report_id.find(k.reportId)?.submit_count ?? 0;
+      const earlier = new Set<string>();
+      for (const m of ctx.db.media_asset.report_id.filter(k.reportId)) if (m.round < round) earlier.add(m.object_key);
+      const others = blobsWithPrefix(ctx.db, `media/${k.reportId}/`, a.object_key).filter(b => !earlier.has(b.object_key));
+      if (others.length >= MAX_MEDIA_BLOBS_PER_REPORT) fail(`too many files for this report (max ${MAX_MEDIA_BLOBS_PER_REPORT})`);
+      const bytes = others.reduce((n, b) => n + b.size_bytes, 0n) + a.size_bytes;
+      if (bytes > BigInt(MAX_MEDIA_BYTES_PER_REPORT)) fail(`too much media for this report (max ${MAX_MEDIA_BYTES_PER_REPORT} bytes)`);
+    } else if (k.kind === 'idv') {
+      if (blobsWithPrefix(ctx.db, `idv/${k.verificationId}/`, a.object_key).length >= MAX_IDV_BLOBS_PER_VERIFICATION)
+        fail('too many files for this verification');
+    }
     const old = ctx.db.blob.object_key.find(a.object_key);
     if (old) {
       if (!old.owner.isEqual(ctx.sender)) fail('object_key already in use');

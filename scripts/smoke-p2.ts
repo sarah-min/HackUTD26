@@ -114,7 +114,6 @@ async function main(): Promise<void> {
   console.log(`Smoke test → ${STDB_URI} / ${STDB_MODULE}  (address: ${parts.normalized})`);
 
   const reporter = await connect('reporter', undefined, [
-    'SELECT * FROM report',
     'SELECT * FROM area_cell_summary',
     'SELECT * FROM my_reports',
     'SELECT * FROM my_agent_steps',
@@ -131,7 +130,7 @@ async function main(): Promise<void> {
   ]);
   check('worker connects as DEV_WORKER_IDENTITY', worker.idHex === WORKER_IDENTITY);
   const affected = await connect('affected', undefined, [
-    'SELECT * FROM report',
+    'SELECT * FROM my_property_reports',
     'SELECT * FROM area_cell_summary',
     'SELECT * FROM my_verifications',
     'SELECT * FROM my_property_privates',
@@ -150,10 +149,10 @@ async function main(): Promise<void> {
   const transitions: string[] = [];
   let claimedLive = false;
   const mine = (row: { reporter: { toHexString(): string } }) => hex(row.reporter) === reporter.idHex;
-  R.db.report.onInsert((_c, row) => {
+  R.db.myReports.onInsert((_c, row) => {
     if (mine(row)) transitions.push(row.status);
   });
-  R.db.report.onUpdate((_c, oldRow, row) => {
+  R.db.myReports.onUpdate((_c, oldRow, row) => {
     if (!mine(row)) return;
     if (row.status !== oldRow.status) transitions.push(row.status);
     if (!oldRow.claimed && row.claimed) claimedLive = true;
@@ -168,7 +167,7 @@ async function main(): Promise<void> {
     })
   );
   if (!ok) return;
-  const report = await waitFor('report row', () => [...R.db.report.iter()].find(mine));
+  const report = await waitFor('report row', () => [...R.db.myReports.iter()].find(mine));
   if (!report) return check('report created', false);
   const reportId = report.id;
   check('create_report → report row visible to reporter', true, `id=${reportId} cell=${report.cellId}`);
@@ -182,6 +181,36 @@ async function main(): Promise<void> {
     'attach_media',
     R.reducers.attachMedia({ reportId, kind: 'video', objectKey: `media/${reportId}/${mediaSha}.mp4`, contentType: 'video/mp4', sizeBytes: 1000n, sha256: mediaSha })
   );
+
+  // Storage cap: 9 media blobs per report round; the 10th upload must be rejected.
+  const capKey = (i: number) => `media/${reportId}/cap${i}.jpg`;
+  let capOk = true;
+  for (let i = 1; i <= 8; i++) {
+    try {
+      await R.reducers.beginUpload({ objectKey: capKey(i), contentType: 'image/jpeg', sizeBytes: 1000n, sha256: sha256(`cap${i}`), chunkCount: 1 });
+    } catch (e) {
+      capOk = false;
+      check(`begin_upload ${i + 1} of 9 allowed`, false, String((e as Error)?.message ?? e));
+    }
+  }
+  if (capOk) check('begin_upload up to 9 media blobs per report allowed', true);
+  try {
+    await R.reducers.beginUpload({ objectKey: capKey(9), contentType: 'image/jpeg', sizeBytes: 1000n, sha256: sha256('cap9'), chunkCount: 1 });
+    check('10th media blob rejected (too many files)', false, 'was accepted');
+  } catch (e) {
+    check('10th media blob rejected (too many files)', /too many files/i.test(String((e as Error)?.message ?? e)), String((e as Error)?.message ?? e).slice(0, 80));
+  }
+
+  // `report` is private: a stranger cannot subscribe to it.
+  let strangerRows = -1;
+  try {
+    const stranger = await connect('stranger', undefined, ['SELECT * FROM report']);
+    strangerRows = [...(stranger.conn.db as any).report?.iter?.() ?? []].length; // reason: the table no longer exists in the bindings
+  } catch {
+    strangerRows = 0; // subscription rejected: private table
+  }
+  check('stranger cannot read the private report table', strangerRows === 0, `rows=${strangerRows}`);
+
   await call('submit_report', R.reducers.submitReport({ reportId }));
 
   // ---------- (b) worker: analyze ----------
