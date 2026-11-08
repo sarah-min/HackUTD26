@@ -24,6 +24,7 @@
  * Refuses to run unless STDB_MODULE ends in "-dev". The token is never printed.
  * Logs job ids and kinds only, no personal data.
  */
+import { costFor, type Level } from './seed-assessment';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -210,13 +211,13 @@ async function handleAnalyze(job: any) {
     reportId: String(reportId),
     propertyId: propertyId !== undefined ? String(propertyId) : '0',
     overallLevel: level,
-    componentLevels: { roof: level, exterior_walls: 'minor', windows_doors: 'minor', foundation: 'none', interior: 'none', utilities: 'none', contents: 'none', vehicle: 'none', yard_debris: 'none' },
+    componentLevels: costFor(level as Level).levels,
     lifeSafety: flags,
     hazard: report?.hazard ?? 'other',
     confidence: 0.76,
     usableFrameCount: 3,
     totalFrameCount: 3,
-    cost: fixtureCost(level),
+    cost: costFor(level as Level).cost,
     declarations: [],
     activeAlerts: [{ event: '[FIXTURE] Flash Flood Warning', severity: 'Severe', headline: '[FIXTURE] Simulated alert' }],
     location: { stateCode: 'TX', countyName: '[FIXTURE] County', countyFips: fips },
