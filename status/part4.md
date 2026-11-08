@@ -1,6 +1,20 @@
-# Part 4: Recovery Navigator & Infra: status log
+# Part 4: Recovery Navigator & storage APIs: status log
 
 Owner: Roselyn. Append-only, newest entry first. Format is in [STATUS.md](../STATUS.md). Only this part's owner (and their LLM) edits this file.
+
+## Requests to other parts (open)
+
+- **P3 (Nemotron / Brev):** Take hosting — Brev (not Vultr), `infra/**` / compose / Dockerfiles / deploy. Update ARCHITECTURE.md / IDEA.md / README / DEMO / SOURCES / STATUS checklist that still say Vultr. Provide the live HTTPS URL and whichever S3-compatible bucket endpoint the app should use. Register P4 `plan`/`coach` handlers when ready.
+- **P2:** Flip `external.ts` RecoverySummaryCard → `@/components/finance`. Confirm web identity `c20031dd…bf61` registered as `web`.
+- **P1:** Workspace members `@hack/finance` + `@hack/storage`.
+
+## 2026-11-07 19:50: Drop Vultr from P4; hand hosting to P3/Brev (branch part4/finance-contracts)
+
+- **Shipped:** Removed Vultr from P4 scope. `docs/DEPLOYMENT.md` rewritten (P3=Brev host; P4=S3-compatible client only). `.env.example` / CONTRACTS §10 / IMPLEMENTATION_PLAN P4 / KICKOFF P4 updated. Local `part4/infra-bootstrap` branch + Vultr infra stash deleted (never pushed).
+- **Verify:** Grep P4-owned paths for `Vultr`/`vultrobjects` should be empty; DEPLOYMENT points at P3 for host.
+- **Fixtures still faked:** same as before for engine/UI
+- **Requests to other parts:** see open list above
+- **Blocked on:** P3 Brev URL + bucket endpoint; recovery UI still to build
 
 ## 2026-11-07 17:45: T4.2–T4.3 storage + HTTP routes + summary card (branch part4/finance-contracts)
 
@@ -114,11 +128,8 @@ infra/**, Dockerfiles, compose, web API routes P4 owns, or .env.example changed.
 Do not open code PRs from this automation.
 ```
 
-## Requests to other parts (open)
-
-- none yet
-
 ## Cost ledger
 
 | When | Service | Item | Amount | Credit or cash |
 |---|---|---|---|---|
+| 2026-11-07 | Vultr | abandoned — hosting moved to P3/Brev | $0 further | — |

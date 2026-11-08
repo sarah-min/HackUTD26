@@ -50,6 +50,6 @@ describe('createStorageFromEnv', () => {
   });
 
   it('throws when S3 env is incomplete', () => {
-    expect(() => createStorageFromEnv({ S3_ENDPOINT: 'https://chi3.vultrobjects.com' })).toThrow(/incomplete/);
+    expect(() => createStorageFromEnv({ S3_ENDPOINT: 'https://s3.example.com' })).toThrow(/incomplete/);
   });
 });
