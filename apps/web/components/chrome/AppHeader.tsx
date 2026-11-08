@@ -15,7 +15,7 @@ export function AppHeader({
     <header
       className={`${dense ? 'app-safe-header-sm' : 'app-safe-header'} border-b border-white/10 bg-[#0f172a] px-4 py-2.5 text-white`}
     >
-      <div className="mx-auto flex w-full max-w-lg items-center justify-between gap-2 sm:max-w-[520px]">
+      <div className="mx-auto flex w-full max-w-[480px] items-center justify-between gap-2">
         <Link className="flex min-w-0 items-center gap-2.5" href="/" aria-label={`${brand.name} home`}>
           <span className="grid size-8 place-items-center rounded-lg bg-white text-[#0f172a]">
             <svg aria-hidden className="size-5" fill="none" viewBox="0 0 24 24">

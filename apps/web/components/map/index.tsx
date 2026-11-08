@@ -23,4 +23,10 @@ export const PinMap = dynamic(
   { ssr: false, loading: () => <MapSkeleton label="map" /> },
 ) as ComponentType<{ pins: MapPin[] }>;
 
+export const MapboxDamageMap = dynamic(
+  () => import('./MapboxDamageMap').then((m) => m.MapboxDamageMap),
+  { ssr: false, loading: () => <MapSkeleton label="mapbox" /> },
+);
+
 export type { MapPin };
+export type { BuildingHighlight, MapMarkerSpec } from './MapboxDamageMap';

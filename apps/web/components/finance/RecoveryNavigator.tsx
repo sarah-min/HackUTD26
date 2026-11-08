@@ -25,6 +25,7 @@ import { AppShell } from '@/components/chrome/AppShell';
 import { CoachChat } from './CoachChat';
 import { IntakeForm } from './IntakeForm';
 import { PlanView } from './PlanView';
+import { FinanceDisclaimer } from './FinanceDisclaimer';
 import { useRecoveryData } from './useRecoveryData';
 import { WhatIfPanel } from './WhatIfPanel';
 
@@ -158,6 +159,7 @@ export function RecoveryNavigator({ propertyIdParam }: { propertyIdParam: string
           <h1 className="mt-0.5 text-lg font-bold tracking-[-0.02em] text-slate-950">
             Verify to open Recovery Navigator
           </h1>
+          <FinanceDisclaimer />
         </header>
         <Link
           href="/affected/start"
@@ -187,9 +189,7 @@ export function RecoveryNavigator({ propertyIdParam }: { propertyIdParam: string
         <h1 className="mt-0.5 text-lg font-bold tracking-[-0.02em] text-slate-950">
           Recovery Navigator
         </h1>
-        <p className="mt-1 text-[12px] text-slate-500">
-          Educational estimate using a synthetic demo profile. Not financial advice.
-        </p>
+        <FinanceDisclaimer />
       </header>
 
       {assessed.length > 1 ? (

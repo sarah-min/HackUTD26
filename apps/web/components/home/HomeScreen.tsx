@@ -27,15 +27,15 @@ function Icon({
   );
 }
 
-/** Landing CTAs into the Next app. */
+/** Updatedfront landing CTAs, in the shared phone shell for width consistency. */
 export function HomeScreen() {
   return (
     <AppShell>
       <header>
-        <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-blue-700">
+        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-blue-700">
           Choose your path
         </p>
-        <h1 className="mt-0.5 text-lg font-bold tracking-[-0.02em] text-slate-950">
+        <h1 className="mt-1 text-[20px] font-bold tracking-[-0.025em] text-slate-950">
           How are you using Aftermath today?
         </h1>
       </header>
@@ -52,7 +52,7 @@ export function HomeScreen() {
             />
           </Icon>
         </span>
-        <p className="text-[12px] leading-relaxed">
+        <p className="text-[11px] leading-relaxed">
           <strong>Immediate danger?</strong> Aftermath does not replace emergency services. Call{' '}
           <a className="font-extrabold underline underline-offset-2" href="tel:911">
             911
@@ -63,7 +63,7 @@ export function HomeScreen() {
 
       <div className="grid gap-3">
         <Link
-          className="group relative overflow-hidden rounded-2xl bg-[#0f172a] p-5 text-left text-white shadow-[0_12px_30px_rgba(15,23,42,.14)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_38px_rgba(15,23,42,.2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+          className="group relative overflow-hidden rounded-[24px] bg-[#0f172a] p-5 text-left text-white shadow-[0_12px_30px_rgba(15,23,42,.14)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_38px_rgba(15,23,42,.2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
           href="/report/new"
         >
           <div className="flex items-start justify-between gap-4">
@@ -90,19 +90,19 @@ export function HomeScreen() {
               </Icon>
             </span>
           </div>
-          <p className="mt-5 text-[10px] font-bold uppercase tracking-[0.13em] text-blue-300">
+          <p className="mt-5 text-[9px] font-bold uppercase tracking-[0.13em] text-blue-300">
             Reporter view
           </p>
           <h2 className="mt-1 text-[21px] font-bold tracking-[-0.025em]">
             I&apos;m documenting damage
           </h2>
-          <p className="mt-2 text-[13px] leading-relaxed text-slate-400">
+          <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
             Capture field evidence, flag urgent hazards, and manage properties you have filmed.
           </p>
           <div className="mt-5 flex flex-wrap gap-2">
-            {['Field capture', 'Safety flags', 'My submissions'].map((item) => (
+            {['Field capture', 'AI assessment', 'My submissions'].map((item) => (
               <span
-                className="rounded-lg bg-white/7 px-2.5 py-1.5 text-[10px] font-semibold text-slate-300 ring-1 ring-inset ring-white/10"
+                className="rounded-lg bg-white/7 px-2.5 py-1.5 text-[8px] font-semibold text-slate-300 ring-1 ring-inset ring-white/10"
                 key={item}
               >
                 {item}
@@ -112,7 +112,7 @@ export function HomeScreen() {
         </Link>
 
         <Link
-          className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-[0_12px_30px_rgba(15,23,42,.07)] transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-[0_18px_38px_rgba(15,23,42,.11)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+          className="group relative overflow-hidden rounded-[24px] border border-slate-200 bg-white p-5 text-left shadow-[0_12px_30px_rgba(15,23,42,.07)] transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-[0_18px_38px_rgba(15,23,42,.11)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
           href="/affected/start"
         >
           <div className="flex items-start justify-between gap-4">
@@ -145,19 +145,19 @@ export function HomeScreen() {
               </Icon>
             </span>
           </div>
-          <p className="mt-5 text-[10px] font-bold uppercase tracking-[0.13em] text-blue-700">
+          <p className="mt-5 text-[9px] font-bold uppercase tracking-[0.13em] text-blue-700">
             Affected person view
           </p>
           <h2 className="mt-1 text-[21px] font-bold tracking-[-0.025em] text-slate-950">
             My home may be affected
           </h2>
-          <p className="mt-2 text-[13px] leading-relaxed text-slate-500">
+          <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
             Verify your residence, understand nearby risks, and build a personalized recovery plan.
           </p>
           <div className="mt-5 flex flex-wrap gap-2">
             {['Private verification', 'Area conditions', 'Recovery plan'].map((item) => (
               <span
-                className="rounded-lg bg-slate-100 px-2.5 py-1.5 text-[10px] font-semibold text-slate-600"
+                className="rounded-lg bg-slate-100 px-2.5 py-1.5 text-[8px] font-semibold text-slate-600"
                 key={item}
               >
                 {item}

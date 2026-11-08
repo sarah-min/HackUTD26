@@ -7,6 +7,7 @@ import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { NormalizedAddress } from '@hack/contracts/property';
 import { formatAddress, saveSelectedAddress } from '@/components/affected/helpers';
+import { MapboxAddressInput } from '@/components/address/MapboxAddressInput';
 import { AppShell } from '@/components/chrome/AppShell';
 import { P } from '@/lib/stdb';
 import { useProcedure } from 'spacetimedb/react';
@@ -87,46 +88,49 @@ function StartInner() {
           I&apos;ve been affected
         </h1>
         <p className="mt-1 text-[12px] text-slate-500">
-          Enter your home address. After you verify your ID, you&apos;ll see any damage reports
-          filed for your home and what&apos;s happening around it.
+          Pick your home from the address suggestions. After you verify your ID, you&apos;ll see any
+          damage reports filed for your home and what&apos;s happening around it.
         </p>
       </header>
 
-      <form
-        className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (query.trim().length >= 5) void run({ q: query.trim() });
-        }}
-      >
+      <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
         <label className="block text-[12px] font-semibold text-slate-700" htmlFor="address">
           Home address
         </label>
-        <input
+        <MapboxAddressInput
           id="address"
-          className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[13px] outline-none focus:border-blue-500"
           placeholder="1234 Main St, Houston, TX 77002"
-          autoComplete="street-address"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(next) => {
+            setQuery(next);
+            if (phase.k === 'error') setPhase({ k: 'idle' });
+          }}
+          onResolved={({ label, address: picked, coords }) => {
+            setQuery(label);
+            if (picked) {
+              setPhase({ k: 'results', list: [picked] });
+              return;
+            }
+            // Prefer reverse geocode when Mapbox gave coords but incomplete components.
+            if (coords) {
+              void run({ lat: coords.lat, lng: coords.lng });
+              return;
+            }
+            void run({ q: label });
+          }}
         />
-        <div className="flex gap-2">
-          <button
-            type="submit"
-            className="flex-1 rounded-xl bg-blue-700 px-4 py-3 text-[13px] font-bold text-white disabled:opacity-50"
-            disabled={phase.k === 'loading'}
-          >
-            Find address
-          </button>
-          <button
-            type="button"
-            onClick={useMyLocation}
-            className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-[13px] font-semibold text-slate-700"
-          >
-            Use my location
-          </button>
-        </div>
-      </form>
+        <p className="text-[10px] text-slate-500">
+          Pick a suggestion from the list to confirm your home address.
+        </p>
+        <button
+          type="button"
+          onClick={useMyLocation}
+          disabled={phase.k === 'loading'}
+          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-[13px] font-semibold text-slate-700 disabled:opacity-50"
+        >
+          Use my location
+        </button>
+      </div>
 
       {phase.k === 'loading' && <p className="text-[13px] text-slate-600">Looking up the address…</p>}
       {phase.k === 'error' && (

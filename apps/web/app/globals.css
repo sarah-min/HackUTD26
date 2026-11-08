@@ -48,3 +48,39 @@
 .app-safe-map-header {
   padding-top: calc(0.75rem + max(env(safe-area-inset-top, 0px), var(--prototype-safe-top)));
 }
+
+.app-safe-overlay-top {
+  top: calc(0.75rem + max(env(safe-area-inset-top, 0px), var(--prototype-safe-top)));
+}
+
+.app-safe-sticky-tabs {
+  top: calc(62px + max(env(safe-area-inset-top, 0px), var(--prototype-safe-top)));
+}
+
+.app-safe-map-count {
+  top: calc(82px + max(env(safe-area-inset-top, 0px), var(--prototype-safe-top)));
+}
+
+@media (max-width: 540px) {
+  :root {
+    /*
+     * Figma / Updatedfront device frames overlay a Dynamic Island but do not
+     * expose safe-area-inset-top. This fallback clears that simulated hardware.
+     */
+    --prototype-safe-top: 3.25rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .app-safe-map-header {
+    padding-top: calc(1.25rem + max(env(safe-area-inset-top, 0px), var(--prototype-safe-top)));
+  }
+
+  .app-safe-overlay-top {
+    top: calc(1.25rem + max(env(safe-area-inset-top, 0px), var(--prototype-safe-top)));
+  }
+
+  .app-safe-map-count {
+    top: calc(90px + max(env(safe-area-inset-top, 0px), var(--prototype-safe-top)));
+  }
+}

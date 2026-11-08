@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import type { Hazard } from '@hack/contracts/common';
 import type { NormalizedAddress } from '@hack/contracts/property';
 import { CreateReportInputSchema } from '@hack/contracts/report';
+import { MapboxAddressInput } from '@/components/address/MapboxAddressInput';
 import { AppShell } from '@/components/chrome/AppShell';
 import { Banner911 } from '@/components/safety';
 import {
@@ -21,6 +22,7 @@ import {
 } from '@/lib/stdb';
 import { useProcedure } from 'spacetimedb/react';
 import { HAZARD_OPTIONS } from './hazardOptions';
+import { gpsFromEvidenceFiles } from './photoGps';
 import { useReporterEvidence, validateEvidence } from './useReporterEvidence';
 
 type Phase = 'form' | 'creating' | 'uploading' | 'error';
@@ -78,6 +80,7 @@ export function ReportCapture() {
   const [uploadFrac, setUploadFrac] = useState(0);
   const [geoBusy, setGeoBusy] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
+  const [photoLocationNote, setPhotoLocationNote] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>('form');
   const [error, setError] = useState<string | null>(null);
 
@@ -213,19 +216,64 @@ export function ReportCapture() {
     return () => window.clearTimeout(t);
   }, [phase]);
 
-  async function searchAddress() {
+  async function searchAddress(overrideQuery?: string) {
+    const q = (overrideQuery ?? addressQuery).trim();
     setGeoError(null);
-    if (addressQuery.trim().length < 5) {
+    if (q.length < 5) {
       setGeoError('Enter at least 5 characters.');
+      return;
+    }
+    // Already confirmed via Mapbox — don't fight it with a Census miss.
+    if (address && formatAddress(address).toLowerCase() === q.toLowerCase()) {
+      setSuggestions([address]);
       return;
     }
     setGeoBusy(true);
     try {
-      const list = await geocode({ q: addressQuery.trim() }, forward, reverse);
+      const list = await geocode({ q }, forward, reverse);
       setSuggestions(list);
-      if (list.length === 0) setGeoError('No matches. Try a fuller street address.');
+      if (list.length === 0) {
+        // Keep a Mapbox-confirmed address; only error when nothing is confirmed yet.
+        if (!address) setGeoError('No matches. Try a fuller street address.');
+        return;
+      }
+      setGeoError(null);
+      setAddress(list[0]!);
+      setAddressQuery(formatAddress(list[0]!));
     } catch (e) {
-      setGeoError(e instanceof Error ? e.message : 'Lookup failed.');
+      if (!address) setGeoError(e instanceof Error ? e.message : 'Lookup failed.');
+    } finally {
+      setGeoBusy(false);
+    }
+  }
+
+  async function applyLocationFromPhoto(list: File[]) {
+    setPhotoLocationNote(null);
+    const gps = await gpsFromEvidenceFiles(list);
+    if (!gps) {
+      if (list.some((f) => f.type.startsWith('image/'))) {
+        setPhotoLocationNote('No GPS in these photos — pick an address from suggestions.');
+      }
+      return;
+    }
+    setDeviceLat(gps.lat);
+    setDeviceLng(gps.lng);
+    setGeoBusy(true);
+    setGeoError(null);
+    try {
+      const results = await geocode({ lat: gps.lat, lng: gps.lng }, forward, reverse);
+      setSuggestions(results);
+      if (results[0]) {
+        setAddress(results[0]);
+        setAddressQuery(formatAddress(results[0]));
+        setPhotoLocationNote('Location filled from photo GPS. Confirm or pick another address.');
+      } else {
+        setPhotoLocationNote('Photo has GPS, but no address matched — pick from suggestions.');
+      }
+    } catch (e) {
+      setPhotoLocationNote(
+        e instanceof Error ? e.message : 'Could not reverse-geocode photo location.',
+      );
     } finally {
       setGeoBusy(false);
     }
@@ -237,6 +285,7 @@ export function ReportCapture() {
     const v = validateEvidence(list);
     if (v && list.length > 0) setError(v);
     else if (error && error.startsWith('Add a photo')) setError(null);
+    void applyLocationFromPhoto(list);
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -334,28 +383,70 @@ export function ReportCapture() {
               <label className="mb-2 block text-[12px] font-semibold text-slate-700" htmlFor="addr">
                 Location
               </label>
-              <div className="flex gap-2">
-                <input
-                  className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-2.5 text-[13px] outline-none focus:border-blue-500"
-                  id="addr"
-                  value={addressQuery}
-                  disabled={busy}
-                  onChange={(ev) => {
-                    setAddressQuery(ev.target.value);
-                    setAddress(null);
-                  }}
-                  placeholder="Street, city, state"
-                />
-                <button
-                  className="shrink-0 rounded-xl bg-slate-900 px-3 py-2 text-[12px] font-bold text-white disabled:opacity-50"
-                  disabled={geoBusy || busy}
-                  onClick={() => void searchAddress()}
-                  type="button"
-                >
-                  {geoBusy ? '…' : 'Lookup'}
-                </button>
-              </div>
-              {geoError ? <p className="mt-1 text-[11px] text-amber-800">{geoError}</p> : null}
+              <MapboxAddressInput
+                id="addr"
+                value={addressQuery}
+                disabled={busy}
+                placeholder="Street, city, state"
+                onChange={(next) => {
+                  setAddressQuery(next);
+                  // Mapbox may rewrite the input after onRetrieve; don't wipe a matching confirm.
+                  setAddress((prev) => {
+                    if (!prev) return null;
+                    const confirmed = formatAddress(prev).toLowerCase();
+                    const typed = next.trim().toLowerCase();
+                    if (!typed || confirmed === typed || confirmed.startsWith(typed)) return prev;
+                    return null;
+                  });
+                }}
+                onResolved={({ label, address: picked, coords }) => {
+                  setGeoError(null);
+                  setAddressQuery(label);
+                  if (picked) {
+                    setAddress(picked);
+                    setSuggestions([picked]);
+                    setAddressQuery(formatAddress(picked));
+                    return;
+                  }
+                  // Incomplete Mapbox components — reverse geocode beats Census-on-full_address.
+                  setAddress(null);
+                  if (coords) {
+                    void (async () => {
+                      setGeoBusy(true);
+                      try {
+                        const list = await geocode(
+                          { lat: coords.lat, lng: coords.lng },
+                          forward,
+                          reverse,
+                        );
+                        setSuggestions(list);
+                        if (list[0]) {
+                          setGeoError(null);
+                          setAddress(list[0]);
+                          setAddressQuery(formatAddress(list[0]));
+                        } else {
+                          setGeoError('No matches. Try a fuller street address.');
+                        }
+                      } catch (e) {
+                        setGeoError(e instanceof Error ? e.message : 'Lookup failed.');
+                      } finally {
+                        setGeoBusy(false);
+                      }
+                    })();
+                    return;
+                  }
+                  void searchAddress(label);
+                }}
+              />
+              <p className="mt-1 text-[10px] text-slate-500">
+                Pick a suggestion, or add a geotagged photo to fill location automatically.
+              </p>
+              {photoLocationNote ? (
+                <p className="mt-1 text-[11px] text-blue-800">{photoLocationNote}</p>
+              ) : null}
+              {geoError && !address ? (
+                <p className="mt-1 text-[11px] text-amber-800">{geoError}</p>
+              ) : null}
               {suggestions.length > 0 ? (
                 <ul className="mt-2 space-y-1">
                   {suggestions.map((s) => {
@@ -371,6 +462,7 @@ export function ReportCapture() {
                           }`}
                           disabled={busy}
                           onClick={() => {
+                            setGeoError(null);
                             setAddress(s);
                             setAddressQuery(label);
                           }}
@@ -450,7 +542,7 @@ export function ReportCapture() {
                       : `${files.length} files selected`}
                 </span>
                 <span className="mt-0.5 block text-[11px] text-slate-500">
-                  One MP4/MOV (≤200 MB) or up to 8 photos — required to queue analysis
+                  One MP4/MOV (≤200 MB) or up to 8 photos. Geotagged photos can set the location.
                 </span>
               </button>
             </div>
