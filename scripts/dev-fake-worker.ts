@@ -210,7 +210,7 @@ async function handleAnalyze(job: any) {
     reportId: String(reportId),
     propertyId: propertyId !== undefined ? String(propertyId) : '0',
     overallLevel: level,
-    componentLevels: { roof: level, exterior_walls: 'minor', windows_doors: 'minor' },
+    componentLevels: { roof: level, exterior_walls: 'minor', windows_doors: 'minor', foundation: 'none', interior: 'none', utilities: 'none', contents: 'none', vehicle: 'none', yard_debris: 'none' },
     lifeSafety: flags,
     hazard: report?.hazard ?? 'other',
     confidence: 0.76,

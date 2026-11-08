@@ -7,16 +7,17 @@ import { fail } from '../constants';
 import { purgeExpiredNotices } from '../notices';
 import { BLOB_STALE_MICROS, deleteBlob, parseKey } from '../blobs';
 
-function requireScheduler(isInternal: boolean): void {
-  // Scheduled reducers run as the module itself; block direct client calls.
-  if (!isInternal) fail('unauthorized: scheduled only');
+function requireScheduler(isInternal: boolean, sender: { isEqual(o: unknown): boolean }, self: unknown): void {
+  // Scheduled reducers run as the module itself; block direct client calls. The test harness reports
+  // isInternal, but on a live host the scheduler's sender is the database's own identity instead.
+  if (!isInternal && !sender.isEqual(self)) fail('unauthorized: scheduled only');
 }
 
 export const requeue_expired_jobs = spacetimedb.reducer(
   { onSchedule: lease_tick },
   { arg: lease_tick.rowType },
   ctx => {
-    requireScheduler(ctx.senderAuth.isInternal);
+    requireScheduler(ctx.senderAuth.isInternal, ctx.sender, ctx.databaseIdentity);
     for (const j of [...ctx.db.job.state.filter('leased')]) {
       if (leaseExpired(j, ctx.timestamp)) failAttempt(ctx, j, 'lease expired');
     }
@@ -43,7 +44,7 @@ export const refresh_area_cells = spacetimedb.reducer(
   { onSchedule: area_tick },
   { arg: area_tick.rowType },
   ctx => {
-    requireScheduler(ctx.senderAuth.isInternal);
+    requireScheduler(ctx.senderAuth.isInternal, ctx.sender, ctx.databaseIdentity);
     refreshAllCells(ctx);
     purgeExpiredNotices(ctx);
   }
