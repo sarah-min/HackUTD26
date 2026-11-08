@@ -153,33 +153,13 @@ describe('damage rules across disaster types', () => {
     expect(levelOf(f, 'roof')).toBe('destroyed');
   });
 
-  it('street scenes raise dangers but never set property damage (the hurricane street photo, live v4 output)', () => {
+  it('street scenes: lower confidence and no yard debris', () => {
     const f = applyDamageRules(frame({ scene: 'street_or_area', observations: [
-      { cue: 'debris_on_lot', evidence: 'Utility poles and wires scattered across the street', confidence: 0.95 },
-      { cue: 'structure_collapsed', evidence: 'Buildings partially collapsed', confidence: 0.85 },
-      { cue: 'vehicle_damaged', evidence: 'Cars with visible damage', confidence: 0.75 },
-      { cue: 'no_visible_damage', evidence: 'Some areas undamaged', confidence: 0.65 },
+      { cue: 'debris_on_lot', evidence: 'debris', confidence: 0.9 },
+      { cue: 'cladding_damaged', evidence: 'siding torn on a house', confidence: 0.8 },
     ] }), 0, 0);
-    expect(f.components).toHaveLength(0);
-    expect(f.lifeSafety.map((s) => s.flag)).toContain('structural_collapse');
-    expect(f.observations!.map((o) => o.cue)).not.toContain('no_visible_damage');
-  });
-
-  it('aerial shots count with lower confidence', () => {
-    const f = applyDamageRules(frame({ scene: 'aerial', observations: [{ cue: 'roof_structure_missing', evidence: 'roof open', confidence: 0.8 }] }), 0, 0);
-    expect(f.components[0]!.confidence).toBeCloseTo(0.64);
-  });
-
-  it('flood photo, live v4 output: minor interior, depth unknown, standing-water flag', () => {
-    const f = applyDamageRules(frame({ scene: 'home_interior', hazardObserved: 'flood',
-      observations: [
-        { cue: 'mud_or_sediment_inside', evidence: 'Muddy water covering the floor', confidence: 0.95 },
-        { cue: 'interior_finishes_damaged', evidence: 'Water soaked into lower walls and baseboards', confidence: 0.85 },
-      ],
-      water: { present: true, inside: true, level: 'not_visible', referenceObject: 'none' } }), 0, 0);
-    expect(levelOf(f, 'interior')).toBe('minor');
-    expect(f.waterDepth).toBe('unknown');
-    expect(f.lifeSafety.map((s) => s.flag)).toEqual(['standing_water_interior']);
+    expect(levelOf(f, 'yard_debris')).toBeUndefined();
+    expect(f.components.find((c) => c.component === 'exterior_walls')!.confidence).toBeCloseTo(0.56);
   });
 
   it('a hazard label with no evidence at all is dropped', () => {

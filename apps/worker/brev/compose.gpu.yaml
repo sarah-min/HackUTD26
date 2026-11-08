@@ -39,7 +39,6 @@ services:
         --max-model-len 16384
         --gpu-memory-utilization ${VL_GPU_FRACTION:-0.30}
         --max-num-seqs 16
-        --structured-outputs-config '{"disable_any_whitespace": true}'
         --api-key "$$NEMOTRON_API_KEY"
         --host 0.0.0.0 --port 8001
     healthcheck:
