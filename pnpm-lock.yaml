@@ -101,6 +101,9 @@ importers:
       '@hack/damage':
         specifier: workspace:*
         version: link:../../packages/damage
+      '@hack/finance':
+        specifier: workspace:*
+        version: link:../../packages/finance
       '@hack/stdb-bindings':
         specifier: workspace:*
         version: link:../../packages/stdb-bindings
