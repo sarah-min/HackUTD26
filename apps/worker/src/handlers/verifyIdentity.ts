@@ -9,6 +9,22 @@ import type { JobHandler } from './types';
 
 const DELETE_ATTEMPTS = 3;
 
+const FIXTURE_CUES = {
+  docConfidence: 0.9,
+  riskCues: {
+    screenCaptureSuspected: false, photoOfPhoto: false, edgesCroppedOrMissing: false,
+    fontOrTemplateInconsistent: false, textOverlayOrEditArtifacts: false, facePhotoPresent: true,
+  },
+};
+
+// Optional server-side config: extra exact names accepted despite looking like placeholders (published specimens).
+// Comma-separated, e.g. IDV_SPECIMEN_NAMES="SAMPLE SPECIMEN,IMA CARDHOLDER". Never user input.
+function specimenNamesFromEnv(): string[] | undefined {
+  const raw = process.env.IDV_SPECIMEN_NAMES;
+  if (!raw) return undefined;
+  return ['SAMPLE SPECIMEN', ...raw.split(',').map((s) => s.trim()).filter(Boolean)];
+}
+
 export const verifyIdentityHandler: JobHandler = async (ctx) => {
   const verificationId = ctx.job.verificationId;
   if (!verificationId) throw new Error('verify_identity job without verification_id');
@@ -33,11 +49,13 @@ export const verifyIdentityHandler: JobHandler = async (ctx) => {
       const mime = sniffImageMime(image);
       let fields: IdDocumentFields | null = null;
       if (mime) {
+        // The hand-written specimen fixture predates the v2 cues; supply them explicitly (all benign) so the
+        // demo path goes through the same required-cues rule as real replies. Fixture output only, never live.
         fields = ctx.nim.useFixtures
-          ? IdDocumentFieldsSchema.parse(await loadFixture('verification/id-fields-specimen.json'))
+          ? IdDocumentFieldsSchema.parse({ ...(await loadFixture<object>('verification/id-fields-specimen.json')), ...FIXTURE_CUES })
           : await extractIdDocument({ nim: ctx.nim, image, mime, signal: ctx.signal });
       }
-      result = decideVerification(fields, propertyAddress);
+      result = decideVerification(fields, propertyAddress, new Date(), { specimenNames: specimenNamesFromEnv() });
     }
   } catch (e) {
     // The message can't contain document fields: extraction returns typed data, never throws it.
@@ -60,11 +78,24 @@ export const verifyIdentityHandler: JobHandler = async (ctx) => {
     }
   }
 
-  await ctx.stdb.recordVerification({
-    verificationId,
-    ok: result.ok,
-    failReason: result.ok ? undefined : result.failReason,
-    nameOnDoc: result.ok ? result.nameOnDoc : undefined,
-  });
+  const record = (failReason: string | undefined) =>
+    ctx.stdb.recordVerification({
+      verificationId,
+      ok: result.ok,
+      failReason,
+      nameOnDoc: result.ok ? result.nameOnDoc : undefined,
+    });
+  try {
+    await record(result.ok ? undefined : result.failReason);
+  } catch (e) {
+    // `needs_review` is newer than the module's fail_reason allowlist: until the module accepts it, record the
+    // same not-verified outcome as `unreadable` rather than losing the decision (the job would retry forever).
+    if (result.ok || result.failReason !== 'needs_review') throw e;
+    ctx.log.warn('record_verification rejected needs_review; recording unreadable', {
+      verificationId, error: (e as Error).message.slice(0, 120),
+    });
+    result = { ok: false, failReason: 'unreadable' };
+    await record('unreadable');
+  }
   ctx.log.info('verification decided', { verificationId, ok: result.ok, failReason: result.failReason ?? null });
 };

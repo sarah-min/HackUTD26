@@ -8,5 +8,8 @@ export * from './rules';
 export * from './idDocument';
 export * from './verify/decide';
 export * from './verify/parseAddressText';
+export * from './verify/textSafety';
+export * from './verify/docChecks';
+export * from './verify/idExtraction';
 export { DAMAGE_FRAME_PROMPT_VERSION } from './prompts/damage-frame';
 export { ID_DOCUMENT_PROMPT_VERSION } from './prompts/id-document';
