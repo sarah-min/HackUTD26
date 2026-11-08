@@ -19,23 +19,50 @@ export async function fetchMediaObjectUrl(
   return URL.createObjectURL(await res.blob());
 }
 
-/** Object URL for one media key, revoked on unmount. null while loading or on error. */
-export function useMediaUrl(key: string | null, verification: { id: string; secret: string } | null): string | null {
-  const [url, setUrl] = useState<string | null>(null);
+export type MediaUrlState =
+  | { status: 'idle'; url: null }
+  | { status: 'loading'; url: null }
+  | { status: 'ready'; url: string }
+  | { status: 'error'; url: null }
+  | { status: 'unavailable'; url: null };
+
+/** Object URL for one media key, revoked on unmount. */
+export function useMediaUrlState(
+  key: string | null,
+  verification: { id: string; secret: string } | null,
+): MediaUrlState {
+  const [state, setState] = useState<MediaUrlState>({ status: 'idle', url: null });
   useEffect(() => {
-    if (!key || !verification) return;
+    if (!key) {
+      setState({ status: 'idle', url: null });
+      return;
+    }
+    if (!verification) {
+      setState({ status: 'unavailable', url: null });
+      return;
+    }
     const ac = new AbortController();
     let made: string | null = null;
+    setState({ status: 'loading', url: null });
     fetchMediaObjectUrl(key, verification, ac.signal)
       .then((u) => {
         made = u;
-        setUrl(u);
+        setState({ status: 'ready', url: u });
       })
-      .catch(() => setUrl(null));
+      .catch((err: unknown) => {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        setState({ status: 'error', url: null });
+      });
     return () => {
       ac.abort();
       if (made) URL.revokeObjectURL(made);
     };
   }, [key, verification?.id, verification?.secret]); // eslint-disable-line react-hooks/exhaustive-deps
-  return url;
+  return state;
+}
+
+/** @deprecated Prefer useMediaUrlState for loading/error UI. */
+export function useMediaUrl(key: string | null, verification: { id: string; secret: string } | null): string | null {
+  const s = useMediaUrlState(key, verification);
+  return s.url;
 }

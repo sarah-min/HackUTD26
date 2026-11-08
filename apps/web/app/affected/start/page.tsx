@@ -7,6 +7,7 @@ import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { NormalizedAddress } from '@hack/contracts/property';
 import { formatAddress, saveSelectedAddress } from '@/components/affected/helpers';
+import { AppHeader } from '@/components/chrome/AppHeader';
 
 type Phase = { k: 'idle' } | { k: 'loading' } | { k: 'results'; list: NormalizedAddress[] } | { k: 'error'; msg: string };
 
@@ -60,6 +61,8 @@ function StartInner() {
   }
 
   return (
+    <div className="min-h-screen bg-[#eef1f5]">
+      <AppHeader dense />
     <main className="mx-auto max-w-md space-y-5 px-4 py-6">
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold">I've been affected</h1>
@@ -125,12 +128,13 @@ function StartInner() {
           </section>
         ))}
     </main>
+    </div>
   );
 }
 
 export default function AffectedStartPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<main className="px-4 py-6 text-sm text-gray-600">Loading…</main>}>
       <StartInner />
     </Suspense>
   );

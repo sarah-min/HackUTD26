@@ -21,6 +21,7 @@ import {
   type ReportRow,
 } from '@/lib/stdb';
 import { Banner911, CellMap } from '@/components/affected/external';
+import { AppHeader } from '@/components/chrome/AppHeader';
 import {
   DAMAGE_LEVEL_TEXT,
   STATUS_TEXT,
@@ -32,18 +33,28 @@ import {
   readAreaNotices,
   toAreaCell,
 } from '@/components/affected/helpers';
-import { useMediaUrl } from '@/components/affected/media';
+import { useMediaUrlState } from '@/components/affected/media';
 import { useVerificationCredentials } from '@/components/affected/useVerificationCredentials';
 
 function ReportThumb({ reportId, propertyId }: { reportId: bigint; propertyId: bigint }) {
   const { frames } = useVerifiedReportData(reportId);
   const creds = useVerificationCredentials(propertyId);
-  const url = useMediaUrl(frames[0]?.thumbKey ?? null, creds);
-  return url ? (
+  const media = useMediaUrlState(frames[0]?.thumbKey ?? null, creds);
+  if (media.status === 'ready' && media.url) {
     // eslint-disable-next-line @next/next/no-img-element -- object URL from an authorized fetch
-    <img src={url} alt="" className="h-16 w-16 flex-none rounded object-cover" />
-  ) : (
-    <div className="h-16 w-16 flex-none rounded bg-gray-200" aria-hidden />
+    return <img src={media.url} alt="" className="h-16 w-16 flex-none rounded object-cover" />;
+  }
+  return (
+    <div
+      className="grid h-16 w-16 flex-none place-items-center rounded bg-gray-200 px-1 text-center text-[9px] leading-tight text-gray-500"
+      aria-hidden={media.status === 'loading'}
+    >
+      {media.status === 'loading'
+        ? '…'
+        : frames[0]
+          ? 'Photo unavailable'
+          : 'No photo'}
+    </div>
   );
 }
 
@@ -113,6 +124,8 @@ export default function AffectedPropertyPage() {
   const addressLine = verified && propertyPrivate ? formatAddress(propertyPrivate) : entered ? formatAddress(entered) : null;
 
   return (
+    <div className="min-h-screen bg-[#eef1f5]">
+      <AppHeader dense />
     <main className="mx-auto max-w-2xl space-y-5 px-4 py-6">
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold">Your home</h1>
@@ -148,13 +161,16 @@ export default function AffectedPropertyPage() {
 
       {verified && (
         <section className="space-y-3">
-          <div className="flex items-baseline justify-between">
+          <div className="flex items-baseline justify-between gap-3">
             <h2 className="text-lg font-semibold">Reports for your home</h2>
-            {newestAssessed && (
-              <Link href={`/affected/property/${idToString(propertyId)}/recovery`} className="text-sm font-medium underline">
-                Recovery Navigator
-              </Link>
-            )}
+            {newestAssessed ? (
+              <span
+                className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-500"
+                title="Recovery Navigator ships with Part 4"
+              >
+                Recovery coming soon
+              </span>
+            ) : null}
           </div>
           {reports.length === 0 ? (
             <div className="space-y-2 rounded-lg border p-4">
@@ -199,5 +215,6 @@ export default function AffectedPropertyPage() {
         </p>
       </section>
     </main>
+    </div>
   );
 }

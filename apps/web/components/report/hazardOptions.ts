@@ -6,5 +6,7 @@ export const HAZARD_OPTIONS: { value: Hazard; label: string }[] = [
   { value: 'flood', label: 'Flood' },
   { value: 'tornado', label: 'Tornado' },
   { value: 'wildfire', label: 'Wildfire' },
+  { value: 'earthquake', label: 'Earthquake' },
+  { value: 'hail', label: 'Hail' },
   { value: 'other', label: 'Other' },
 ];

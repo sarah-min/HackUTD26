@@ -6,6 +6,7 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'Aftermath',
   description: 'Disaster response network — report damage or claim your property.',
+  icons: { icon: '/favicon.png' },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

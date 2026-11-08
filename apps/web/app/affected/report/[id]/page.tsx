@@ -7,6 +7,7 @@ import { useParams } from 'next/navigation';
 import { idFromString, idToString, useReport, useVerifiedFor } from '@/lib/stdb';
 import { AgentTrace, Banner911, DamageReport, HazardList, RecoverySummaryCard } from '@/components/affected/external';
 import { DAMAGE_LEVEL_TEXT, STATUS_TEXT, parseFlagsCsv, parseLevel } from '@/components/affected/helpers';
+import { AppHeader } from '@/components/chrome/AppHeader';
 
 export default function AffectedReportPage() {
   const params = useParams<{ id: string }>();
@@ -35,6 +36,8 @@ export default function AffectedReportPage() {
   const flags = parseFlagsCsv(report.lifeSafetyCsv);
 
   return (
+    <div className="min-h-screen bg-[#eef1f5]">
+      <AppHeader dense />
     <main className="mx-auto max-w-2xl space-y-5 px-4 py-6">
       <Link href={`/affected/property/${propertyId}`} className="text-sm underline">
         ← Your home
@@ -72,5 +75,6 @@ export default function AffectedReportPage() {
         AI estimate, not an insurance determination or inspection.
       </p>
     </main>
+    </div>
   );
 }

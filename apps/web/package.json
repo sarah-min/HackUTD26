@@ -14,14 +14,17 @@
     "@hack/address": "workspace:*",
     "@hack/contracts": "workspace:*",
     "@hack/stdb-bindings": "workspace:*",
+    "leaflet": "1.9.4",
     "next": "16.0.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "react-leaflet": "5.0.0",
     "spacetimedb": "2.13.0",
     "zod": "4.6.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.1.16",
+    "@types/leaflet": "1.9.20",
     "@types/node": "24.10.1",
     "@types/react": "19.1.8",
     "@types/react-dom": "19.1.6",

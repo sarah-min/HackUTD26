@@ -1,11 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import type { Hazard } from '@hack/contracts/common';
 import type { NormalizedAddress } from '@hack/contracts/property';
 import { CreateReportInputSchema } from '@hack/contracts/report';
+import { AppHeader } from '@/components/chrome/AppHeader';
 import { Banner911 } from '@/components/safety';
 import {
   R,
@@ -21,6 +22,8 @@ import { HAZARD_OPTIONS } from './hazardOptions';
 
 type Phase = 'form' | 'creating' | 'error';
 
+const CREATE_TIMEOUT_MS = 15_000;
+
 async function geocode(qs: string): Promise<NormalizedAddress[]> {
   const res = await fetch(`/api/geocode?${qs}`);
   if (res.status === 429) throw new Error('Too many lookups. Wait a minute and try again.');
@@ -32,9 +35,10 @@ function formatAddress(a: NormalizedAddress): string {
   return `${a.line1}, ${a.city}, ${a.state} ${a.zip}`;
 }
 
-/** Live createReport capture. Media upload + submitReport need P4 presign (next step). */
+/** Live createReport capture. Media upload + submitReport need P4 presign. */
 export function ReportCapture() {
   const router = useRouter();
+  const params = useSearchParams();
   const { isActive, error: connError } = useStdb();
   const createReport = useReducer(R.createReport);
   const { rows: myReports, ready: reportsReady } = useMyReports();
@@ -56,9 +60,41 @@ export function ReportCapture() {
   const pendingSecret = useRef<string | null>(null);
   const knownIds = useRef<Set<string> | null>(null);
   const gpsTried = useRef(false);
+  const prefillTried = useRef(false);
+
+  // Film-it-yourself / self-report deep link: ?self=1&address=
+  useEffect(() => {
+    if (prefillTried.current) return;
+    prefillTried.current = true;
+    if (params.get('self') === '1') setIsSelfReport(true);
+    const prefill = params.get('address')?.trim();
+    if (!prefill || prefill.length < 5) return;
+    setAddressQuery(prefill);
+    setGeoBusy(true);
+    void (async () => {
+      try {
+        const list = await geocode(new URLSearchParams({ q: prefill }).toString());
+        setSuggestions(list);
+        if (list[0]) {
+          setAddress(list[0]);
+          setAddressQuery(formatAddress(list[0]));
+        } else {
+          setGeoError('No match for that address. Edit and look up again.');
+        }
+      } catch (e) {
+        setGeoError(e instanceof Error ? e.message : 'Lookup failed.');
+      } finally {
+        setGeoBusy(false);
+      }
+    })();
+  }, [params]);
 
   useEffect(() => {
     if (gpsTried.current) return;
+    if (params.get('address')) {
+      gpsTried.current = true;
+      return;
+    }
     gpsTried.current = true;
     if (!('geolocation' in navigator)) return;
     setGeoBusy(true);
@@ -91,7 +127,7 @@ export function ReportCapture() {
       },
       { enableHighAccuracy: true, timeout: 10_000 },
     );
-  }, []);
+  }, [params]);
 
   // After createReport, the new draft appears in myReports — save secret and open status.
   useEffect(() => {
@@ -110,6 +146,20 @@ export function ReportCapture() {
       router.replace(`/report/${id}`);
     }
   }, [phase, myReports, reportsReady, router, isSelfReport, address]);
+
+  // Timeout if the new row never appears.
+  useEffect(() => {
+    if (phase !== 'creating') return;
+    const t = window.setTimeout(() => {
+      pendingSecret.current = null;
+      knownIds.current = null;
+      setPhase('error');
+      setError(
+        'The draft may have been created, but we could not confirm it in time. Check My submissions, or try again.',
+      );
+    }, CREATE_TIMEOUT_MS);
+    return () => window.clearTimeout(t);
+  }, [phase]);
 
   async function searchAddress() {
     setGeoError(null);
@@ -174,19 +224,7 @@ export function ReportCapture() {
   return (
     <div className="min-h-screen bg-slate-200 text-slate-900">
       <div className="mx-auto min-h-screen max-w-[480px] bg-[#f5f7fa] shadow-[0_0_45px_rgba(15,23,42,0.12)]">
-        <header className="app-safe-header-sm bg-[#0f172a] px-4 pb-4 pt-3 text-white">
-          <div className="mx-auto flex max-w-md items-center justify-between">
-            <Link className="text-[19px] font-bold tracking-[-0.025em]" href="/">
-              Aftermath
-            </Link>
-            <Link className="text-[11px] font-bold text-blue-300 underline" href="/reporter">
-              My submissions
-            </Link>
-          </div>
-          <p className="mx-auto mt-2 max-w-md text-[10px] text-slate-400">
-            Live draft on SpacetimeDB · media upload comes next (needs P4 presign)
-          </p>
-        </header>
+        <AppHeader dense />
 
         <main className="space-y-3 px-3.5 py-3.5 pb-8">
           {selfDanger ? <Banner911 reason="You flagged that someone may be in danger on scene." /> : null}
@@ -206,7 +244,7 @@ export function ReportCapture() {
 
             <fieldset>
               <legend className="mb-2 text-[12px] font-semibold text-slate-700">Hazard type</legend>
-              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-5">
+              <div className="flex flex-wrap gap-1.5">
                 {HAZARD_OPTIONS.map((item) => (
                   <button
                     className={`rounded-full px-3 py-2 text-[12px] font-semibold transition ${
@@ -270,9 +308,6 @@ export function ReportCapture() {
                           type="button"
                         >
                           {label}
-                          <span className="mt-0.5 block text-[10px] font-normal text-slate-400">
-                            {s.source}
-                          </span>
                         </button>
                       </li>
                     );
@@ -339,14 +374,21 @@ export function ReportCapture() {
             </label>
 
             <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-950">
-              Creates a <strong>live draft</strong> on the dev database. Photo/video upload is not
-              wired yet (needs <code className="text-[10px]">/api/uploads/presign</code>).
+              Saves a <strong>draft</strong> now. Photo/video upload will be available in a later update —
+              you can still file the location and hazard details today.
             </div>
 
             {(error || connError) && (
-              <p className="mt-3 text-[12px] font-semibold text-red-700">
-                {error ?? connError?.message}
-              </p>
+              <div className="mt-3 space-y-2">
+                <p className="text-[12px] font-semibold text-red-700">
+                  {error ?? connError?.message}
+                </p>
+                {phase === 'error' ? (
+                  <Link className="text-[12px] font-bold text-blue-700 underline" href="/reporter">
+                    Open My submissions
+                  </Link>
+                ) : null}
+              </div>
             )}
 
             <button

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { AppHeader } from '@/components/chrome/AppHeader';
 
 function Icon({
   children,
@@ -30,41 +31,15 @@ function Icon({
 export function HomeScreen() {
   return (
     <div className="min-h-screen bg-[#eef1f5] text-slate-950">
-      <header className="app-safe-header border-b border-white/10 bg-[#0f172a] px-4 py-4 text-white md:px-7">
-        <div className="mx-auto flex max-w-6xl items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <span className="grid size-9 place-items-center rounded-xl bg-white text-[#0f172a]">
-              <Icon size={21}>
-                <path
-                  d="M4 18 9.1 6.8a1 1 0 0 1 1.82 0L16 18M6.3 13h7.4M17.8 7.5 20 12h-4.4"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2.3"
-                />
-              </Icon>
-            </span>
-            <div>
-              <p className="text-[19px] font-bold tracking-[-0.03em]">Aftermath</p>
-              <p className="text-[8px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                Disaster response network
-              </p>
-            </div>
-          </div>
-          <span className="flex items-center gap-1.5 rounded-full bg-emerald-400/10 px-2.5 py-1.5 text-[9px] font-bold text-emerald-300 ring-1 ring-inset ring-emerald-300/20">
-            <span className="size-1.5 rounded-full bg-emerald-300" />
-            Systems online
-          </span>
-        </div>
-      </header>
+      <AppHeader />
 
       <main className="mx-auto max-w-6xl px-4 py-7 md:px-7 md:py-10">
         <section>
           <div className="mb-3">
-            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-blue-700">
+            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-blue-700">
               Choose your path
             </p>
-            <h1 className="mt-1 text-[20px] font-bold tracking-[-0.025em] text-slate-950">
+            <h1 className="mt-1 text-[22px] font-bold tracking-[-0.025em] text-slate-950 md:text-[28px]">
               How are you using Aftermath today?
             </h1>
           </div>
@@ -81,7 +56,7 @@ export function HomeScreen() {
                 />
               </Icon>
             </span>
-            <p className="text-[10px] leading-relaxed">
+            <p className="text-[12px] leading-relaxed">
               <strong>Immediate danger?</strong> Aftermath does not replace emergency services. Call{' '}
               <a className="font-extrabold underline underline-offset-2" href="tel:911">
                 911
@@ -119,19 +94,19 @@ export function HomeScreen() {
                   </Icon>
                 </span>
               </div>
-              <p className="mt-5 text-[9px] font-bold uppercase tracking-[0.13em] text-blue-300">
+              <p className="mt-5 text-[10px] font-bold uppercase tracking-[0.13em] text-blue-300">
                 Reporter view
               </p>
               <h2 className="mt-1 text-[21px] font-bold tracking-[-0.025em]">
                 I&apos;m documenting damage
               </h2>
-              <p className="mt-2 max-w-md text-[11px] leading-relaxed text-slate-400">
+              <p className="mt-2 max-w-md text-[13px] leading-relaxed text-slate-400">
                 Capture field evidence, flag urgent hazards, and manage properties you have filmed.
               </p>
               <div className="mt-5 flex flex-wrap gap-2">
-                {['Field capture', 'AI assessment', 'My submissions'].map((item) => (
+                {['Field capture', 'Safety flags', 'My submissions'].map((item) => (
                   <span
-                    className="rounded-lg bg-white/7 px-2.5 py-1.5 text-[8px] font-semibold text-slate-300 ring-1 ring-inset ring-white/10"
+                    className="rounded-lg bg-white/7 px-2.5 py-1.5 text-[10px] font-semibold text-slate-300 ring-1 ring-inset ring-white/10"
                     key={item}
                   >
                     {item}
@@ -174,20 +149,20 @@ export function HomeScreen() {
                   </Icon>
                 </span>
               </div>
-              <p className="mt-5 text-[9px] font-bold uppercase tracking-[0.13em] text-blue-700">
+              <p className="mt-5 text-[10px] font-bold uppercase tracking-[0.13em] text-blue-700">
                 Affected person view
               </p>
               <h2 className="mt-1 text-[21px] font-bold tracking-[-0.025em] text-slate-950">
                 My home may be affected
               </h2>
-              <p className="mt-2 max-w-md text-[11px] leading-relaxed text-slate-500">
+              <p className="mt-2 max-w-md text-[13px] leading-relaxed text-slate-500">
                 Verify your residence, understand nearby risks, and build a personalized recovery
                 plan.
               </p>
               <div className="mt-5 flex flex-wrap gap-2">
                 {['Private verification', 'Area conditions', 'Recovery plan'].map((item) => (
                   <span
-                    className="rounded-lg bg-slate-100 px-2.5 py-1.5 text-[8px] font-semibold text-slate-600"
+                    className="rounded-lg bg-slate-100 px-2.5 py-1.5 text-[10px] font-semibold text-slate-600"
                     key={item}
                   >
                     {item}

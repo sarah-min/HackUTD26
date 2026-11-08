@@ -20,6 +20,7 @@ import {
   useVerificationBySecretHash,
 } from '@/lib/stdb';
 import { DOC_KINDS, FAIL_REASON_TEXT, formatAddress, loadSelectedAddress, type DocKind } from '@/components/affected/helpers';
+import { AppHeader } from '@/components/chrome/AppHeader';
 
 const MAX_BYTES = 15 * 1024 * 1024;
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -55,6 +56,7 @@ export default function AffectedVerifyPage() {
   const [phase, setPhase] = useState<Phase>('choose');
   const [error, setError] = useState<string | null>(null);
   const [secretHash, setSecretHash] = useState<string | null>(null);
+  const [uploadsReady, setUploadsReady] = useState<boolean | null>(null);
   const secretRef = useRef<string | null>(null);
   const uploadStarted = useRef(false);
 
@@ -67,6 +69,26 @@ export default function AffectedVerifyPage() {
       setSecretHash(pending);
       setPhase('submitted');
     }
+  }, []);
+
+  // P4 owns /api/uploads/presign — probe so the demo fails clearly instead of mid-upload.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch('/api/uploads/presign', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: '{}',
+        });
+        if (!cancelled) setUploadsReady(res.status !== 404);
+      } catch {
+        if (!cancelled) setUploadsReady(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Step 3: once our row exists, upload the photo and submit it.
@@ -114,6 +136,10 @@ export default function AffectedVerifyPage() {
   async function begin() {
     setError(null);
     if (!address || !file) return;
+    if (uploadsReady === false) {
+      setError('ID photo upload is not available in this build yet. You can still view area conditions without verifying.');
+      return;
+    }
     if (!IMAGE_TYPES.includes(file.type)) return setError('Use a JPEG, PNG or WebP photo.');
     if (file.size > MAX_BYTES) return setError('That photo is over 15 MB. Retake it at a lower resolution.');
     const secret = generateSecret();
@@ -141,7 +167,11 @@ export default function AffectedVerifyPage() {
     setPhase('choose');
   }
 
-  if (address === undefined) return null;
+  if (address === undefined) {
+    return (
+      <main className="mx-auto max-w-md px-4 py-6 text-sm text-gray-600">Loading your address…</main>
+    );
+  }
   if (address === null) {
     return (
       <main className="mx-auto max-w-md space-y-3 px-4 py-6">
@@ -155,8 +185,11 @@ export default function AffectedVerifyPage() {
 
   const failed = row?.state === 'failed';
   const busy = phase === 'starting' || phase === 'uploading' || (phase === 'submitted' && !failed);
+  const canUpload = uploadsReady !== false;
 
   return (
+    <div className="min-h-screen bg-[#eef1f5]">
+      <AppHeader dense />
     <main className="mx-auto max-w-md space-y-5 px-4 py-6">
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold">Verify it's your home</h1>
@@ -167,6 +200,16 @@ export default function AffectedVerifyPage() {
         Demo identity check — not production-grade verification. We read only your name and address from the photo, and
         the image is deleted right after the check.
       </p>
+
+      {uploadsReady === false ? (
+        <section role="status" className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+          <p className="font-medium">ID photo upload is not available in this build yet.</p>
+          <p>You can still browse area conditions without verifying. Full verification unlocks when upload support lands.</p>
+          <Link href="/affected/start" className="inline-block font-medium underline">
+            Back to address
+          </Link>
+        </section>
+      ) : null}
 
       {busy ? (
         <section aria-live="polite" className="space-y-2 rounded-lg border p-4">
@@ -195,7 +238,7 @@ export default function AffectedVerifyPage() {
             </Link>
           )}
         </section>
-      ) : (
+      ) : canUpload ? (
         <form
           className="space-y-4"
           onSubmit={(e) => {
@@ -233,13 +276,14 @@ export default function AffectedVerifyPage() {
 
           <button
             type="submit"
-            disabled={!file || !isActive}
+            disabled={!file || !isActive || uploadsReady === null}
             className="w-full rounded-lg bg-black px-4 py-3 font-medium text-white disabled:opacity-50"
           >
-            {isActive ? 'Verify' : 'Connecting…'}
+            {!isActive ? 'Connecting…' : uploadsReady === null ? 'Checking upload…' : 'Verify'}
           </button>
         </form>
-      )}
+      ) : null}
     </main>
+    </div>
   );
 }
