@@ -1,0 +1,40 @@
+{
+  "source": "synthetic",
+  "schema": "FinancialProfileSchema",
+  "description": "Synthetic renter persona for Recovery Navigator demos. Not a real person.",
+  "data": {
+    "id": "persona-maria-renter",
+    "label": "Maria, 34, renter, Houston",
+    "description": "Synthetic demo persona: apartment renter with checking, a small savings buffer, and one credit card. Labeled synthetic — not a real person.",
+    "accounts": [
+      {
+        "id": "maria-checking",
+        "type": "checking",
+        "name": "Everyday Checking",
+        "balanceCents": 185000
+      },
+      {
+        "id": "maria-savings",
+        "type": "savings",
+        "name": "Rainy Day Savings",
+        "balanceCents": 320000
+      },
+      {
+        "id": "maria-card",
+        "type": "credit_card",
+        "name": "Everyday Rewards Card",
+        "balanceCents": 210000,
+        "aprBps": 2199,
+        "creditLimitCents": 500000,
+        "monthlyPaymentCents": 6500,
+        "dueDay": 12
+      }
+    ],
+    "monthlyNetIncomeCents": 420000,
+    "monthlyGrossIncomeCents": 520000,
+    "monthlyEssentialExpensesCents": 245000,
+    "payDays": [1, 15],
+    "personalLoanOfferAprBps": 1499,
+    "source": "synthetic"
+  }
+}

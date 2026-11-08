@@ -2,7 +2,31 @@
 
 Owner: Roselyn. Append-only, newest entry first. Format is in [STATUS.md](../STATUS.md). Only this part's owner (and their LLM) edits this file.
 
-## 2026-11-07 15:14: Grok Bot + automation kit (local skill; no PR yet)
+## 2026-11-07 17:45: T4.2–T4.3 storage + HTTP routes + summary card (branch part4/finance-contracts)
+
+- **Shipped:** `@hack/storage` (`StoragePort`, `MemoryStorage`, `S3Storage`, key helpers, size/type guards). API routes: `/api/uploads/presign`, `/api/media/[...key]` (always 403 on `idv/`), `/api/health`. Auth reads via `WEB_AUTH_FIXTURE_JSON` until live `web_*` subscription client lands. `<RecoverySummaryCard>` stub under `components/finance/`.
+- **Verify:** `cd packages/storage && pnpm install --ignore-workspace && pnpm test && pnpm typecheck`
+- **Fixtures still faked:** live Vultr S3 round-trip; live STDB web auth (fixture JSON only); RecoverySummaryCard does not yet read `recovery_plan` rows
+- **Requests to other parts:** `P2: flip external.ts RecoverySummaryCard import to @/components/finance`. `P1: workspace members @hack/storage + @hack/finance; transpilePackages`. `P3: assessment.ts` as before.
+- **Blocked on:** Vultr bucket for real S3 ping; P1 Next package.json to run route tests in-app
+
+## 2026-11-07 17:30: T4.6–T4.7 recovery engine + simulate (branch part4/finance-contracts)
+
+- **Shipped:** Pure `@hack/finance` engine: payout/gap (incl. flood exclusion + renters), 5 indicators, funding options + recommended mix, 91-day forecast, `buildRecoveryPlan()`, `simulate()` (< 20 ms). Exact-cents tests in `packages/finance/test/engine.test.ts`.
+- **Verify:** `cd packages/finance && pnpm install --ignore-workspace && pnpm test && pnpm typecheck`
+- **Fixtures still faked:** no live `estimateRepairCost` yet (pass recomputed `CostEstimate` in); plan/coach job handlers not started; storage/APIs/UI pending
+- **Requests to other parts:** same as below (P3 assessment + cost model; P1 workspace)
+- **Blocked on:** Vultr for T4.1; P1 for recovery routes
+
+## 2026-11-07 17:20: T4.4–T4.5 finance contracts + personas (branch part4/finance-contracts)
+
+- **Shipped:** `packages/contracts/src/finance.ts` (intake, profile, scenario, plan, coach, simulation result). `@hack/finance` with 3 synthetic personas (`maria`, `james`, `aisha`) + `getPersona` / `PERSONAS`. Fixtures under `fixtures/finance/`. Contracts tsconfig now typechecks `finance.ts`.
+- **Verify:** `cd packages/contracts && pnpm install --ignore-workspace && pnpm test`; `cd packages/finance && pnpm install --ignore-workspace && pnpm test`
+- **Fixtures still faked:** recovery engine / simulate / storage / APIs not built yet. `RecoveryPlan.cost` uses a shape-compatible ref until P3’s `assessment.ts` is on main (then switch to `CostEstimateSchema`).
+- **Requests to other parts:** `P3: merge assessment.ts (CostEstimateSchema) so finance can import it and drop CostEstimateRefSchema`. `P1: add @hack/finance to workspace when scaffold lands`. `P2 (Sidd): register web identity hex c20031dd428a584134bf24332b596afe4f25a327bfb5c4311e609915e5b7bf61 as role web` if not done.
+- **Blocked on:** Vultr support (T4.1); P1 scaffold for Next routes; P3 cost model for T4.6 (fixture cost until then)
+
+## 2026-11-07 15:14: Grok Bot + automation kit (merged #1)
 
 - **Shipped:** Personal Cursor skill `hackutd-p4-grokbot` on this machine (`~/.cursor/skills/hackutd-p4-grokbot/`). Pasteables below for Grok Bot memory and two Cursor Automations. No product code yet.
 - **Verify:** Create Bot → paste Memory A → send First task. Create automations at https://cursor.com/automations with prompts B and C. Confirm Cloud Agent delegation is on (Grok Bot dashboard).

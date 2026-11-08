@@ -15,5 +15,5 @@
     "resolveJsonModule": true,
     "types": []
   },
-  "include": ["src/common.ts", "src/report.ts", "src/property.ts", "test"]
+  "include": ["src/common.ts", "src/report.ts", "src/property.ts", "src/finance.ts", "test"]
 }
