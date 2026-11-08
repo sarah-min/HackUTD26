@@ -14,7 +14,7 @@ Both screens update live from SpacetimeDB.
 - **Phone (A):** the site open at `/`, private tab (fresh anonymous identity). The demo clip saved in the camera roll (public-domain FEMA/NOAA footage or our own recording; source in `fixtures/media/README.md`). Know the exact demo address you'll confirm.
 - **Laptop (B):** the site open at `/`, a separate browser profile. B's ID (or the specimen) at hand. The demo address **must match the address on the ID used**. If you use a specimen, use the specimen's printed address as the demo address.
 - Pick a demo persona with a visible coverage gap (e.g. a homeowner with flood damage and no flood policy).
-- Check that `/api/health` is green. Pre-film one other report near the demo address (from a different identity) so the area map has a second cell.
+- Check that `/api/health` is green, and that dev/prod were prepared per docs/BACKEND_RUNBOOK.md (wipe dev, `pnpm seed:demo` shortly before the demo because the map counts the last 72 hours). Pre-film one other report near the demo address (from a different identity) so the area map has a second cell.
 
 ## 3-minute judge demo
 
@@ -39,15 +39,14 @@ Both screens update live from SpacetimeDB.
 - **State Farm (partial fit, be honest):** Lead with the hand-off. Anyone at the scene documents damage in about a minute, the evacuated family gets it after verifying, the area map's Hazards mode shows where life-safety hazards cluster, so urgent pockets stand out, hazards trigger a 911 prompt, and a first-notice-of-loss claim is drafted. **Say plainly** that we surface urgent *areas*, but we don't rank individual people or run a coordination dashboard. That part of the prompt is out of our scope. Pitch it as "no one is overlooked because anyone can report for them."
 - **PNC:** Start on the Recovery Navigator: the 5 indicators, coverage gap, forecast with obligations and shortfall day, what-if simulator and coach. Mention the synthetic personas spanning checking, savings, CD, IRA, loans, cards and mortgage.
 - **NVIDIA:** Start on the agent trace. Nemotron VL is used twice (damage frames → structured findings, and ID documents → extracted fields). Then show the agent's multi-step tool calls (cost, OpenFEMA, NWS, geocode, claim draft, finance) and the validated output. The model picks the tools; code owns numbers and matching.
-- **Spacetime:** Two devices, two identities. Reporter progress, verification-gated access (the affected person sees details the reporter can't), and the claimed badge flipping live. There's no API server, ORM or websocket code.
-- **Vultr / GoDaddy:** Live domain over HTTPS, the Vultr VM running web and worker, and footage, frames and short-lived ID images in Vultr Object Storage via presigned upload.
+- **If a judge asks how it stays live across devices:** one sentence. Both browsers talk to SpacetimeDB directly, each only receives rows its views allow, and the reporter's pin flips to Claimed the moment the family verifies. No API server, ORM or websocket code. This is not a separate track pitch.
 
 ## Pre-demo smoke checklist
 
-- [ ] `/api/health` reports web, stdb and storage OK on the production domain
+- [ ] `/api/health` reports web and stdb OK on the production domain (storage now lives in SpacetimeDB, so `storage` there may be a no-op)
 - [ ] Reporter (fresh private tab): capture → upload → submit works. The status page shows hazards + damage level only (no cost, frames or finances)
 - [ ] Worker logs: claim → frames → VL → agent → assessment within about 90 s
-- [ ] Affected (separate profile): address → ID photo → **Verified** within about 30 s. The `idv/` object is gone from the bucket afterwards
+- [ ] Affected (separate profile): address → ID photo → **Verified** within about 30 s. The `idv/` blob is gone afterwards (`SELECT * FROM blob` as admin shows no `idv/` keys)
 - [ ] An unverified identity cannot open `/affected/report/[id]` or the property page (gating works)
 - [ ] A wrong-address ID returns `address_mismatch`, and the 4th attempt within an hour is `rate_limited`
 - [ ] Area map shows cells only (no other pins). The reporter map shows only that reporter's pins. The claimed badge flips live
@@ -62,8 +61,8 @@ Both screens update live from SpacetimeDB.
 1. **Pre-recorded demo video** of the full two-person journey, recorded as soon as both slices work. Always ready.
 2. **Cached VL results:** findings are cached by frame SHA-256, so the demo clip re-runs fast and survives rate limits.
 3. **`USE_FIXTURES=true`:** damage analysis or ID extraction returns captured fixture output with `source: "fixture"` and a visible **Fixture** badge. If VL ID extraction is flaky, use a **fixture verification (labeled)** for the specimen ID. Say so out loud. Never present it as live.
-4. If Maincloud is down, use the self-hosted container on the VM (docs/DEPLOYMENT.md).
-5. If the domain or HTTPS fails, use the Vultr IP or provider hostname.
+4. If Maincloud is down, use the self-hosted container (docs/DEPLOYMENT.md).
+5. If the domain or HTTPS fails, use the Brev provider hostname.
 
 ## Devpost checklist
 
@@ -71,6 +70,6 @@ Both screens update live from SpacetimeDB.
 - [ ] Demo video (**VERIFY** the length limit) uploaded and linked. Any ID shown is a specimen or blurred
 - [ ] Description matches shipped behavior: two views, demo-grade ID check, synthetic and fixture data called out, no claims of multi-report triage
 - [ ] AI coding tools disclosed (which LLMs and agents each member used)
-- [ ] Tracks selected (priority: NVIDIA, PNC, Spacetime, then State Farm; plus MLH Vultr and GoDaddy Registry). **VERIFY** the limit
+- [ ] Tracks selected: **State Farm, PNC and NVIDIA (Nemotron)** only. **VERIFY** the Devpost limit allows three
 - [ ] All 4 team members added; domain and live URL listed
 - [ ] Initial submission by 11:00 PM Saturday; final by 12:00 PM Sunday

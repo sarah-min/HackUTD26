@@ -8,7 +8,7 @@ SpacetimeDB stays on **Maincloud** (Part 2 publishes). Part 4 still owns the **S
 
 - Provision Brev (or equivalent) so `web` + `worker` run with the app env file.
 - Docker / compose / Caddy (or Brev’s reverse proxy) and redeploy after merges to `main`.
-- Public HTTPS URL; wire DNS if the team keeps a GoDaddy domain (`MLHUTD84`).
+- Public HTTPS URL; wire DNS if the team keeps a GoDaddy domain (`MLHUTD84`). Optional: GoDaddy is not a submission track.
 - Document the live URL and redeploy steps in `status/part3.md` (and update this file’s “live URL” line when known).
 
 **Live URL:** _TBD by Part 3_

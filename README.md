@@ -23,18 +23,17 @@ Behind the scenes, Nemotron VL reads the footage to analyze the damage and anoth
 | [SOURCES.md](SOURCES.md) | Sponsor prompts, API docs, data sources, what's verified and what isn't | Whoever touches an integration |
 | [docs/KICKOFF_PROMPTS.md](docs/KICKOFF_PROMPTS.md) | Copy-paste first prompt for each part's LLM | Each owner at kickoff |
 | [docs/DEMO.md](docs/DEMO.md) | Demo script, judge checklist, Devpost notes | Everyone near the end |
-| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Vultr, object storage, Maincloud, domain, HTTPS | Part 4, and anyone deploying |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Hosting (Brev), Maincloud, HTTPS | Part 4, and anyone deploying |
 
 ## Sponsors we are targeting
+
+We are submitting to exactly three tracks: **State Farm, PNC and NVIDIA (Nemotron)**. SpacetimeDB is still our whole backend, but Spacetime, Vultr and GoDaddy Registry are **not** submission tracks.
 
 | Sponsor | Challenge | How we answer it |
 |---|---|---|
 | **PNC** | "360° Financial Health Navigator": one clear view of the whole financial picture and the next move | Recovery Navigator: 3+ health indicators, 90-day balance forecast, "what-if" funding simulator, coach |
 | **NVIDIA** | "Use Nemotron Beyond a Chatbot": multi-step workflows, tool integration, real-world use | Nemotron VL on damage frames **and** ID documents, plus a Nemotron agent loop over tools, with a visible run trace |
-| **Spacetime** | The reactive backend: tables, functions, auth, sync | The whole backend is a SpacetimeDB module, including verification-gated access. The reporter and the affected person on two devices see progress and the "claimed" badge live |
 | **State Farm** | "The Worst Day, at Scale" | Anyone at the scene can report for an evacuated family; verified hand-off to the resident; area map highlighting where life-safety hazards cluster; hazard detection + 911 prompt; auto-drafted claim summary. Partial fit: no per-person ranking or coordination dashboard (see IDEA.md) |
-| **Vultr** (MLH) | Best use of Vultr | Web and worker on a Vultr VM; footage, frames and short-lived ID images on Vultr Object Storage |
-| **GoDaddy Registry** (MLH) | Best domain | Production domain registered via GoDaddy Registry |
 
 ## Quick start (after Part 1 publishes the scaffold)
 

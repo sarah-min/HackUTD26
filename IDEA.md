@@ -64,16 +64,15 @@ The reporter does **not** see the cost breakdown, frames with findings, claim dr
 
 ## Sponsor fit (what judges must be able to see)
 
+We are submitting to exactly three tracks: **State Farm, PNC and NVIDIA (Nemotron)**. SpacetimeDB is still our whole backend, but Spacetime, Vultr and GoDaddy Registry are **not** submission tracks.
+
 | Sponsor | What their prompt asks | Where it shows up |
 |---|---|---|
 | **PNC: "360° Financial Health Navigator"** | Whole financial picture; 3+ health indicators; forecast balances and obligations; what-if simulator; conversational coach | Recovery Navigator: 5 indicators, 90-day forecast with obligations, what-if simulator, coach |
 | **NVIDIA: "Nemotron Beyond a Chatbot"** | Multi-step workflows, tool integration, real-world applicability | Nemotron VL reads damage frames **and** ID documents. A Nemotron agent plans and calls tools (cost model, OpenFEMA, NWS alerts, geocoding, finance engine, claim draft). Validated structured output, with a visible trace |
-| **Spacetime** | A reactive backend: logic in the DB, real-time sync, multiplayer | All state and server logic live in a SpacetimeDB module: verification-gated access, property matching, jobs. Two people on two devices (reporter and affected person) see the same report progress, and the claimed badge, live |
 | **State Farm: "The Worst Day, at Scale"** | Identify the most urgent needs, coordinate help, ensure no one is overlooked | Anyone at the scene can document anyone's damage, so people who evacuated aren't left out. Verified hand-off to the actual resident; an area map that highlights where life-safety hazards cluster, so urgent pockets stand out; automatic hazard detection with a 911 prompt; auto-drafted claim summary. **Partial fit:** the hazard map surfaces urgent areas, but there's no per-person ranking or coordination dashboard |
-| **Vultr** (MLH) | Best use of Vultr | Vultr VM runs web and worker; Vultr Object Storage holds footage, frames and (briefly) ID images |
-| **GoDaddy Registry** (MLH) | Best domain | Production domain via GoDaddy Registry (code `MLHUTD84`) |
 
-**Open question:** whether there's a cap on how many sponsor tracks we can select on Devpost. Check the Hackerpack/Discord. If there's a cap, prioritize **NVIDIA, PNC, Spacetime**, then State Farm.
+**Open question:** whether Devpost caps how many sponsor tracks we can select. We select three (State Farm, PNC, NVIDIA), so this only matters if the cap is below three. Check the Hackerpack/Discord.
 
 ## Product defaults (decided; don't re-litigate in code)
 
@@ -96,7 +95,7 @@ The reporter does **not** see the cost breakdown, frames with findings, claim dr
 
 1. **Reporter vertical slice:** capture → upload → frames → Nemotron VL findings → assessment → live reporter status page.
 2. **Affected vertical slice:** address → ID check → verified property → full report page.
-3. Deployed on Vultr with HTTPS; 911 banner and safety guidance on both sides.
+3. Deployed with HTTPS (hosting on Brev, see docs/DEPLOYMENT.md); 911 banner and safety guidance on both sides.
 4. Nemotron agent tool loop with trace (cost, OpenFEMA, NWS, geocode, claim draft).
 5. Recovery Navigator: intake, indicators, gap, forecast, ranked options.
 6. What-if simulator.
