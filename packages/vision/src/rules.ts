@@ -56,7 +56,7 @@ export const WATER_LEVEL_RULES: Record<WaterLevel, { level: DamageLevel; depth: 
   over_roof: { level: 'destroyed', depth: 'above_waist' },
 };
 
-/** Area shots show many buildings at once: their evidence counts, with less confidence that it is this property. */
+/** Shots that may not show the reported property count with less confidence (street shots set no levels at all). */
 export const SCENE_CONFIDENCE: Record<Scene, number> = {
   home_exterior: 1, home_interior: 1, vehicle: 1, aerial: 0.8, street_or_area: 0.7, other: 0.8,
 };
@@ -88,9 +88,11 @@ export function applyDamageRules(m: ModelFrame, frameIndex: number, tSec: number
     m.water.referenceObject === 'none' && m.water.level !== 'not_visible'
       ? { ...m.water, level: 'not_visible' } // no reference object, no height
       : m.water;
-  const observations = m.usable
-    ? m.observations.filter((o) => !(o.cue === 'debris_on_lot' && m.scene === 'street_or_area'))
-    : [];
+  const usableObs = m.usable ? m.observations : [];
+  // no_visible_damage alongside damage is a contradiction: the damage cues win.
+  const observations = usableObs.some((o) => o.cue !== 'no_visible_damage') ? usableObs.filter((o) => o.cue !== 'no_visible_damage') : usableObs;
+  // A street or area shot is not the reported property: its evidence raises dangers, never the property's damage levels.
+  const areaShot = m.scene === 'street_or_area';
   const cues = new Set(observations.map((o) => o.cue));
 
   type Comp = FrameFinding['components'][number];
@@ -108,8 +110,9 @@ export function applyDamageRules(m: ModelFrame, frameIndex: number, tSec: number
   for (const o of observations) {
     const rule = CUE_RULES[o.cue];
     const confidence = Math.round(o.confidence * factor * 1000) / 1000;
-    for (const component of rule.components)
-      put({ component, level: rule.level, evidence: o.evidence, confidence, ...(o.extent ? { extent: o.extent } : {}), ...(o.box ? { box: o.box } : {}) });
+    if (!areaShot)
+      for (const component of rule.components)
+        put({ component, level: rule.level, evidence: o.evidence, confidence, ...(o.extent ? { extent: o.extent } : {}), ...(o.box ? { box: o.box } : {}) });
     if (rule.flag) addFlag({ flag: rule.flag, evidence: o.evidence, confidence, ...(o.box ? { box: o.box } : {}) });
   }
 
