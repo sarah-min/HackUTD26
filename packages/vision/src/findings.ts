@@ -55,7 +55,8 @@ export interface AnalyzeFrameResult {
 }
 
 /** Sampling for one frame. Guided JSON + a light repetition penalty keep the reply bounded (v1 could loop). */
-export const FRAME_REQUEST = { temperature: 0, max_tokens: 900, repetition_penalty: 1.05 } as const;
+// A full v4 reply is ~200-350 tokens; 600 leaves room without letting a runaway reply take long.
+export const FRAME_REQUEST = { temperature: 0, max_tokens: 600, repetition_penalty: 1.05 } as const;
 
 // Servers that rejected guided decoding (HTTP 400); later frames skip response_format for them.
 const noGuidedJson = new WeakSet<NimClient>();
