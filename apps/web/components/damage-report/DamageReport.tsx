@@ -3,6 +3,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { DamageAssessmentSchema, FrameFindingSchema, type DamageAssessment, type FrameFinding } from '@hack/contracts/assessment';
 import { type DamageLevel } from '@hack/contracts/common';
+import { frameHeadline, frameLabel, primaryFinding, LIFE_SAFETY_LABEL } from '@hack/contracts/display';
 import { HazardList } from '@/components/safety';
 import { formatCents } from '@/lib/format';
 import { useMediaUrl, type MediaUrlResolver } from './useMediaUrl';
@@ -61,6 +62,7 @@ function Section({ title, children, aside }: { title: string; children: ReactNod
 function FrameCard({ row, finding, resolve }: { row: FrameRowLike; finding: FrameFinding | null; resolve?: MediaUrlResolver }) {
   const { url, loading } = useMediaUrl(row.thumbKey, resolve);
   const damaged = finding?.components.filter((c) => c.level !== 'none') ?? [];
+  const primary = finding?.usable ? primaryFinding(finding) : null;
   return (
     <figure className="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800">
       <div className="relative aspect-[4/3] bg-zinc-100 dark:bg-zinc-900">
@@ -70,16 +72,28 @@ function FrameCard({ row, finding, resolve }: { row: FrameRowLike; finding: Fram
         ) : (
           <div className="flex h-full items-center justify-center text-xs text-zinc-400">{loading ? 'Loading…' : 'Image unavailable'}</div>
         )}
+        {url && primary?.box && (
+          <span
+            aria-hidden
+            className={`pointer-events-none absolute rounded-md border-2 ${primary.kind === 'lifeSafety' ? 'border-red-500' : 'border-amber-400'}`}
+            style={{ left: `${primary.box.x * 100}%`, top: `${primary.box.y * 100}%`, width: `${primary.box.w * 100}%`, height: `${primary.box.h * 100}%` }}
+          />
+        )}
         <span className="absolute left-2 top-2 rounded bg-black/60 px-1.5 py-0.5 font-mono text-[11px] text-white">
-          {Number(row.frameIndex) + 1}
-          {row.tSec ? ` · ${row.tSec.toFixed(1)}s` : ''}
+          {frameLabel(Number(row.frameIndex), row.tSec ?? 0)}
         </span>
         {finding && !finding.usable && (
           <span className="absolute right-2 top-2 rounded bg-black/60 px-1.5 py-0.5 text-[11px] text-white">Unusable</span>
         )}
       </div>
       <figcaption className="space-y-2 p-3">
-        <p className="text-sm text-zinc-800 dark:text-zinc-200">{finding?.caption ?? 'No finding for this frame.'}</p>
+        {finding?.usable && (
+          <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+            {frameHeadline(finding)}
+            {primary && <span className="ml-2 font-normal tabular-nums text-zinc-400">{primary.confidence.toFixed(2)}</span>}
+          </p>
+        )}
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">{finding?.caption ?? 'No finding for this frame.'}</p>
         {damaged.length > 0 && (
           <ul className="space-y-1">
             {damaged.map((c, i) => (
@@ -94,7 +108,7 @@ function FrameCard({ row, finding, resolve }: { row: FrameRowLike; finding: Fram
         )}
         {finding && finding.lifeSafety.length > 0 && (
           <p className="text-xs font-medium text-red-700 dark:text-red-400">
-            ⚠ {finding.lifeSafety.map((s) => s.flag.replace(/_/g, ' ')).join(', ')}
+            ⚠ {finding.lifeSafety.map((s) => LIFE_SAFETY_LABEL[s.flag]).join(', ')}
           </p>
         )}
       </figcaption>

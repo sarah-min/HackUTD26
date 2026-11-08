@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FrameFindingSchema } from '@hack/contracts/assessment';
-import { analyzeFrame, createMemoryCache } from '../src';
+import { analyzeFrame, createMemoryCache, normalizeBox } from '../src';
 import { scriptedNim } from './fakeNim';
 
 const good = JSON.stringify({
@@ -57,5 +57,73 @@ describe('analyzeFrame', () => {
     const part = seen[0].messages[1].content[1];
     expect(part.type).toBe('image_url');
     expect(part.image_url.url.startsWith('data:image/jpeg;base64,')).toBe(true);
+  });
+
+  it('asks for guided JSON with bounded sampling', async () => {
+    const seen: any[] = [];
+    const { nim } = scriptedNim([good], seen);
+    await analyzeFrame({ nim, image: img, frameIndex: 0, tSec: 0 });
+    expect(seen[0].response_format.type).toBe('json_schema');
+    expect(seen[0].response_format.json_schema.schema.properties.components.maxItems).toBe(6);
+    expect(seen[0].repetition_penalty).toBeGreaterThan(1);
+    expect(seen[0].max_tokens).toBeLessThanOrEqual(900);
+  });
+
+  it('falls back to plain JSON once when the server rejects guided decoding', async () => {
+    const seen: any[] = [];
+    const { nim } = scriptedNim([{ status: 400, body: 'response_format not supported' }, good, good], seen);
+    const r = await analyzeFrame({ nim, image: img, frameIndex: 0, tSec: 0 });
+    expect(r.finding.usable).toBe(true);
+    expect(seen[1].response_format).toBeUndefined();
+    await analyzeFrame({ nim, image: Buffer.from([9, 9, 9]), frameIndex: 1, tSec: 1 });
+    expect(seen[2].response_format).toBeUndefined(); // remembered for this client
+  });
+
+  it('retries a reply cut off at the length limit, asking for a shorter one', async () => {
+    const seen: any[] = [];
+    const { nim } = scriptedNim([{ content: '{"usable": true, "components": [', finishReason: 'length' }, good], seen);
+    const r = await analyzeFrame({ nim, image: img, frameIndex: 0, tSec: 0 });
+    expect(r.attempts).toBe(2);
+    expect(r.finding.usable).toBe(true);
+    expect(JSON.stringify(seen[1].messages.at(-1))).toContain('cut off');
+  });
+
+  it('collapses a looping reply: each component and flag once, worst level kept, lists capped', async () => {
+    const looping = JSON.stringify({
+      usable: true,
+      headline: 'Pole down across the street with hanging wires and more words beyond the eighty character limit',
+      caption: 'Street with a leaning utility pole.',
+      components: [
+        ...Array.from({ length: 10 }, () => ({ component: 'utilities', level: 'minor', extent: 'partial', evidence: 'Leaning pole', confidence: 0.7 })),
+        { component: 'utilities', level: 'major', extent: 'widespread', evidence: 'Pole snapped', confidence: 0.6, box: [10, 20, 30, 40] },
+        { component: 'yard_debris', level: 'minor', extent: 'sideways', evidence: 'Debris', confidence: 0.8 },
+      ],
+      lifeSafety: Array.from({ length: 6 }, () => ({ flag: 'downed_power_line', evidence: 'Wires on the road', confidence: 0.9 })),
+      waterDepth: 'none',
+    });
+    const { nim } = scriptedNim([looping]);
+    const r = await analyzeFrame({ nim, image: img, frameIndex: 2, tSec: 8 });
+    expect(r.finding.components).toHaveLength(2);
+    const util = r.finding.components.find((c) => c.component === 'utilities')!;
+    expect(util.level).toBe('major');
+    expect(util.box).toEqual({ x: 0.1, y: 0.2, w: 0.3, h: 0.4 });
+    expect(r.finding.components.find((c) => c.component === 'yard_debris')!.extent).toBeUndefined();
+    expect(r.finding.lifeSafety).toHaveLength(1);
+    expect(r.finding.headline!.length).toBeLessThanOrEqual(80);
+  });
+
+  it('normalizes highlight boxes', () => {
+    expect(normalizeBox({ x: 0.5, y: 0.5, w: 0.8, h: 0.2 })).toEqual({ x: 0.5, y: 0.5, w: 0.5, h: 0.2 });
+    expect(normalizeBox([25, 25, 50, 50])).toEqual({ x: 0.25, y: 0.25, w: 0.5, h: 0.5 });
+    expect(normalizeBox({ x: 120, y: 40, w: 300, h: 200 })).toBeUndefined(); // pixels
+    expect(normalizeBox({ x: 0.1, y: 0.1, w: 0.001, h: 0.5 })).toBeUndefined();
+    expect(normalizeBox('top left')).toBeUndefined();
+  });
+
+  it('still reads v1-style findings without the new fields', async () => {
+    const { nim } = scriptedNim([good]);
+    const r = await analyzeFrame({ nim, image: img, frameIndex: 0, tSec: 0 });
+    expect(r.finding.headline).toBeUndefined();
+    expect(r.finding.components[0]!.box).toBeUndefined();
   });
 });

@@ -11,6 +11,16 @@ import {
 
 export const WaterDepthSchema = z.enum(['none', 'ankle', 'knee', 'waist', 'above_waist', 'unknown']);
 
+/** Additive: normalized image region, 0..1 from the top-left corner. Drawn as the highlight box on a frame. */
+export const FrameBoxSchema = z
+  .object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1), w: z.number().gt(0).max(1), h: z.number().gt(0).max(1) })
+  .refine((b) => b.x + b.w <= 1.0001 && b.y + b.h <= 1.0001, 'box must stay inside the image');
+export type FrameBox = z.infer<typeof FrameBoxSchema>;
+
+/** Additive: how much of the visible component is damaged. Feeds the "scope detected" column. */
+export const DamageExtentSchema = z.enum(['localized', 'partial', 'widespread']);
+export type DamageExtent = z.infer<typeof DamageExtentSchema>;
+
 export const FrameFindingSchema = z.object({
   frameIndex: z.number().int().min(0),
   tSec: z.number().min(0), // 0 for photos
@@ -22,6 +32,8 @@ export const FrameFindingSchema = z.object({
       level: DamageLevelSchema,
       evidence: z.string().max(200),
       confidence: z.number().min(0).max(1),
+      extent: DamageExtentSchema.optional(), // additive
+      box: FrameBoxSchema.optional(), // additive
     }),
   ),
   lifeSafety: z.array(
@@ -29,11 +41,14 @@ export const FrameFindingSchema = z.object({
       flag: LifeSafetyFlagSchema,
       evidence: z.string().max(200),
       confidence: z.number().min(0).max(1),
+      box: FrameBoxSchema.optional(), // additive
     }),
   ),
   hazardObserved: HazardSchema.optional(),
   waterDepth: WaterDepthSchema.default('unknown'),
   caption: z.string().max(240),
+  /** Additive: the frame's main finding in a few words, e.g. "Missing shingles and exposed decking". Affected view only. */
+  headline: z.string().max(80).optional(),
 });
 export type FrameFinding = z.infer<typeof FrameFindingSchema>;
 
