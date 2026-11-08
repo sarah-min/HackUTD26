@@ -73,11 +73,6 @@ function ReportItem({ r }: { r: ReportRow }) {
             {flags.length > 0 && (
               <span className="ml-2 font-semibold text-red-700">⚠ {flags.length} hazard(s)</span>
             )}
-            {r.source !== 'live' && (
-              <span className="ml-2 rounded bg-slate-100 px-1 text-[10px] font-bold uppercase text-slate-600">
-                {r.source}
-              </span>
-            )}
           </p>
         </div>
       </Link>

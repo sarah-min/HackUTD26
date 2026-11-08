@@ -23,6 +23,7 @@ import {
 } from '@/lib/stdb';
 import { DOC_KINDS, FAIL_REASON_TEXT, formatAddress, loadSelectedAddress, type DocKind } from '@/components/affected/helpers';
 import { AppShell } from '@/components/chrome/AppShell';
+import { DevPreviewButton } from '@/components/damage-report/DevPreviewButton';
 
 const MAX_BYTES = 15 * 1024 * 1024;
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -153,6 +154,7 @@ export default function AffectedVerifyPage() {
         >
           Enter address
         </Link>
+        <DevPreviewButton />
       </AppShell>
     );
   }
@@ -277,6 +279,8 @@ export default function AffectedVerifyPage() {
           </button>
         </form>
       )}
+
+      <DevPreviewButton />
     </AppShell>
   );
 }

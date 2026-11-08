@@ -87,11 +87,6 @@ export default function ReporterPage() {
                               Retry
                             </span>
                           ) : null}
-                          {report.source !== 'live' ? (
-                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-900">
-                              {report.source}
-                            </span>
-                          ) : null}
                         </div>
                       </div>
                       <span

@@ -493,8 +493,10 @@ export function MapboxDamageMap({
 
     // Surface problems (bad token, blocked style, WebGL) on screen instead of failing silently.
     map.on("error", (event) => {
-      const message = (event as { error?: { message?: string } }).error?.message ?? "Unknown map error";
-      console.error("[Mapbox]", event);
+      const err = (event as { error?: { message?: string; status?: number; url?: string } }).error;
+      const message = err?.message ?? "Unknown map error";
+      // Log the message itself: the raw event object serializes as {} in the Next.js error overlay.
+      console.warn(`[Mapbox] ${message}${err?.status ? ` (HTTP ${err.status})` : ""}${err?.url ? ` ${err.url.split("?")[0]}` : ""}`);
       errorLog.current = [...errorLog.current.slice(-2), message];
       setMapError((prev) => prev ?? message);
     });

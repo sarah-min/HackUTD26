@@ -15,7 +15,7 @@ export function RetrySubmit({ reportId }: { reportId: bigint }) {
     try {
       await submitReport({ reportId });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Retry failed.');
+      setError(e instanceof Error ? e.message : 'That didn’t work. Please try again.');
     } finally {
       setBusy(false);
     }
@@ -23,11 +23,10 @@ export function RetrySubmit({ reportId }: { reportId: bigint }) {
 
   return (
     <section className="rounded-2xl border border-amber-200 bg-amber-50/80 p-5">
-      <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-amber-800">Retry</p>
-      <h2 className="mt-1 text-[15px] font-bold text-slate-950">Analysis failed</h2>
+      <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-amber-800">Something went wrong</p>
+      <h2 className="mt-1 text-[15px] font-bold text-slate-950">The review didn’t finish</h2>
       <p className="mt-1 text-[12px] text-slate-600">
-        Re-queue using the footage already attached. New media can be added if the status becomes
-        &quot;needs more footage&quot;.
+        We can try again with the photos you already sent. No need to upload them again.
       </p>
       {error ? <p className="mt-2 text-[12px] font-semibold text-red-700">{error}</p> : null}
       <button
@@ -36,7 +35,7 @@ export function RetrySubmit({ reportId }: { reportId: bigint }) {
         onClick={() => void retry()}
         type="button"
       >
-        {busy ? 'Re-queuing…' : 'Retry analysis'}
+        {busy ? 'Starting again…' : 'Try again'}
       </button>
     </section>
   );

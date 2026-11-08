@@ -2,20 +2,20 @@ import type { DamageLevel, LifeSafetyFlag } from '@hack/contracts/common';
 import { damageLevelColor } from './brand';
 
 export const DAMAGE_LEVEL_LABEL: Record<DamageLevel, string> = {
-  none: 'No damage assessed yet',
-  affected: 'Affected',
-  minor: 'Minor',
-  major: 'Major',
+  none: 'Not assessed yet',
+  affected: 'Minor damage',
+  minor: 'Moderate damage',
+  major: 'Severe damage',
   destroyed: 'Destroyed',
 };
 
 export const REPORT_STATUS_LABEL: Record<string, string> = {
-  draft: 'Draft — evidence not submitted yet',
-  queued: 'Queued for analysis',
-  processing: 'Analyzing footage',
-  assessed: 'Assessment complete',
-  needs_more_footage: 'Needs more footage',
-  failed: 'Analysis failed',
+  draft: 'Add photos to get started',
+  queued: 'Your report is in line',
+  processing: 'Reviewing your photos',
+  assessed: 'Your report is ready',
+  needs_more_footage: 'We need a few more photos',
+  failed: 'We couldn’t finish the review',
 };
 
 export const FLAG_GUIDANCE: Record<LifeSafetyFlag, string> = {

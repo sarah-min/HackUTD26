@@ -34,19 +34,19 @@ export const FAIL_REASON_TEXT: Record<string, string> = {
 
 export const DAMAGE_LEVEL_TEXT: Record<DamageLevel, string> = {
   none: 'No visible damage',
-  affected: 'Affected',
-  minor: 'Minor damage',
-  major: 'Major damage',
+  affected: 'Minor damage',
+  minor: 'Moderate damage',
+  major: 'Severe damage',
   destroyed: 'Destroyed',
 };
 
 export const STATUS_TEXT: Record<string, string> = {
   draft: 'Being filed',
-  queued: 'Waiting for analysis',
-  processing: 'Analyzing footage',
+  queued: 'Waiting for review',
+  processing: 'Reviewing photos',
   assessed: 'Report ready',
-  needs_more_footage: 'Needs more footage',
-  failed: 'Analysis failed',
+  needs_more_footage: 'Needs more photos',
+  failed: 'Review didn’t finish',
 };
 
 /** CSV of LifeSafetyFlag (report.life_safety_csv) → validated flags; unknown values dropped. */

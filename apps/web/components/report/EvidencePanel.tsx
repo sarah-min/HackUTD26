@@ -49,10 +49,10 @@ export function EvidencePanel({
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5">
-      <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-blue-700">Evidence</p>
-      <h2 className="mt-1 text-[15px] font-bold text-slate-950">Add photo or video</h2>
+      <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-blue-700">Photos</p>
+      <h2 className="mt-1 text-[15px] font-bold text-slate-950">Add photos or a video</h2>
       <p className="mt-1 text-[12px] text-slate-500">
-        Required to queue AI analysis. One video or up to 8 photos.
+        We need at least one to start the review. Add one video or up to 8 photos.
       </p>
       <input
         accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime"
@@ -70,10 +70,10 @@ export function EvidencePanel({
         type="button"
       >
         {files.length === 0
-          ? 'Choose files'
+          ? 'Choose photos or a video'
           : files.length === 1
             ? files[0]!.name
-            : `${files.length} files`}
+            : `${files.length} files selected`}
       </button>
       {busy ? (
         <div className="mt-3 text-[12px] text-blue-900">
@@ -93,7 +93,7 @@ export function EvidencePanel({
         onClick={() => void submit()}
         type="button"
       >
-        {busy ? 'Working…' : 'Upload and submit'}
+        {busy ? 'Uploading…' : 'Upload and start review'}
       </button>
     </section>
   );
