@@ -1,0 +1,32 @@
+{
+  "name": "@hack/web",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --port 3000",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hack/address": "workspace:*",
+    "@hack/contracts": "workspace:*",
+    "@hack/stdb-bindings": "workspace:*",
+    "next": "16.0.1",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "spacetimedb": "2.13.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.1.16",
+    "@types/node": "24.10.1",
+    "@types/react": "19.1.8",
+    "@types/react-dom": "19.1.6",
+    "tailwindcss": "4.1.16",
+    "typescript": "5.9.3",
+    "vitest": "3.2.4"
+  }
+}
