@@ -45,7 +45,7 @@ Local/dev without a bucket: `STORAGE_DRIVER=memory`.
 1. Part 2: publish module, regenerate bindings, register service identities (`worker`, `web`).
 2. Env (see `.env.example`): `STDB_URI`, `STDB_MODULE`, `NEXT_PUBLIC_STDB_*`, `STDB_SERVICE_TOKEN` (P3), `STDB_WEB_TOKEN` (P4).
 3. Dev DB: `aftermath-hackutd-dev`. Prod/demo: `aftermath-hackutd`.
-4. Accounts are recovery-code only: no email, SMS or delivery-vendor env vars are needed (Brevo and Photon were dropped). The account module is published to dev; check docs/BACKEND_RUNBOOK.md for prod state before claiming prod.
+4. Accounts are recovery-code only: no email, SMS or delivery-vendor env vars are needed (Brevo and Photon were dropped). The account module is published to dev and prod (2026-11-08); see docs/DEMO_SETUP.md for demo-day setup.
 
 ## Health and logs
 
