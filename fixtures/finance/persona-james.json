@@ -1,0 +1,57 @@
+{
+  "source": "synthetic",
+  "schema": "FinancialProfileSchema",
+  "description": "Synthetic homeowner persona with mortgage and CD. Not a real person.",
+  "data": {
+    "id": "persona-james-homeowner",
+    "label": "James, 41, homeowner, Dallas",
+    "description": "Synthetic demo persona: homeowner with checking, savings, a CD, and a mortgage. Labeled synthetic — not a real person.",
+    "accounts": [
+      {
+        "id": "james-checking",
+        "type": "checking",
+        "name": "Primary Checking",
+        "balanceCents": 410000
+      },
+      {
+        "id": "james-savings",
+        "type": "savings",
+        "name": "Emergency Savings",
+        "balanceCents": 1250000
+      },
+      {
+        "id": "james-cd",
+        "type": "cd",
+        "name": "12-Month CD",
+        "balanceCents": 800000,
+        "earlyWithdrawalPenaltyBps": 150,
+        "maturityAt": 1811808000000
+      },
+      {
+        "id": "james-mortgage",
+        "type": "mortgage",
+        "name": "Primary Mortgage",
+        "balanceCents": 24500000,
+        "aprBps": 625,
+        "monthlyPaymentCents": 185000,
+        "dueDay": 1
+      },
+      {
+        "id": "james-card",
+        "type": "credit_card",
+        "name": "Travel Card",
+        "balanceCents": 95000,
+        "aprBps": 1899,
+        "creditLimitCents": 1200000,
+        "monthlyPaymentCents": 3500,
+        "dueDay": 22
+      }
+    ],
+    "monthlyNetIncomeCents": 780000,
+    "monthlyGrossIncomeCents": 980000,
+    "monthlyEssentialExpensesCents": 310000,
+    "payDays": [5, 20],
+    "personalLoanOfferAprBps": 1199,
+    "source": "synthetic"
+  }
+}

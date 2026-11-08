@@ -1,0 +1,103 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    color: #0f172a;
+    background: #e2e8f0;
+    --prototype-safe-top: 0px;
+    font-family:
+      Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    min-width: 320px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  #root {
+    min-width: 0;
+    overflow-x: hidden;
+  }
+
+  p,
+  td,
+  th {
+    overflow-wrap: anywhere;
+  }
+
+  button,
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes scan {
+  0%,
+  100% {
+    transform: translateY(-48px);
+    opacity: 0.45;
+  }
+  50% {
+    transform: translateY(48px);
+    opacity: 1;
+  }
+}
+
+.app-safe-header {
+  padding-top: calc(1rem + max(env(safe-area-inset-top, 0px), var(--prototype-safe-top)));
+}
+
+.app-safe-header-sm,
+.app-safe-map-header {
+  padding-top: calc(0.75rem + max(env(safe-area-inset-top, 0px), var(--prototype-safe-top)));
+}
+
+.app-safe-overlay-top {
+  top: calc(0.75rem + max(env(safe-area-inset-top, 0px), var(--prototype-safe-top)));
+}
+
+.app-safe-sticky-tabs {
+  top: calc(62px + max(env(safe-area-inset-top, 0px), var(--prototype-safe-top)));
+}
+
+.app-safe-map-count {
+  top: calc(82px + max(env(safe-area-inset-top, 0px), var(--prototype-safe-top)));
+}
+
+@media (max-width: 540px) {
+  :root {
+    /*
+     * Figma prototype device frames visually overlay a Dynamic Island but do not
+     * expose safe-area-inset-top. This fallback clears that simulated hardware.
+     */
+    --prototype-safe-top: 3.25rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .app-safe-map-header {
+    padding-top: calc(1.25rem + max(env(safe-area-inset-top, 0px), var(--prototype-safe-top)));
+  }
+
+  .app-safe-overlay-top {
+    top: calc(1.25rem + max(env(safe-area-inset-top, 0px), var(--prototype-safe-top)));
+  }
+
+  .app-safe-map-count {
+    top: calc(90px + max(env(safe-area-inset-top, 0px), var(--prototype-safe-top)));
+  }
+}

@@ -7,6 +7,7 @@ import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { NormalizedAddress } from '@hack/contracts/property';
 import { formatAddress, saveSelectedAddress } from '@/components/affected/helpers';
+import { AppShell } from '@/components/chrome/AppShell';
 import { P } from '@/lib/stdb';
 import { useProcedure } from 'spacetimedb/react';
 
@@ -24,7 +25,6 @@ async function geocode(
   for (let attempt = 0; attempt < 4; attempt++) {
     const r = 'q' in query ? await forward(query) : await reverse(query);
     if (r.ok) return JSON.parse(r.addressesJson) as NormalizedAddress[];
-    // Reverse lookups are spaced 1.1 s apart across all users; wait and retry.
     if (r.error === 'busy') {
       await new Promise((res) => setTimeout(res, 1200));
       continue;
@@ -80,62 +80,75 @@ function StartInner() {
   }
 
   return (
-    <main className="mx-auto max-w-md space-y-5 px-4 py-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold">I've been affected</h1>
-        <p className="text-sm text-gray-600">
-          Enter your home address. After you verify your ID, you'll see any damage reports filed for your home and what's
-          happening around it.
+    <AppShell>
+      <header>
+        <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-blue-700">Affected</p>
+        <h1 className="mt-0.5 text-lg font-bold tracking-[-0.02em] text-slate-950">
+          I&apos;ve been affected
+        </h1>
+        <p className="mt-1 text-[12px] text-slate-500">
+          Enter your home address. After you verify your ID, you&apos;ll see any damage reports
+          filed for your home and what&apos;s happening around it.
         </p>
       </header>
 
       <form
-        className="space-y-3"
+        className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4"
         onSubmit={(e) => {
           e.preventDefault();
           if (query.trim().length >= 5) void run({ q: query.trim() });
         }}
       >
-        <label className="block text-sm font-medium" htmlFor="address">
+        <label className="block text-[12px] font-semibold text-slate-700" htmlFor="address">
           Home address
         </label>
         <input
           id="address"
-          className="w-full rounded-lg border border-gray-300 px-3 py-3 text-base"
+          className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[13px] outline-none focus:border-blue-500"
           placeholder="1234 Main St, Houston, TX 77002"
           autoComplete="street-address"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
         <div className="flex gap-2">
-          <button type="submit" className="flex-1 rounded-lg bg-black px-4 py-3 font-medium text-white disabled:opacity-50" disabled={phase.k === 'loading'}>
+          <button
+            type="submit"
+            className="flex-1 rounded-xl bg-blue-700 px-4 py-3 text-[13px] font-bold text-white disabled:opacity-50"
+            disabled={phase.k === 'loading'}
+          >
             Find address
           </button>
-          <button type="button" onClick={useMyLocation} className="rounded-lg border border-gray-300 px-4 py-3 font-medium">
+          <button
+            type="button"
+            onClick={useMyLocation}
+            className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-[13px] font-semibold text-slate-700"
+          >
             Use my location
           </button>
         </div>
       </form>
 
-      {phase.k === 'loading' && <p className="text-sm text-gray-600">Looking up the address…</p>}
+      {phase.k === 'loading' && <p className="text-[13px] text-slate-600">Looking up the address…</p>}
       {phase.k === 'error' && (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="text-[13px] font-semibold text-red-700">
           {phase.msg}
         </p>
       )}
       {phase.k === 'results' &&
         (phase.list.length === 0 ? (
-          <p className="text-sm text-gray-700">No match found. Check the street number and ZIP code and try again.</p>
+          <p className="text-[13px] text-slate-700">
+            No match found. Check the street number and ZIP code and try again.
+          </p>
         ) : (
           <section className="space-y-2">
-            <h2 className="text-sm font-medium">Is this your home?</h2>
+            <h2 className="text-[12px] font-semibold text-slate-700">Is this your home?</h2>
             <ul className="space-y-2">
               {phase.list.map((a) => (
                 <li key={a.normalized}>
                   <button
                     type="button"
                     onClick={() => choose(a)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-3 text-left hover:bg-gray-50"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-left text-[13px] text-slate-800 hover:border-blue-300 hover:bg-blue-50"
                   >
                     {formatAddress(a)}
                   </button>
@@ -144,13 +157,19 @@ function StartInner() {
             </ul>
           </section>
         ))}
-    </main>
+    </AppShell>
   );
 }
 
 export default function AffectedStartPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense
+      fallback={
+        <AppShell>
+          <p className="text-sm text-slate-600">Loading…</p>
+        </AppShell>
+      }
+    >
       <StartInner />
     </Suspense>
   );

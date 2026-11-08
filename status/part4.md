@@ -1,8 +1,54 @@
-# Part 4: Recovery Navigator & Infra: status log
+# Part 4: Recovery Navigator & storage APIs: status log
 
 Owner: Roselyn. Append-only, newest entry first. Format is in [STATUS.md](../STATUS.md). Only this part's owner (and their LLM) edits this file.
 
-## 2026-11-07 15:14: Grok Bot + automation kit (local skill; no PR yet)
+## Requests to other parts (open)
+
+- **P3 (Nemotron / Brev):** Register `planHandler` and `coachHandler` from `@hack/finance` in `apps/worker/src/handlers/index.ts` (one import + one registry line each). Hosting stays Brev. Live HTTPS URL when ready.
+- **P2:** Confirm web identity registered as `web` if any legacy `/api/*` auth is kept. `RecoverySummaryCard` is already flipped on reconcile-p4.
+- **P1:** Confirm workspace members `@hack/finance` + `@hack/storage` + `@hack/damage` on main.
+
+## 2026-11-08 06:20: Recovery Navigator UI + plan/coach handlers (branch reconcile-p4)
+
+- **Shipped:** `/affected/property/[propertyId]/recovery` with intake → client `buildRecoveryPlan` / `simulate` what-if → indicators, gap, SVG forecast, funding options, grounded coach. Live `<RecoverySummaryCard>` reads `my_recovery_plans`. Exported `planHandler` / `coachHandler` from `@hack/finance` for P3 to register. Property page CTA to Recovery Navigator.
+- **Verify:** `pnpm --filter @hack/finance typecheck && pnpm --filter @hack/finance test && pnpm --filter @hack/web typecheck`. Open a verified property with an assessed report → Recovery Navigator → Build recovery plan → move what-if sliders.
+- **Fixtures still faked:** Personas are synthetic; coach replies are plan-grounded templates until the worker registers the handlers and (optionally) NIM. Presign/S3 paths remain unused (SpacetimeDB blobs).
+- **Requests to other parts:** see open list (P3 register handlers).
+- **Blocked on:** assessed report + verified identity for a full live walkthrough; worker registration for persisted `recovery_plan` rows.
+
+## 2026-11-07 19:50: Drop Vultr from P4; hand hosting to P3/Brev (branch part4/finance-contracts)
+
+- **Shipped:** Removed Vultr from P4 scope. `docs/DEPLOYMENT.md` rewritten (P3=Brev host; P4=S3-compatible client only). `.env.example` / CONTRACTS §10 / IMPLEMENTATION_PLAN P4 / KICKOFF P4 updated. Local `part4/infra-bootstrap` branch + Vultr infra stash deleted (never pushed).
+- **Verify:** Grep P4-owned paths for `Vultr`/`vultrobjects` should be empty; DEPLOYMENT points at P3 for host.
+- **Fixtures still faked:** same as before for engine/UI
+- **Requests to other parts:** see open list above
+- **Blocked on:** P3 Brev URL + bucket endpoint; recovery UI still to build
+
+## 2026-11-07 17:45: T4.2–T4.3 storage + HTTP routes + summary card (branch part4/finance-contracts)
+
+- **Shipped:** `@hack/storage` (`StoragePort`, `MemoryStorage`, `S3Storage`, key helpers, size/type guards). API routes: `/api/uploads/presign`, `/api/media/[...key]` (always 403 on `idv/`), `/api/health`. Auth reads via `WEB_AUTH_FIXTURE_JSON` until live `web_*` subscription client lands. `<RecoverySummaryCard>` stub under `components/finance/`.
+- **Verify:** `cd packages/storage && pnpm install --ignore-workspace && pnpm test && pnpm typecheck`
+- **Fixtures still faked:** live Vultr S3 round-trip; live STDB web auth (fixture JSON only); RecoverySummaryCard does not yet read `recovery_plan` rows
+- **Requests to other parts:** `P2: flip external.ts RecoverySummaryCard import to @/components/finance`. `P1: workspace members @hack/storage + @hack/finance; transpilePackages`. `P3: assessment.ts` as before.
+- **Blocked on:** Vultr bucket for real S3 ping; P1 Next package.json to run route tests in-app
+
+## 2026-11-07 17:30: T4.6–T4.7 recovery engine + simulate (branch part4/finance-contracts)
+
+- **Shipped:** Pure `@hack/finance` engine: payout/gap (incl. flood exclusion + renters), 5 indicators, funding options + recommended mix, 91-day forecast, `buildRecoveryPlan()`, `simulate()` (< 20 ms). Exact-cents tests in `packages/finance/test/engine.test.ts`.
+- **Verify:** `cd packages/finance && pnpm install --ignore-workspace && pnpm test && pnpm typecheck`
+- **Fixtures still faked:** no live `estimateRepairCost` yet (pass recomputed `CostEstimate` in); plan/coach job handlers not started; storage/APIs/UI pending
+- **Requests to other parts:** same as below (P3 assessment + cost model; P1 workspace)
+- **Blocked on:** Vultr for T4.1; P1 for recovery routes
+
+## 2026-11-07 17:20: T4.4–T4.5 finance contracts + personas (branch part4/finance-contracts)
+
+- **Shipped:** `packages/contracts/src/finance.ts` (intake, profile, scenario, plan, coach, simulation result). `@hack/finance` with 3 synthetic personas (`maria`, `james`, `aisha`) + `getPersona` / `PERSONAS`. Fixtures under `fixtures/finance/`. Contracts tsconfig now typechecks `finance.ts`.
+- **Verify:** `cd packages/contracts && pnpm install --ignore-workspace && pnpm test`; `cd packages/finance && pnpm install --ignore-workspace && pnpm test`
+- **Fixtures still faked:** recovery engine / simulate / storage / APIs not built yet. `RecoveryPlan.cost` uses a shape-compatible ref until P3’s `assessment.ts` is on main (then switch to `CostEstimateSchema`).
+- **Requests to other parts:** `P3: merge assessment.ts (CostEstimateSchema) so finance can import it and drop CostEstimateRefSchema`. `P1: add @hack/finance to workspace when scaffold lands`. `P2 (Sidd): register web identity hex c20031dd428a584134bf24332b596afe4f25a327bfb5c4311e609915e5b7bf61 as role web` if not done.
+- **Blocked on:** Vultr support (T4.1); P1 scaffold for Next routes; P3 cost model for T4.6 (fixture cost until then)
+
+## 2026-11-07 15:14: Grok Bot + automation kit (merged #1)
 
 - **Shipped:** Personal Cursor skill `hackutd-p4-grokbot` on this machine (`~/.cursor/skills/hackutd-p4-grokbot/`). Pasteables below for Grok Bot memory and two Cursor Automations. No product code yet.
 - **Verify:** Create Bot → paste Memory A → send First task. Create automations at https://cursor.com/automations with prompts B and C. Confirm Cloud Agent delegation is on (Grok Bot dashboard).
@@ -90,11 +136,8 @@ infra/**, Dockerfiles, compose, web API routes P4 owns, or .env.example changed.
 Do not open code PRs from this automation.
 ```
 
-## Requests to other parts (open)
-
-- none yet
-
 ## Cost ledger
 
 | When | Service | Item | Amount | Credit or cash |
 |---|---|---|---|---|
+| 2026-11-07 | Vultr | abandoned — hosting moved to P3/Brev | $0 further | — |

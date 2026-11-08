@@ -1,0 +1,17 @@
+{
+  "name": "hackutd26",
+  "private": true,
+  "packageManager": "pnpm@10.20.0",
+  "scripts": {
+    "dev": "pnpm --filter @hack/web dev",
+    "build": "pnpm --filter @hack/web build",
+    "check": "pnpm -r --if-present run typecheck && pnpm -r --if-present run test",
+    "worker": "pnpm --filter @hack/worker start"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["ffmpeg-static", "esbuild", "sharp"]
+  }
+}
