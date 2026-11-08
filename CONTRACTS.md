@@ -521,6 +521,21 @@ All arithmetic is integer cents with Math.round at each multiplication. Never ac
 
 ## 8. HTTP API
 
+> **Update 2026-11-07 (branch `backend-spacetimedb-brev`, Part 3):** SpacetimeDB is the whole backend. `/api/uploads/presign`,
+> `/api/media` and `/api/geocode` are replaced by module functions called over the client's own connection:
+> - Upload: `begin_upload({objectKey, contentType, sizeBytes, sha256, chunkCount})`, then `upload_chunk({objectKey, seq, bytes})`
+>   for each 512 KiB piece (`useUploadFile()` in `apps/web/lib/stdb/files.ts`). Keys keep their shapes:
+>   `media/<reportId>/<sha256>.<ext>` (reporter, while the report accepts footage; ≤ 100 MB video / 15 MB photo),
+>   `idv/<verificationId>/<name>` (the person verifying, while pending; ≤ 15 MB), `frames/<reportId>/<n>.jpg` (worker,
+>   `put_blob`). `attach_media` and `submit_verification` now require the completed upload.
+> - Read: procedure `read_blob({objectKey, seq})` → `{ok, error, part?: {contentType, sizeBytes, chunkCount, seq, bytes}}`
+>   (`useReadFile()` / `useFileObjectUrl()`). Worker: anything. Verified resident: `media/` and `frames/` of their property.
+>   `idv/` is never readable by a client; `record_verification` deletes it, and unfinished uploads and leftover ID images
+>   are purged after 1 hour.
+> - Address lookup: procedures `geocode_address({q})` (Census) and `geocode_point({lat, lng})` (Nominatim, 1 request /
+>   1.1 s across all users; `error: 'busy'` means retry) → `{ok, error, addressesJson}` (NormalizedAddress[] JSON).
+
+
 | Method + path | Owner | Auth | Request | Response |
 |---|---|---|---|---|
 | `GET /api/geocode?q=<address>` | P2 | none (rate limited per IP) | — | `NormalizedAddress[]` via the US Census Geocoder (`source='census'`) |
@@ -593,6 +608,12 @@ export const coachHandler: JobHandler;  // packages/finance/src/coach/handler.ts
 ```
 
 ## 10. Environment variables (`.env.example`, Part 4)
+
+> **Update 2026-11-07 (branch `backend-spacetimedb-brev`):** no `S3_*`, `NVIDIA_API_KEY`, `NVIDIA_BASE_URL`,
+> `NOMINATIM_USER_AGENT` or `CENSUS_GEOCODER_BENCHMARK` (storage and lookup run in the module). The worker adds
+> `NEMOTRON_VL_BASE_URL`, `NEMOTRON_AGENT_BASE_URL`, `NEMOTRON_API_KEY` (secret); model defaults
+> `nvidia/NVIDIA-Nemotron-Nano-12B-v2-VL-FP8` and `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8`. `STDB_WEB_TOKEN` is unused.
+
 
 | Name | Used by | Example / note |
 |---|---|---|

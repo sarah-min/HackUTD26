@@ -6,5 +6,14 @@
 import { type Infer as __Infer } from "spacetimedb";
 
 // Import all procedure arg schemas
+import * as GeocodeAddressProcedure from "../geocode_address_procedure";
+import * as GeocodePointProcedure from "../geocode_point_procedure";
+import * as ReadBlobProcedure from "../read_blob_procedure";
 
+export type GeocodeAddressArgs = __Infer<typeof GeocodeAddressProcedure.params>;
+export type GeocodeAddressResult = __Infer<typeof GeocodeAddressProcedure.returnType>;
+export type GeocodePointArgs = __Infer<typeof GeocodePointProcedure.params>;
+export type GeocodePointResult = __Infer<typeof GeocodePointProcedure.returnType>;
+export type ReadBlobArgs = __Infer<typeof ReadBlobProcedure.params>;
+export type ReadBlobResult = __Infer<typeof ReadBlobProcedure.returnType>;
 

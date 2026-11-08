@@ -9,6 +9,7 @@ import { CreateReportInputSchema } from '@hack/contracts/report';
 import { AppHeader } from '@/components/chrome/AppHeader';
 import { Banner911 } from '@/components/safety';
 import {
+  P,
   R,
   generateSecret,
   idToString,
@@ -18,29 +19,48 @@ import {
   useReducer,
   useStdb,
 } from '@/lib/stdb';
+import { useProcedure } from 'spacetimedb/react';
 import { HAZARD_OPTIONS } from './hazardOptions';
 
 type Phase = 'form' | 'creating' | 'error';
+type GeocodeQuery = { q: string } | { lat: number; lng: number };
+type GeocodeResult = { ok: boolean; error: string; addressesJson: string };
 
 const CREATE_TIMEOUT_MS = 15_000;
 
-async function geocode(qs: string): Promise<NormalizedAddress[]> {
-  const res = await fetch(`/api/geocode?${qs}`);
-  if (res.status === 429) throw new Error('Too many lookups. Wait a minute and try again.');
-  if (!res.ok) throw new Error("Address lookup isn't responding. Try again in a moment.");
-  return (await res.json()) as NormalizedAddress[];
+/** Address lookup in the SpacetimeDB module (geocode_address / geocode_point). */
+async function geocode(
+  query: GeocodeQuery,
+  forward: (a: { q: string }) => Promise<GeocodeResult>,
+  reverse: (a: { lat: number; lng: number }) => Promise<GeocodeResult>,
+): Promise<NormalizedAddress[]> {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const r = 'q' in query ? await forward(query) : await reverse(query);
+    if (r.ok) return JSON.parse(r.addressesJson) as NormalizedAddress[];
+    if (r.error === 'busy') {
+      await new Promise((res) => setTimeout(res, 1200));
+      continue;
+    }
+    if (r.error === 'geocoder_unavailable') {
+      throw new Error("The address lookup isn't responding. Try again in a moment.");
+    }
+    throw new Error('Enter a full street address.');
+  }
+  throw new Error('Too many lookups right now. Try again in a moment.');
 }
 
 function formatAddress(a: NormalizedAddress): string {
   return `${a.line1}, ${a.city}, ${a.state} ${a.zip}`;
 }
 
-/** Live createReport capture. Media upload + submitReport need P4 presign. */
+/** Live createReport capture. Media attach/submit can use SpacetimeDB blobs next. */
 export function ReportCapture() {
   const router = useRouter();
   const params = useSearchParams();
   const { isActive, error: connError } = useStdb();
   const createReport = useReducer(R.createReport);
+  const forward = useProcedure(P.geocodeAddress);
+  const reverse = useProcedure(P.geocodePoint);
   const { rows: myReports, ready: reportsReady } = useMyReports();
 
   const [hazard, setHazard] = useState<Hazard>('flood');
@@ -73,7 +93,7 @@ export function ReportCapture() {
     setGeoBusy(true);
     void (async () => {
       try {
-        const list = await geocode(new URLSearchParams({ q: prefill }).toString());
+        const list = await geocode({ q: prefill }, forward, reverse);
         setSuggestions(list);
         if (list[0]) {
           setAddress(list[0]);
@@ -87,7 +107,7 @@ export function ReportCapture() {
         setGeoBusy(false);
       }
     })();
-  }, [params]);
+  }, [params, forward, reverse]);
 
   useEffect(() => {
     if (gpsTried.current) return;
@@ -106,9 +126,7 @@ export function ReportCapture() {
         setDeviceLng(lng);
         void (async () => {
           try {
-            const list = await geocode(
-              new URLSearchParams({ lat: String(lat), lng: String(lng) }).toString(),
-            );
+            const list = await geocode({ lat, lng }, forward, reverse);
             setSuggestions(list);
             if (list[0]) {
               setAddress(list[0]);
@@ -127,7 +145,7 @@ export function ReportCapture() {
       },
       { enableHighAccuracy: true, timeout: 10_000 },
     );
-  }, [params]);
+  }, [params, forward, reverse]);
 
   // After createReport, the new draft appears in myReports — save secret and open status.
   useEffect(() => {
@@ -169,7 +187,7 @@ export function ReportCapture() {
     }
     setGeoBusy(true);
     try {
-      const list = await geocode(new URLSearchParams({ q: addressQuery.trim() }).toString());
+      const list = await geocode({ q: addressQuery.trim() }, forward, reverse);
       setSuggestions(list);
       if (list.length === 0) setGeoError('No matches. Try a fuller street address.');
     } catch (e) {
@@ -374,7 +392,7 @@ export function ReportCapture() {
             </label>
 
             <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-950">
-              Saves a <strong>draft</strong> now. Photo/video upload will be available in a later update —
+              Saves a <strong>draft</strong> now. Attach photo/video and submit in a follow-up step —
               you can still file the location and hazard details today.
             </div>
 

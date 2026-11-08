@@ -1,0 +1,28 @@
+{
+  "name": "@hack/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file=../../.env.local src/main.ts",
+    "start": "tsx src/main.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "identity": "tsx src/identity.ts",
+    "e2e:dev": "tsx --env-file-if-exists=../../.env.local scripts/e2e-dev.ts"
+  },
+  "dependencies": {
+    "@hack/address": "workspace:*",
+    "@hack/agent": "workspace:*",
+    "@hack/contracts": "workspace:*",
+    "@hack/damage": "workspace:*",
+    "@hack/vision": "workspace:*",
+    "tsx": "4.23.15",
+    "zod": "4.6.7",
+    "@hack/stdb-bindings": "workspace:*",
+    "spacetimedb": "2.13.0"
+  },
+  "devDependencies": {
+    "vitest": "3.2.4"
+  }
+}

@@ -51,8 +51,18 @@ export function setup() {
     return created.id;
   };
 
-  const attach = (auth: TestAuth, reportId: bigint, kind: 'video' | 'image' = 'video', n = 0) =>
-    call(auth, mod.attach_media as any, {
+  /** Stores `size` bytes under `key` as `auth` (begin_upload + 512 KiB chunks). */
+  const upload = (auth: TestAuth, key: string, contentType: string, size = 1000, fill = 7) => {
+    const CH = 512 * 1024;
+    const n = Math.ceil(size / CH);
+    call(auth, mod.begin_upload as any, { object_key: key, content_type: contentType, size_bytes: BigInt(size), sha256: HEX('b'), chunk_count: n });
+    for (let i = 0; i < n; i++)
+      call(auth, mod.upload_chunk as any, { object_key: key, seq: i, bytes: new Uint8Array(Math.min(CH, size - i * CH)).fill(fill) });
+  };
+
+  const attach = (auth: TestAuth, reportId: bigint, kind: 'video' | 'image' = 'video', n = 0) => {
+    upload(auth, `media/${reportId}/${HEX(String(n % 10))}.${kind === 'video' ? 'mp4' : 'jpg'}`, kind === 'video' ? 'video/mp4' : 'image/jpeg');
+    return call(auth, mod.attach_media as any, {
       report_id: reportId,
       kind,
       object_key: `media/${reportId}/${HEX(String(n % 10))}.${kind === 'video' ? 'mp4' : 'jpg'}`,
@@ -60,6 +70,7 @@ export function setup() {
       size_bytes: 1000n,
       sha256: HEX(String(n % 10)),
     });
+  };
 
   const jobsFor = (reportId: bigint) => [...h.db.job.iter()].filter(j => j.report_id === reportId);
 
@@ -92,6 +103,7 @@ export function setup() {
     });
     const mine = [...h.db.verification.identity.filter(idOf(auth))];
     const v = mine[mine.length - 1];
+    upload(auth, `idv/${v.id}/doc.jpg`, 'image/jpeg');
     call(auth, mod.submit_verification as any, { verification_id: v.id, object_key: `idv/${v.id}/doc.jpg` });
     const job = [...h.db.job.iter()].find(j => j.verification_id === v.id)!;
     call(worker, mod.claim_job as any, { job_id: job.id, lease_ms: 60_000 });
@@ -105,5 +117,5 @@ export function setup() {
     return h.db.verification.id.find(v.id)!;
   };
 
-  return { h, clock, internal, call, user, idOf, view, worker, advanceMs, createReport, attach, assess, verify, jobsFor };
+  return { h, clock, internal, call, user, idOf, view, worker, advanceMs, createReport, upload, attach, assess, verify, jobsFor };
 }

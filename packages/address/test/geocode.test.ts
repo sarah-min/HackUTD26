@@ -7,8 +7,7 @@ import nominatimError from './__fixtures__/nominatim-error.json';
 // Real responses captured 2026-11-07 from the live APIs (Texas State Capitol, a public building).
 import censusLive from './__fixtures__/census-live-capitol.json';
 import nominatimLive from './__fixtures__/nominatim-live-capitol.json';
-import { censusUrl, nominatimReverseUrl, parseCensus, parseNominatimReverse, parseQuery } from './parse';
-import { RateLimiter, Throttle, TtlCache } from './limits';
+import { censusUrl, nominatimReverseUrl, parseCensus, parseNominatimReverse, parseGeocodeQuery } from '../src/geocode';
 
 describe('parseCensus', () => {
   it('maps a match to a normalized address with coordinates', () => {
@@ -61,52 +60,23 @@ describe('parseNominatimReverse', () => {
   });
 });
 
-describe('parseQuery and URLs', () => {
+describe('parseGeocodeQuery and URLs', () => {
   it('accepts q or lat/lng and rejects bad input', () => {
-    expect(parseQuery(new URLSearchParams('q=  1100  Congress Ave, Austin TX '))).toEqual({
-      kind: 'forward',
-      q: '1100 Congress Ave, Austin TX',
-    });
-    expect(parseQuery(new URLSearchParams('lat=30.27&lng=-97.74'))).toEqual({ kind: 'reverse', lat: 30.27, lng: -97.74 });
-    expect(parseQuery(new URLSearchParams('q=ab'))).toHaveProperty('error');
-    expect(parseQuery(new URLSearchParams('lat=91&lng=0'))).toHaveProperty('error');
-    expect(parseQuery(new URLSearchParams('lat=abc&lng=0'))).toHaveProperty('error');
-    expect(parseQuery(new URLSearchParams(''))).toHaveProperty('error');
+    expect(parseGeocodeQuery({ q: '  1100  Congress Ave, Austin TX ' })).toEqual({ kind: 'forward', q: '1100 Congress Ave, Austin TX' });
+    expect(parseGeocodeQuery({ lat: 30.27, lng: -97.74 })).toEqual({ kind: 'reverse', lat: 30.27, lng: -97.74 });
+    expect(parseGeocodeQuery({ q: 'ab' })).toHaveProperty('error');
+    expect(parseGeocodeQuery({ lat: 91, lng: 0 })).toHaveProperty('error');
+    expect(parseGeocodeQuery({ lat: NaN, lng: 0 })).toHaveProperty('error');
+    expect(parseGeocodeQuery({})).toHaveProperty('error');
   });
   it('builds upstream URLs', () => {
     const c = new URL(censusUrl('1100 Congress Ave', 'Public_AR_Current'));
     expect(c.hostname).toBe('geocoding.geo.census.gov');
     expect(c.searchParams.get('format')).toBe('json');
+    expect(c.searchParams.get('address')).toBe('1100 Congress Ave');
     const n = new URL(nominatimReverseUrl(30.1, -97.2));
     expect(n.searchParams.get('format')).toBe('jsonv2');
     expect(n.searchParams.get('lon')).toBe('-97.200000');
-  });
-});
-
-describe('limits', () => {
-  it('TtlCache expires entries', () => {
-    let t = 0;
-    const c = new TtlCache<number>(1000, 10, () => t);
-    c.set('a', 1);
-    expect(c.get('a')).toBe(1);
-    t = 1000;
-    expect(c.get('a')).toBeUndefined();
-  });
-  it('RateLimiter allows `limit` per window', () => {
-    let t = 0;
-    const r = new RateLimiter(2, 1000, () => t);
-    expect([r.allow('ip'), r.allow('ip'), r.allow('ip')]).toEqual([true, true, false]);
-    t = 1000;
-    expect(r.allow('ip')).toBe(true);
-  });
-  it('Throttle spaces calls at least gapMs apart', async () => {
-    let t = 0;
-    const starts: number[] = [];
-    const th = new Throttle(1100, () => t, async (ms) => {
-      t += ms;
-    });
-    await Promise.all([1, 2, 3].map(() => th.run(async () => starts.push(t))));
-    expect(starts).toEqual([0, 1100, 2200]);
   });
 });
 

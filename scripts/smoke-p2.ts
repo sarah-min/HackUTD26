@@ -175,6 +175,9 @@ async function main(): Promise<void> {
   check('report starts unclaimed', report.claimed === false);
 
   const mediaSha = sha256(`smoke-${reportId}-${Date.now()}`);
+  // Files are stored in SpacetimeDB: upload the bytes first (one 1000-byte chunk).
+  await call('begin_upload(media)', R.reducers.beginUpload({ objectKey: `media/${reportId}/${mediaSha}.mp4`, contentType: 'video/mp4', sizeBytes: 1000n, sha256: mediaSha, chunkCount: 1 }));
+  await call('upload_chunk(media)', R.reducers.uploadChunk({ objectKey: `media/${reportId}/${mediaSha}.mp4`, seq: 0, bytes: new Uint8Array(1000) }));
   await call(
     'attach_media',
     R.reducers.attachMedia({ reportId, kind: 'video', objectKey: `media/${reportId}/${mediaSha}.mp4`, contentType: 'video/mp4', sizeBytes: 1000n, sha256: mediaSha })
@@ -252,6 +255,8 @@ async function main(): Promise<void> {
   check('affected sees its verification row', !!ver);
   if (!ver) return;
   check('verification matched the report property', ver.propertyId === report.propertyId, `ver.property=${ver.propertyId} report.property=${report.propertyId}`);
+  await call('begin_upload(idv)', A.reducers.beginUpload({ objectKey: `idv/${ver.id}/doc.jpg`, contentType: 'image/jpeg', sizeBytes: 1000n, sha256: sha256('specimen'), chunkCount: 1 }));
+  await call('upload_chunk(idv)', A.reducers.uploadChunk({ objectKey: `idv/${ver.id}/doc.jpg`, seq: 0, bytes: new Uint8Array(1000) }));
   await call('submit_verification', A.reducers.submitVerification({ verificationId: ver.id, objectKey: `idv/${ver.id}/doc.jpg` }));
 
   const vjob = await waitFor('verify_identity job', () =>

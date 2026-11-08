@@ -8,14 +8,32 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import type { NormalizedAddress } from '@hack/contracts/property';
 import { formatAddress, saveSelectedAddress } from '@/components/affected/helpers';
 import { AppHeader } from '@/components/chrome/AppHeader';
+import { P } from '@/lib/stdb';
+import { useProcedure } from 'spacetimedb/react';
 
 type Phase = { k: 'idle' } | { k: 'loading' } | { k: 'results'; list: NormalizedAddress[] } | { k: 'error'; msg: string };
 
-async function geocode(qs: string): Promise<NormalizedAddress[]> {
-  const res = await fetch(`/api/geocode?${qs}`);
-  if (res.status === 429) throw new Error('Too many lookups. Wait a minute and try again.');
-  if (!res.ok) throw new Error("The address lookup isn't responding. Try again in a moment.");
-  return (await res.json()) as NormalizedAddress[];
+type GeocodeQuery = { q: string } | { lat: number; lng: number };
+type GeocodeResult = { ok: boolean; error: string; addressesJson: string };
+
+/** Address lookup runs in the SpacetimeDB module (geocode_address / geocode_point procedures). */
+async function geocode(
+  query: GeocodeQuery,
+  forward: (a: { q: string }) => Promise<GeocodeResult>,
+  reverse: (a: { lat: number; lng: number }) => Promise<GeocodeResult>,
+): Promise<NormalizedAddress[]> {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const r = 'q' in query ? await forward(query) : await reverse(query);
+    if (r.ok) return JSON.parse(r.addressesJson) as NormalizedAddress[];
+    // Reverse lookups are spaced 1.1 s apart across all users; wait and retry.
+    if (r.error === 'busy') {
+      await new Promise((res) => setTimeout(res, 1200));
+      continue;
+    }
+    if (r.error === 'geocoder_unavailable') throw new Error("The address lookup isn't responding. Try again in a moment.");
+    throw new Error('Enter a full street address.');
+  }
+  throw new Error('Too many lookups right now. Try again in a moment.');
 }
 
 function StartInner() {
@@ -25,11 +43,13 @@ function StartInner() {
   const [query, setQuery] = useState(prefill);
   const [phase, setPhase] = useState<Phase>({ k: 'idle' });
   const autoRan = useRef(false);
+  const forward = useProcedure(P.geocodeAddress);
+  const reverse = useProcedure(P.geocodePoint);
 
-  async function run(qs: string) {
+  async function run(query: GeocodeQuery) {
     setPhase({ k: 'loading' });
     try {
-      setPhase({ k: 'results', list: await geocode(qs) });
+      setPhase({ k: 'results', list: await geocode(query, forward, reverse) });
     } catch (e) {
       setPhase({ k: 'error', msg: e instanceof Error ? e.message : 'Lookup failed.' });
     }
@@ -38,7 +58,7 @@ function StartInner() {
   useEffect(() => {
     if (prefill && !autoRan.current) {
       autoRan.current = true;
-      void run(new URLSearchParams({ q: prefill }).toString());
+      void run({ q: prefill });
     }
   }, [prefill]);
 
@@ -49,7 +69,7 @@ function StartInner() {
     }
     setPhase({ k: 'loading' });
     navigator.geolocation.getCurrentPosition(
-      (pos) => void run(new URLSearchParams({ lat: String(pos.coords.latitude), lng: String(pos.coords.longitude) }).toString()),
+      (pos) => void run({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
       () => setPhase({ k: 'error', msg: 'Location permission was denied. Type the address instead.' }),
       { enableHighAccuracy: true, timeout: 10_000 },
     );
@@ -76,7 +96,7 @@ function StartInner() {
         className="space-y-3"
         onSubmit={(e) => {
           e.preventDefault();
-          if (query.trim().length >= 5) void run(new URLSearchParams({ q: query.trim() }).toString());
+          if (query.trim().length >= 5) void run({ q: query.trim() });
         }}
       >
         <label className="block text-sm font-medium" htmlFor="address">

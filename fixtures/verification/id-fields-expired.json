@@ -1,0 +1,10 @@
+{
+  "docKind": "state_id",
+  "fullName": "SAMPLE SPECIMEN",
+  "addressText": "1234 MAIN ST, DALLAS, TX 75201",
+  "expiration": "2020-06-30",
+  "isLikelyId": true,
+  "confidence": 0.9,
+  "modelId": "fixture",
+  "promptVersion": "id-document-v1"
+}

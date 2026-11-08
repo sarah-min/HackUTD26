@@ -1,0 +1,108 @@
+{
+  "reportId": "7",
+  "propertyId": "9",
+  "overallLevel": "major",
+  "componentLevels": {
+    "roof": "major",
+    "exterior_walls": "none",
+    "windows_doors": "minor",
+    "foundation": "none",
+    "interior": "minor",
+    "utilities": "none",
+    "contents": "minor",
+    "vehicle": "affected",
+    "yard_debris": "minor"
+  },
+  "lifeSafety": [
+    "downed_power_line"
+  ],
+  "hazard": "hurricane_wind",
+  "confidence": 0.762,
+  "usableFrameCount": 3,
+  "totalFrameCount": 4,
+  "cost": {
+    "lowCents": 2768150,
+    "likelyCents": 3954500,
+    "highCents": 5536300,
+    "lineItems": [
+      {
+        "component": "roof",
+        "level": "major",
+        "basis": "1,800 sqft × $150/sqft × 15% roof share × 50% (major)",
+        "likelyCents": 2025000
+      },
+      {
+        "component": "windows_doors",
+        "level": "minor",
+        "basis": "1,800 sqft × $150/sqft × 7% windows doors share × 15% (minor)",
+        "likelyCents": 283500
+      },
+      {
+        "component": "interior",
+        "level": "minor",
+        "basis": "1,800 sqft × $150/sqft × 30% interior share × 15% (minor)",
+        "likelyCents": 1215000
+      },
+      {
+        "component": "yard_debris",
+        "level": "minor",
+        "basis": "1,800 sqft × $150/sqft × 2% yard debris share × 15% (minor)",
+        "likelyCents": 81000
+      },
+      {
+        "component": "contents",
+        "level": "minor",
+        "basis": "Fixed contents allowance for minor damage",
+        "likelyCents": 300000
+      },
+      {
+        "component": "vehicle",
+        "level": "affected",
+        "basis": "Fixed vehicle allowance for affected damage",
+        "likelyCents": 50000
+      }
+    ],
+    "inputs": {
+      "homeSqft": 1800,
+      "stories": 1,
+      "tenure": "own",
+      "assumed": true
+    },
+    "costModelVersion": "cost-v1",
+    "disclaimer": "Illustrative estimate, not a contractor quote or insurance determination.",
+    "notes": [
+      "Assumed home size (1,800 sqft, 1 story, owner). Update your home details for a closer estimate."
+    ]
+  },
+  "declarations": [
+    {
+      "femaDeclarationString": "DR-0000-TX",
+      "declarationType": "DR",
+      "incidentType": "Hurricane",
+      "title": "FIXTURE DECLARATION (NOT REAL)",
+      "declarationDate": "2026-09-01T00:00:00.000Z",
+      "ihProgramDeclared": true,
+      "sourceUrl": "https://www.fema.gov/disaster/declarations"
+    }
+  ],
+  "activeAlerts": [],
+  "location": {
+    "stateCode": "TX",
+    "countyName": "Dallas County",
+    "countyFips": "48113"
+  },
+  "summary": "The footage shows major roof damage with a large opening, water damage to the living-room ceiling, shattered front windows and minor damage to belongings. A power line appears to be hanging low across the driveway, so treat it as live. The illustrative repair estimate in this report uses an assumed home size and is not a quote. Check the declarations section to see whether federal Individual Assistance is available in your county.",
+  "recommendedActions": [
+    "If you are in immediate danger, call 911.",
+    "Stay away from the low-hanging power line and report it to your utility.",
+    "Cover the roof opening with a tarp only if it is safe to do so.",
+    "Photograph every room before cleaning up.",
+    "Contact your insurer to open a claim and keep receipts for temporary repairs."
+  ],
+  "claimNotice": "Subject: First notice of loss, wind damage\n\nDate and type of event: windstorm (fixture).\n\nWhat was observed: a large opening in the roof, a water-stained and sagging living-room ceiling, two shattered front windows and wet furniture.\n\nSafety: a service line appears to hang low across the driveway.\n\nNext steps: photos saved; temporary roof cover planned.\n\nPolicy number: ____  Name: ____  Phone: ____",
+  "modelId": "fixture",
+  "visionModelId": "fixture",
+  "promptVersion": "agent-v1+damage-frame-v1",
+  "source": "fixture",
+  "createdAt": 1794100000000
+}

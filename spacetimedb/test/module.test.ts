@@ -70,7 +70,7 @@ describe('report status machine', () => {
     expect(() => s.attach(alice, rid, 'image', 2)).toThrow(/max 8 photos|no mixing/);
     s.call(alice, mod.submit_report as any, { report_id: rid });
     expect(s.h.db.report.id.find(rid)!.status).toBe('queued');
-    expect(() => s.attach(alice, rid, 'image')).toThrow(/cannot attach media in status queued/);
+    expect(() => s.attach(alice, rid, 'image')).toThrow(/cannot (attach media|upload) in status queued/);
 
     const job = s.jobsFor(rid)[0];
     expect(job.kind).toBe('analyze');
@@ -248,6 +248,7 @@ describe('verification', () => {
     const a = s.user('a');
     s.call(a, mod.start_verification as any, { address_json: JSON.stringify(addr('1 Oak St', BASE_LAT, BASE_LNG)), doc_kind: 'state_id', secret_hash: HEX('1') });
     const v = [...s.h.db.verification.iter()][0];
+    s.upload(a, `idv/${v.id}/a.jpg`, 'image/jpeg');
     s.call(a, mod.submit_verification as any, { verification_id: v.id, object_key: `idv/${v.id}/a.jpg` });
     const job = [...s.h.db.job.iter()].find(j => j.verification_id === v.id)!;
     for (let i = 0; i < 2; i++) {

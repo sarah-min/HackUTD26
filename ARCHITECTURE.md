@@ -1,5 +1,8 @@
 # Technical Architecture
 
+> **Update 2026-11-07 (branch `backend-spacetimedb-brev`):** SpacetimeDB is the whole backend (data, jobs, auth, file storage, address lookup). No S3 bucket, no Vultr VM, no backend API routes. Nemotron (vLLM) and the worker run together on one NVIDIA Brev GPU instance (`apps/worker/brev/`). See CONTRACTS §8 and `status/part3.md`.
+
+
 Design baseline: Saturday, November 7, 2026. Product behavior comes from [IDEA.md](IDEA.md), exact interfaces from [CONTRACTS.md](CONTRACTS.md), and ownership from [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md). Items marked **VERIFY** must be confirmed by the owner in the first hour against the live provider. Record the result in your `status/partN.md` and, if it changes an interface, in CONTRACTS.md.
 
 ## 1. Decisions

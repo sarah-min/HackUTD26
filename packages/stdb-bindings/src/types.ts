@@ -73,6 +73,36 @@ export const Assessment = __t.object("Assessment", {
 });
 export type Assessment = __Infer<typeof Assessment>;
 
+export const Blob = __t.object("Blob", {
+  objectKey: __t.string(),
+  owner: __t.identity(),
+  contentType: __t.string(),
+  sizeBytes: __t.u64(),
+  sha256: __t.string(),
+  chunkCount: __t.u32(),
+  received: __t.u32(),
+  complete: __t.bool(),
+  createdAt: __t.timestamp(),
+});
+export type Blob = __Infer<typeof Blob>;
+
+export const BlobChunk = __t.object("BlobChunk", {
+  id: __t.u64(),
+  objectKey: __t.string(),
+  seq: __t.u32(),
+  bytes: __t.byteArray(),
+});
+export type BlobChunk = __Infer<typeof BlobChunk>;
+
+export const BlobPart = __t.object("BlobPart", {
+  contentType: __t.string(),
+  sizeBytes: __t.u64(),
+  chunkCount: __t.u32(),
+  seq: __t.u32(),
+  bytes: __t.byteArray(),
+});
+export type BlobPart = __Infer<typeof BlobPart>;
+
 export const CoachMessage = __t.object("CoachMessage", {
   id: __t.u64(),
   identity: __t.identity(),
@@ -93,6 +123,26 @@ export const Frame = __t.object("Frame", {
   findingJson: __t.string(),
 });
 export type Frame = __Infer<typeof Frame>;
+
+export const GeocodeCache = __t.object("GeocodeCache", {
+  key: __t.string(),
+  resultJson: __t.string(),
+  at: __t.timestamp(),
+});
+export type GeocodeCache = __Infer<typeof GeocodeCache>;
+
+export const GeocodeResult = __t.object("GeocodeResult", {
+  ok: __t.bool(),
+  error: __t.string(),
+  addressesJson: __t.string(),
+});
+export type GeocodeResult = __Infer<typeof GeocodeResult>;
+
+export const GeocodeThrottle = __t.object("GeocodeThrottle", {
+  id: __t.u8(),
+  lastNominatimAt: __t.timestamp(),
+});
+export type GeocodeThrottle = __Infer<typeof GeocodeThrottle>;
 
 export const Job = __t.object("Job", {
   id: __t.u64(),
@@ -183,6 +233,15 @@ export const PropertyPrivate = __t.object("PropertyPrivate", {
   countyFips: __t.option(__t.string()),
 });
 export type PropertyPrivate = __Infer<typeof PropertyPrivate>;
+
+export const ReadBlobResult = __t.object("ReadBlobResult", {
+  ok: __t.bool(),
+  error: __t.string(),
+  get part() {
+    return __t.option(BlobPart);
+  },
+});
+export type ReadBlobResult = __Infer<typeof ReadBlobResult>;
 
 export const RecoveryPlan = __t.object("RecoveryPlan", {
   id: __t.u64(),

@@ -33,27 +33,18 @@ import {
   readAreaNotices,
   toAreaCell,
 } from '@/components/affected/helpers';
-import { useMediaUrlState } from '@/components/affected/media';
-import { useVerificationCredentials } from '@/components/affected/useVerificationCredentials';
+import { useMediaUrl } from '@/components/affected/media';
 
-function ReportThumb({ reportId, propertyId }: { reportId: bigint; propertyId: bigint }) {
+function ReportThumb({ reportId }: { reportId: bigint }) {
   const { frames } = useVerifiedReportData(reportId);
-  const creds = useVerificationCredentials(propertyId);
-  const media = useMediaUrlState(frames[0]?.thumbKey ?? null, creds);
-  if (media.status === 'ready' && media.url) {
-    // eslint-disable-next-line @next/next/no-img-element -- object URL from an authorized fetch
-    return <img src={media.url} alt="" className="h-16 w-16 flex-none rounded object-cover" />;
+  const url = useMediaUrl(frames[0]?.thumbKey ?? null);
+  if (url) {
+    // eslint-disable-next-line @next/next/no-img-element -- object URL from SpacetimeDB storage
+    return <img src={url} alt="" className="h-16 w-16 flex-none rounded object-cover" />;
   }
   return (
-    <div
-      className="grid h-16 w-16 flex-none place-items-center rounded bg-gray-200 px-1 text-center text-[9px] leading-tight text-gray-500"
-      aria-hidden={media.status === 'loading'}
-    >
-      {media.status === 'loading'
-        ? '…'
-        : frames[0]
-          ? 'Photo unavailable'
-          : 'No photo'}
+    <div className="grid h-16 w-16 flex-none place-items-center rounded bg-gray-200 px-1 text-center text-[9px] leading-tight text-gray-500">
+      {frames[0] ? '…' : 'No photo'}
     </div>
   );
 }
@@ -66,7 +57,7 @@ function ReportItem({ r }: { r: ReportRow }) {
         href={`/affected/report/${idToString(r.id)}`}
         className="flex items-center gap-3 rounded-lg border p-3 hover:bg-gray-50"
       >
-        <ReportThumb reportId={r.id} propertyId={r.propertyId} />
+        <ReportThumb reportId={r.id} />
         <div className="min-w-0 flex-1">
           <p className="font-medium">{DAMAGE_LEVEL_TEXT[parseLevel(r.overallLevel)]}</p>
           <p className="text-sm text-gray-600">

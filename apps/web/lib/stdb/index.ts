@@ -3,4 +3,6 @@ export { StdbProvider } from './provider';
 export * from './hooks';
 export * from './ids';
 export * from './secrets';
+export * from './files';
+export { P } from './bindings';
 export type * from './bindings';
