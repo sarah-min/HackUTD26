@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FrameFindingSchema } from '@hack/contracts/assessment';
-import { analyzeFrame, createMemoryCache, normalizeBox } from '../src';
+import { addMentionedDangers, analyzeFrame, createMemoryCache, normalizeBox } from '../src';
 import { scriptedNim } from './fakeNim';
 
 const good = JSON.stringify({
@@ -125,5 +125,24 @@ describe('analyzeFrame', () => {
     const r = await analyzeFrame({ nim, image: img, frameIndex: 0, tSec: 0 });
     expect(r.finding.headline).toBeUndefined();
     expect(r.finding.components[0]!.box).toBeUndefined();
+  });
+
+  it('adds a flag the model described but did not set (the hurricane street photo)', async () => {
+    const street = JSON.stringify({
+      usable: true, headline: 'Downed power lines and debris on street',
+      caption: 'A residential street littered with fallen utility poles and wires after a storm.',
+      components: [], lifeSafety: [], waterDepth: 'none',
+    });
+    const { nim } = scriptedNim([street]);
+    const r = await analyzeFrame({ nim, image: img, frameIndex: 0, tSec: 0 });
+    expect(r.finding.lifeSafety.map((s) => s.flag)).toContain('downed_power_line');
+  });
+
+  it('does not add a flag for a negated mention', () => {
+    const f = FrameFindingSchema.parse({
+      frameIndex: 0, tSec: 0, usable: true, components: [], lifeSafety: [], waterDepth: 'none',
+      caption: 'House with no downed power lines visible.', headline: 'Minor siding damage',
+    });
+    expect(addMentionedDangers(f).lifeSafety).toHaveLength(0);
   });
 });

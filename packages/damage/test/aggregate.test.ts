@@ -41,4 +41,16 @@ describe('aggregateFindings', () => {
     expect(needsMoreFootage(4, 8)).toBe(false);
     expect(needsMoreFootage(0, 0)).toBe(true);
   });
+
+  it('street debris alone does not make the overall level major', () => {
+    const agg = aggregateFindings([
+      { frameIndex: 0, tSec: 0, usable: true, waterDepth: 'none', caption: 'x', lifeSafety: [],
+        components: [
+          { component: 'yard_debris', level: 'major', evidence: 'branches', confidence: 0.9 },
+          { component: 'exterior_walls', level: 'minor', evidence: 'siding torn', confidence: 0.8 },
+        ] },
+    ]);
+    expect(agg.componentLevels.yard_debris).toBe('major');
+    expect(agg.overallLevel).toBe('minor');
+  });
 });

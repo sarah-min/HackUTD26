@@ -111,6 +111,32 @@ function prepare(frameIndex: number, tSec: number) {
   };
 }
 
+/**
+ * Safety consistency: when the model's own words name a danger it did not flag, add the flag (confidence 0.6).
+ * Safety errs toward showing (CONTRACTS §3.1); a negated mention ("no downed lines") never adds one.
+ */
+const DANGER_WORDS: { flag: FrameFinding['lifeSafety'][number]['flag']; re: RegExp }[] = [
+  { flag: 'downed_power_line', re: /\b(downed|fallen|falling|leaning|snapped|toppled|collapsed|broken|hanging|sagging|dangling|low)\b[^.;]{0,40}\b(power|utility|electric(al)?)?\s*(lines?|wires?|poles?|cables?)\b/i },
+  { flag: 'active_fire', re: /\b(flames?|on fire|burning|active fire)\b/i },
+  { flag: 'road_blocked', re: /\b(road|street|lane)s?\b[^.;]{0,30}\b(blocked|impassable|obstructed)\b|\bblock(s|ing|ed)? the (road|street)\b/i },
+];
+const NEGATION = /\b(no|not|without|none|free of)\b[^.;]{0,25}$/i;
+
+export function addMentionedDangers(f: FrameFinding): FrameFinding {
+  const sentences = [f.headline ?? '', f.caption, ...f.components.map((c) => c.evidence)].join('. ');
+  const have = new Set(f.lifeSafety.map((s) => s.flag));
+  const added: FrameFinding['lifeSafety'] = [];
+  for (const { flag, re } of DANGER_WORDS) {
+    if (have.has(flag)) continue;
+    const m = re.exec(sentences);
+    if (!m) continue;
+    if (NEGATION.test(sentences.slice(Math.max(0, m.index - 40), m.index))) continue;
+    added.push({ flag, evidence: clampString(`Mentioned by the model: "${m[0]}"`, 200) as string, confidence: 0.6 });
+  }
+  if (!added.length) return f;
+  return { ...f, lifeSafety: [...f.lifeSafety, ...added].slice(0, MAX_FLAGS_PER_FRAME + DANGER_WORDS.length) };
+}
+
 export function unusableFinding(frameIndex: number, tSec: number, reason: FrameFinding['unusableReason'], caption: string): FrameFinding {
   return FrameFindingSchema.parse({
     frameIndex, tSec, usable: false, unusableReason: reason, components: [], lifeSafety: [], waterDepth: 'unknown',
@@ -171,11 +197,12 @@ export async function analyzeFrame(args: AnalyzeFrameArgs): Promise<AnalyzeFrame
         ? ({ ok: false, error: 'the reply was cut off at the length limit' } as const)
         : parseModelJson(text, FrameFindingSchema, prepare(frameIndex, tSec));
     if (parsed.ok) {
+      const finding = addMentionedDangers(parsed.value);
       if (cache) {
-        const { frameIndex: _f, tSec: _t, ...rest } = parsed.value;
+        const { frameIndex: _f, tSec: _t, ...rest } = finding;
         await cache.set(key, rest);
       }
-      return { finding: parsed.value, attempts, cached: false };
+      return { finding, attempts, cached: false };
     }
     lastError = parsed.error;
     messages.push({ role: 'assistant', content: text.slice(0, 2000) });

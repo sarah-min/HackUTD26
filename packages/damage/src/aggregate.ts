@@ -3,6 +3,9 @@ import { ComponentSchema, DAMAGE_LEVEL_RANK, LifeSafetyFlagSchema, type Componen
 
 export const CONFIDENCE_THRESHOLD = 0.5;
 
+/** Components that never set the overall level above 'affected'. */
+export const NON_STRUCTURAL: ReadonlySet<Component> = new Set<Component>(['yard_debris', 'vehicle']);
+
 export interface AggregatedFindings {
   componentLevels: Record<Component, DamageLevel>;
   overallLevel: DamageLevel;
@@ -25,7 +28,8 @@ export function emptyComponentLevels(): Record<Component, DamageLevel> {
 
 /**
  * Code-computed assessment fields (CONTRACTS §3.1). The model never sets these.
- * - componentLevels / overallLevel: max level per component over usable frames, confidence ≥ 0.5.
+ * - componentLevels: max level per component over usable frames, confidence ≥ 0.5.
+ * - overallLevel: max over componentLevels, with yard_debris and vehicle capped at 'affected'.
  * - lifeSafety: any frame (usable or not) with that flag at confidence ≥ 0.5. Safety errs toward showing.
  * - confidence: mean component confidence over usable frames (0 when nothing usable).
  */
@@ -51,8 +55,11 @@ export function aggregateFindings(findings: readonly FrameFinding[]): Aggregated
   }
   const lifeSafety = LifeSafetyFlagSchema.options.filter((flag) => flags.has(flag));
 
+  // Debris and vehicles say little about whether the home is livable: they count toward the overall level only as 'affected'.
+  // componentLevels keeps their real level (the cost estimate still prices them).
   let overallLevel: DamageLevel = 'none';
-  for (const level of Object.values(componentLevels)) overallLevel = maxLevel(overallLevel, level);
+  for (const [component, level] of Object.entries(componentLevels) as [Component, DamageLevel][])
+    overallLevel = maxLevel(overallLevel, NON_STRUCTURAL.has(component) ? (level === 'none' ? 'none' : 'affected') : level);
 
   const confidence = confidences.length
     ? Math.round((confidences.reduce((s, v) => s + v, 0) / confidences.length) * 1000) / 1000

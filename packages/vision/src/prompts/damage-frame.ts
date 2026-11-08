@@ -1,9 +1,10 @@
 import { ComponentSchema, DamageLevelSchema, HazardSchema, LifeSafetyFlagSchema, type Hazard } from '@hack/contracts/common';
 import { DamageExtentSchema, WaterDepthSchema } from '@hack/contracts/assessment';
 
+// v3: separates the home from the street (public poles, road debris) and requires a flag for every visible danger.
 // v2: output shaped for the reporter and affected-person views (headline, extent, highlight box), bounded lists,
 // guided JSON decoding. v1 free-form output could loop until the token limit.
-export const DAMAGE_FRAME_PROMPT_VERSION = 'damage-frame-v2';
+export const DAMAGE_FRAME_PROMPT_VERSION = 'damage-frame-v3';
 
 export const MAX_COMPONENTS_PER_FRAME = 6;
 export const MAX_FLAGS_PER_FRAME = 4;
@@ -71,20 +72,22 @@ export const DAMAGE_FRAME_JSON_SCHEMA = {
 const list = (xs: readonly string[]) => xs.join(', ');
 
 export const DAMAGE_FRAME_SYSTEM_PROMPT = `/no_think
-You assess ONE still frame from a phone video or photo of a residential property after a disaster.
-Reply with one JSON object and nothing else:
-- usable: true if the frame shows a building, vehicle or property clearly enough to assess. If false, give unusableReason (dark, blurry, not_a_structure, other) and empty lists.
-- headline: the single most important finding in 3 to 8 words, e.g. "Missing shingles and exposed decking". Use "No visible damage" when nothing is damaged.
-- caption: one plain sentence describing the frame.
-- components: up to ${MAX_COMPONENTS_PER_FRAME} visible parts, each listed once. component is one of: ${list(ComponentSchema.options)}.
+You assess ONE still frame from a phone video or photo taken after a disaster. Reply with one JSON object and nothing else.
+Safety first: list every clearly visible danger in lifeSafety. Fallen or leaning utility poles, or wires hanging low or lying on the ground, are downed_power_line. Poles, trees or debris across a road are road_blocked. If your headline or caption mentions a danger, it must also be in lifeSafety.
+Damage second: components describe only the home or property being filmed. Street poles, wires and road debris are not components; they belong in lifeSafety or the caption. Use yard_debris only for debris on the property's own lot. If the frame is mostly a street, components may be empty. Name a component only when that part of a building is visible; do not infer roof damage from loose debris.
+Fields:
+- usable: true if the frame is clear enough to assess. If false, give unusableReason (dark, blurry, not_a_structure, other) and an empty components list.
+- headline: the most important finding in 3 to 8 words, dangers before damage, e.g. "Downed power lines across the road". Use "No visible damage" when nothing is damaged or dangerous.
+- caption: one plain sentence describing what is visible.
+- components: up to ${MAX_COMPONENTS_PER_FRAME}, each part once. component is one of: ${list(ComponentSchema.options)}.
   level uses the FEMA scale: none (undamaged), affected (cosmetic, livable), minor (repairable, e.g. some shingles missing, water below the outlets), major (structural damage or water above the outlets), destroyed (total loss or structurally unsafe).
   extent: localized (one small area), partial (a noticeable section), widespread (most of what is visible).
   evidence: what you see, under 160 characters. confidence: 0 to 1.
-  box: the damaged region as fractions of the image (x, y from the top-left; w, h sizes). Include it only when you can point to the area.
-- lifeSafety: up to ${MAX_FLAGS_PER_FRAME} dangers that are clearly visible, each listed once: ${list(LifeSafetyFlagSchema.options)}. Same evidence, confidence and box rules.
-- hazardObserved: the disaster type the frame shows, if clear: ${list(HazardSchema.options)}.
+  box: the region as fractions of the image (x, y from the top-left; w, h sizes), only when you can point to it.
+- lifeSafety: up to ${MAX_FLAGS_PER_FRAME} visible dangers, each once: ${list(LifeSafetyFlagSchema.options)}. Same evidence, confidence and box rules.
+- hazardObserved: the disaster type, only if the frame itself shows it: ${list(HazardSchema.options)}.
 - waterDepth: ${list(WaterDepthSchema.options)}.
-Describe only what this frame shows. Leave out costs, causes you cannot see, and parts that are not visible.`;
+Describe only what this frame shows. Leave out costs and anything that is not visible.`;
 
 export function damageFrameUserText(hazard: Hazard | undefined): string {
   return hazard ? `Reported hazard: ${hazard}. Assess this frame.` : 'Assess this frame.';
