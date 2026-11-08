@@ -1,0 +1,64 @@
+{
+  "source": "synthetic",
+  "schema": "FinancialProfileSchema",
+  "description": "Synthetic homeowner persona with IRA and auto loan. Not a real person.",
+  "data": {
+    "id": "persona-aisha-homeowner",
+    "label": "Aisha, 38, homeowner, Fort Worth",
+    "description": "Synthetic demo persona: homeowner with checking, a small savings balance, an IRA, an auto loan, and a mortgage. Labeled synthetic — not a real person.",
+    "accounts": [
+      {
+        "id": "aisha-checking",
+        "type": "checking",
+        "name": "Joint Checking",
+        "balanceCents": 240000
+      },
+      {
+        "id": "aisha-savings",
+        "type": "savings",
+        "name": "Short-Term Savings",
+        "balanceCents": 175000
+      },
+      {
+        "id": "aisha-ira",
+        "type": "ira",
+        "name": "Traditional IRA",
+        "balanceCents": 4200000
+      },
+      {
+        "id": "aisha-auto",
+        "type": "auto_loan",
+        "name": "Auto Loan",
+        "balanceCents": 1150000,
+        "aprBps": 699,
+        "monthlyPaymentCents": 42000,
+        "dueDay": 8
+      },
+      {
+        "id": "aisha-mortgage",
+        "type": "mortgage",
+        "name": "Home Mortgage",
+        "balanceCents": 31000000,
+        "aprBps": 675,
+        "monthlyPaymentCents": 210000,
+        "dueDay": 1
+      },
+      {
+        "id": "aisha-card",
+        "type": "credit_card",
+        "name": "Store Card",
+        "balanceCents": 380000,
+        "aprBps": 2499,
+        "creditLimitCents": 450000,
+        "monthlyPaymentCents": 12000,
+        "dueDay": 18
+      }
+    ],
+    "monthlyNetIncomeCents": 610000,
+    "monthlyGrossIncomeCents": 760000,
+    "monthlyEssentialExpensesCents": 290000,
+    "payDays": [1],
+    "personalLoanOfferAprBps": 1649,
+    "source": "synthetic"
+  }
+}

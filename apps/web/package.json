@@ -13,6 +13,8 @@
   "dependencies": {
     "@hack/address": "workspace:*",
     "@hack/contracts": "workspace:*",
+    "@hack/finance": "workspace:*",
+    "@hack/storage": "workspace:*",
     "@hack/stdb-bindings": "workspace:*",
     "leaflet": "1.9.4",
     "next": "16.0.1",

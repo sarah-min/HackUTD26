@@ -627,7 +627,7 @@ export const coachHandler: JobHandler;  // packages/finance/src/coach/handler.ts
 | `NVIDIA_BASE_URL` | worker | `https://integrate.api.nvidia.com/v1` |
 | `NEMOTRON_VL_MODEL` | worker | `nvidia/nemotron-nano-12b-v2-vl` (VERIFY) |
 | `NEMOTRON_AGENT_MODEL` | worker | VERIFY on build.nvidia.com |
-| `S3_ENDPOINT` | web, worker | Vultr Object Storage endpoint, e.g. `https://<region>.vultrobjects.com` |
+| `S3_ENDPOINT` | web, worker | S3-compatible endpoint (not Vultr-specific), e.g. `https://<host>` |
 | `S3_REGION`, `S3_BUCKET` | web, worker | |
 | `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | web, worker | **secret** |
 | `NOMINATIM_USER_AGENT` | web | a generic app name + site URL, e.g. `ProjectAftermath/0.1 (+https://<domain>)`. No personal email |

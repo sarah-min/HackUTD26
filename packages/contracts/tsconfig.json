@@ -1,7 +1,5 @@
 {
   // index.ts re-exports every domain file (CONTRACTS.md §0).
-  // Placeholder stubs for assessment/agent/verification/finance exist so the workspace typechecks;
-  // replace them with P3/P4's real files on merge (do not combine).
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",

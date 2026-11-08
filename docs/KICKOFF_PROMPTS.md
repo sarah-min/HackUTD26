@@ -52,14 +52,15 @@ Never edit files outside your list; requests go in status/part3.md. Branch part3
 ## Part 4: Recovery Navigator & Infra
 
 ```text
-You are the coding agent for PART 4 (Recovery Navigator & Infra: PNC + Vultr + domain) of a 4-person HackUTD 2026 project.
+You are the coding agent for PART 4 (Recovery Navigator + storage APIs; PNC) of a 4-person HackUTD 2026 project.
 Two views: (1) Reporter: anyone at the scene films a property and submits it. (2) Affected person: the resident verifies address + ID and receives the full report and your Recovery Navigator. Only verified affected persons ever see finances.
+Hosting is **Brev (Part 3)** — not Vultr. Do not provision VMs or Vultr Object Storage.
 
 Before coding, read AGENTS.md, IDEA.md, ARCHITECTURE.md §7 and §9, CONTRACTS.md (finance, finance formulas, HTTP API, env), IMPLEMENTATION_PLAN.md (sections 2–4 and P4), WORKFLOW.md and docs/DEPLOYMENT.md, then status/part4.md.
-You own ONLY the P4 "Owned files": packages/finance, packages/storage, contracts finance.ts, /affected/property/[propertyId]/recovery/**, components/finance (<RecoverySummaryCard>), /api/uploads, /api/media, /api/health, infra/**, compose/Dockerfiles, .env.example, docs/DEPLOYMENT.md, fixtures/finance.
-First hour: T4.1 Vultr VM + bucket + domain started; T4.2 StoragePort; T4.3 presign (kind=media|idv) + media (verified-only, never serve idv/) + health; personas + buildRecoveryPlan against a fixture assessment.
+You own ONLY the P4 "Owned files": packages/finance, packages/storage, contracts finance.ts, /affected/property/[propertyId]/recovery/**, components/finance (<RecoverySummaryCard>), /api/uploads, /api/media, /api/health, .env.example, docs/DEPLOYMENT.md, fixtures/finance.
+First hour: T4.2 StoragePort; T4.3 presign (kind=media|idv) + media (verified-only, never serve idv/) + health; personas + buildRecoveryPlan against a fixture assessment. Coordinate S3-compatible bucket endpoint with P3.
 Hard rules: money is integer cents, rates are bps; the engine and simulate() are pure; personas are labeled synthetic; output says "educational, not financial advice"; never put secrets in files or NEXT_PUBLIC vars.
-Never edit files outside your list; the worker registry belongs to P3, so ask them to register your plan/coach handlers and build_recovery_plan tool. Branch part4/<topic>, small commits, `pnpm check` before pushing, log in status/part4.md (including the cost ledger). Don't run git commit/push yourself unless I ask; give me the commands.
+Never edit files outside your list; the worker registry and Brev/infra belong to P3, so ask them to register your plan/coach handlers and build_recovery_plan tool. Branch part4/<topic>, small commits, `pnpm check` before pushing, log in status/part4.md. Don't run git commit/push yourself unless I ask; give me the commands.
 ```
 
 ---

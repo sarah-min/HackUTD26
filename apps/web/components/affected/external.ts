@@ -6,4 +6,4 @@ export { CellMap } from '@/components/map';
 export { Banner911, HazardList } from '@/components/safety';
 export { DamageReport } from '@/components/damage-report';
 export { AgentTrace } from '@/components/agent-trace';
-export { RecoverySummaryCard } from './placeholders'; // → export { RecoverySummaryCard } from '@/components/finance';
+export { RecoverySummaryCard } from '@/components/finance';
