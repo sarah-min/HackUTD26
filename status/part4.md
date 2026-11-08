@@ -5,9 +5,17 @@ Owner: Roselyn. Append-only, newest entry first. Format is in [STATUS.md](../STA
 ## Requests to other parts (open)
 
 - **P2 (Sidd):** `c20050ec1127b417108012e8359d013e783d4186e6a0bad9f1c4a0db7c448468` is registered as worker on **dev**; still needs the same on **prod** (`aftermath-hackutd`) if we run against it. Local fake-worker restarted on `aftermath-hackutd-dev` after stale connection (report 14 / job 18).
-- **P3 (Nemotron / Brev):** Register `planHandler` and `coachHandler` from `@hack/finance` in `apps/worker/src/handlers/index.ts` (one import + one registry line each). Hosting stays Brev. Live HTTPS URL when ready. **Check the job queue before starting a local worker on shared dev.**
+- **P3 (Nemotron / Brev):** Hosting stays Brev. Live HTTPS URL when ready. **Check the job queue before starting a local worker on shared dev.** (`planHandler` / `coachHandler` already registered on main.)
 - **P2:** Confirm web identity registered as `web` if any legacy `/api/media` auth is kept. `RecoverySummaryCard` is already flipped on reconcile-p4.
 - **P1:** Confirm workspace members `@hack/finance` + `@hack/storage` + `@hack/damage` on main. **Also:** `part4/updatedfront-ui` prioritizes Updatedfront Mapbox maps inside `components/map/**` and the Updatedfront home/shell. Plan still listed Leaflet — please confirm Mapbox is OK for demo or re-home ownership.
+
+## 2026-11-08 07:50: Remove fixture Recovery Navigator preview (branch part4/remove-recovery-preview)
+
+- **Shipped:** Deleted `RecoveryFixturePreview` and `/affected/property/[propertyId]/recovery/preview` (dummy route that should not have shipped).
+- **Verify:** `/affected/property/0/recovery/preview` → 404; live `/recovery` unchanged.
+- **Fixtures still faked:** none new.
+- **Requests to other parts:** none.
+- **Blocked on:** none.
 
 ## 2026-11-08 06:45: Plan subject filter + delete presign + restart fake-worker (branch part4/updatedfront-ui)
 
