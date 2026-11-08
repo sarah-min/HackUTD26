@@ -92,13 +92,22 @@ pnpm verify:identity -- STDB_SERVICE_TOKEN [aftermath-hackutd]
 
 ## 5. Seed data
 
-`scripts/seed-demo.ts` is being written by another agent. **It may not exist yet (unverified).** If it does:
+`scripts/seed-demo.ts` exists and works (verified live on dev and prod, 2026-11-08). It creates 11 fixture reports in 3 cells near UT Dallas through the real reducers.
 
 ```bash
-cd scripts && pnpm seed:demo        # or: pnpm --filter @hack/scripts seed:demo
+cd scripts && pnpm seed:demo -- --dry-run     # print the plan only
+cd scripts && pnpm seed:demo                  # seed dev (refuses non -dev databases)
 ```
 
-Seed rows must be labelled `fixture`. Don't seed prod without the script's explicit prod flag. Without seed data, the area map is empty until real reports exist.
+**Prod:** the script refuses unless you pass `--i-know-this-is-prod`, and it needs a worker identity. Register the dev fake worker on prod temporarily (`admin_add_service "<DEV_WORKER_IDENTITY>" '"worker"'`), run `STDB_MODULE=aftermath-hackutd pnpm seed:demo -- --i-know-this-is-prod`, then remove it again with `spacetime sql --server maincloud aftermath-hackutd "DELETE FROM service_identity WHERE identity = 0x<DEV_WORKER_IDENTITY>"`.
+
+**After every seed, mark the reports as fixture** (`create_report` hardcodes `source = 'live'`, and the seed can't change it). Run this on each seeded database, and only when every report in it is seed data:
+
+```bash
+spacetime sql --server maincloud <db> "UPDATE report SET source = 'fixture' WHERE source = 'live'"
+```
+
+The map only counts the last 72 hours, so seed again close to the demo. Re-seeding needs a wipe first, because the script skips cells that already have their reports. Without seed data, the area map is empty until real reports exist.
 
 ## 6. Smoke test
 
