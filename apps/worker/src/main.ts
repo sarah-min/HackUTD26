@@ -1,5 +1,5 @@
 import { NimClient, createLogger } from '@hack/agent';
-import { loadEnv } from './env';
+import { PROD_MODULE, loadEnv } from './env';
 import { handlers } from './handlers';
 import { Runner } from './runner';
 import { SdkServiceConnection } from './stdb/sdk';
@@ -9,6 +9,7 @@ const log = createLogger('worker');
 
 async function main(): Promise<void> {
   const env = loadEnv();
+  if (env.STDB_MODULE === PROD_MODULE) log.warn('connected to the PRODUCTION database (demo); use aftermath-hackutd-dev while building');
   const stdb = await SdkServiceConnection.connect({ uri: env.STDB_URI, module: env.STDB_MODULE, token: env.STDB_SERVICE_TOKEN });
   const storage = createStorageFromEnv();
   const nim = NimClient.fromEnv();

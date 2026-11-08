@@ -12,16 +12,23 @@ Env (CONTRACTS §10): `STDB_URI`, `STDB_MODULE`, `STDB_SERVICE_TOKEN`, `NEMOTRON
 
 Models run on our own Vultr GPU instance (vLLM), not NVIDIA's hosted API: see [model-server/README.md](model-server/README.md).
 
-## Connect to Part 2's backend (once per database)
+## Connect to Part 2's backend
 
-Build against `STDB_MODULE=aftermath-hackutd-dev`; prod `aftermath-hackutd` is for the demo only.
-`STDB_URI=https://maincloud.spacetimedb.com` (the SDK upgrades it to a WebSocket).
+The worker identity is **registered as `worker` on both databases** (Sidd, 2026-11-07). One token works for both:
 
-1. `pnpm --filter @hack/worker identity` mints the worker's identity. It prints the identity hex and saves the token
-   (secret) to `~/.config/aftermath/worker-token-<module>`. Put the token in the worker's env as `STDB_SERVICE_TOKEN`.
-2. Send the **identity hex** (never the token) to Sidd, who registers it:
-   `spacetime call --server maincloud <db> admin_add_service '"<hex>"' '"worker"'`. Until then every service reducer
-   fails with `unauthorized: service only` and the `svc_*` views are empty.
+| | `STDB_MODULE` |
+|---|---|
+| Building and testing | `aftermath-hackutd-dev` (the default) |
+| Demo only | `aftermath-hackutd` (the worker logs a warning) |
+
+`STDB_URI` defaults to `https://maincloud.spacetimedb.com`. Set `STDB_SERVICE_TOKEN` to the worker token (a secret;
+never commit or paste it).
+
+`pnpm --filter @hack/worker identity` prints the identity. It reuses `~/.config/aftermath/worker-token` (or
+`STDB_SERVICE_TOKEN`) and only mints a new identity if neither exists; a new one must be registered by Sidd on both
+databases (`admin_add_service '"<hex>"' '"worker"'`) before service reducers stop failing with `unauthorized: service only`.
+
+Live check against the dev database without a GPU or bucket: `pnpm --filter @hack/worker e2e:dev` (see below).
 
 ## How it works
 - Connects with the SpacetimeDB SDK and Part 2's generated `@hack/stdb-bindings`, and subscribes to the worker-only
@@ -41,3 +48,11 @@ Build against `STDB_MODULE=aftermath-hackutd-dev`; prod `aftermath-hackutd` is f
 - `USE_FIXTURES=true` uses labeled fixture model output (`fixtures/assessment`), never passed off as live.
 
 Smoke test the model server first: `node --env-file=.env.local --import tsx scripts/smoke-nim.ts --image <public-domain photo>`.
+
+## Live end-to-end check (dev database only)
+
+`pnpm --filter @hack/worker e2e:dev` (reads `../../.env.local`; needs `STDB_SERVICE_TOKEN`) runs the real job loop
+against `aftermath-hackutd-dev` with fixture model output and in-memory storage: an anonymous reporter files a report
+with one photo, the worker analyzes it, an anonymous affected person verifies with a placeholder ID, and the script
+checks every row the app reads. It refuses any database not ending in `-dev`. It writes test rows (notes
+"P3 E2E TEST (fixture)", assessment `source: "fixture"`).

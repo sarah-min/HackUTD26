@@ -8,7 +8,8 @@
     "start": "tsx src/main.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "identity": "tsx src/identity.ts"
+    "identity": "tsx src/identity.ts",
+    "e2e:dev": "tsx --env-file-if-exists=../../.env.local scripts/e2e-dev.ts"
   },
   "dependencies": {
     "@hack/address": "workspace:*",
