@@ -1,0 +1,19 @@
+{
+  "name": "@hack/scripts",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Dev/admin scripts. smoke-p2 + dev-fake-worker (Part 2) target the -dev database only.",
+  "scripts": {
+    "smoke:p2": "tsx --tsconfig tsconfig.run.json smoke-p2.ts",
+    "fake-worker": "tsx --tsconfig tsconfig.run.json dev-fake-worker.ts"
+  },
+  "dependencies": {
+    "spacetimedb": "2.13.0"
+  },
+  "devDependencies": {
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "@types/node": "24.10.1"
+  }
+}

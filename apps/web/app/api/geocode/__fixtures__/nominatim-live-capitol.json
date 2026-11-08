@@ -1,0 +1,34 @@
+{
+ "place_id": 316991024,
+ "licence": "Data \u00a9 OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+ "osm_type": "node",
+ "osm_id": 6879997373,
+ "lat": "30.2746740",
+ "lon": "-97.7403430",
+ "category": "tourism",
+ "type": "artwork",
+ "place_rank": 30,
+ "importance": 7.494392309448413e-05,
+ "addresstype": "tourism",
+ "name": "Goddess of Liberty",
+ "display_name": "Goddess of Liberty, 112, East 11th Street, Downtown, Austin, Travis County, Texas, 78701, United States",
+ "address": {
+  "tourism": "Goddess of Liberty",
+  "house_number": "112",
+  "road": "East 11th Street",
+  "neighbourhood": "Downtown",
+  "city": "Austin",
+  "county": "Travis County",
+  "state": "Texas",
+  "ISO3166-2-lvl4": "US-TX",
+  "postcode": "78701",
+  "country": "United States",
+  "country_code": "us"
+ },
+ "boundingbox": [
+  "30.2746240",
+  "30.2747240",
+  "-97.7403930",
+  "-97.7402930"
+ ]
+}
